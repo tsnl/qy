@@ -92,7 +92,6 @@ postfixExp
     : through=primaryExp                            #throughPostfixExp
     | called_exp=postfixExp arg=wrappedExp          #callExp
     | called_ts=primaryTypeSpec arg=wrappedExp      #constructionExp
-    | lhs=postfixExp ':' str_key=VID                #dotMethodExp
     | lhs=postfixExp '.' str_key=VID                #dotNameKeyExp
     | lhs=postfixExp '.' int_key=intPrimaryExp      #dotIntKeyExp
     ;
@@ -106,8 +105,8 @@ unaryOp
     | '+'
     | '-'
     | '*'
-    | '&' 'mut'
-    | '&'
+    | '^' 'mut'
+    | '^'
     ;
 
 binaryExp
@@ -142,11 +141,11 @@ eqBinaryExp
     ;
 logicalAndBinaryExp
     : through=eqBinaryExp
-    | lt=logicalAndBinaryExp op='and' rt=eqBinaryExp
+    | lt=logicalAndBinaryExp op='&' rt=eqBinaryExp
     ;
 logicalOrBinaryExp
     : through=logicalAndBinaryExp
-    | lt=logicalOrBinaryExp op='or' rt=logicalAndBinaryExp
+    | lt=logicalOrBinaryExp op='|' rt=logicalAndBinaryExp
     ;
 
 assignExp
@@ -196,7 +195,7 @@ unaryTypeSpec
     | 'Slice' '[' t=typeSpec ']'                   #sliceTypeSpec
     | 'Opt' '[' it=typeSpec ']'                    #optTypeSpec
     | '^' ts=typeSpec                              #immutablePtrTypeSpec
-    | '&' ts=typeSpec                              #mutablePtrTypeSpec
+    | '^' 'mut' ts=typeSpec                        #mutablePtrTypeSpec
     ;
 binaryTypeSpec
     : through=unaryTypeSpec                         #throughBinaryTypeSpec
@@ -208,8 +207,9 @@ binaryTypeSpec
 //
 
 // IMPORTANT: CID before TID
-TID: ('_'*) (U) (L|U|D|'_')* ;
-VID: ('_'*) (L) (L|U|D|'_')* ;
+TID : ('_'*) (U)   (L|U|D|'_')* ;
+VID : ('_'*) (L)   (L|U|D|'_')*
+    | ('_'*) ('_') (L|D|'_')*;
 
 DEC_INT:             D (D|'_')* INT_SUFFIX?;
 HEX_INT: ('0x'|'0X') H (H|'_')* INT_SUFFIX?;
