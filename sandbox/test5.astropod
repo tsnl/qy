@@ -1,0 +1,7 @@
+hello = (x, y) -> {
+    w = x;
+    (x, y, w)
+};
+
+zero1 = hello(0, 42f);
+zero2 = hello(0, 42f);

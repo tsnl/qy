@@ -1,0 +1,67 @@
+imports {
+    helper from "./helper.astro" exposing {
+        name1, name2, name3
+    };
+};
+
+INumber = Interface {
+    requires {
+        from_float :: (IFloat) -> Self;
+        from_int :: (IInteger) -> Self;
+        add :: (Self) -> (Self) -> Self;
+        mul :: (Self) -> (Self) -> Self;
+    };
+    provides {};
+};
+
+# Number: INumber by {};
+
+Vector3 = Struct {
+    x: INumber;
+    y: INumber;
+    z: INumber;
+};
+
+add = (v, w) -> {
+    v: Vector3;
+    w: Vector3;
+
+    Vector3 (
+        v.x + w.x,
+        v.y + w.y,
+        v.z + w.z
+    )
+};
+
+#
+# Immutable bound elements:
+#
+
+a1: Int16;
+a2: Int16;
+a3: Int16;
+a4: Int16;
+
+a1 = 42;
+a2 = 43;
+a3 = 44;
+a4 = "Hello, world!\n";
+
+a5 = """
+#version 330
+
+layout(location=0) in vec3f model_pos;
+layout(location=1) in mat4  mvp_matrix;
+
+void main() {
+    gl_Position = vec4f(mvp_matrix * model_pos)
+}
+""";
+
+omega = if 0b {
+    1
+} else if 1b {
+    0
+} else {
+    2
+};
