@@ -1,0 +1,29 @@
+exports {
+    vec:{*}
+};
+
+mod vec [T] {
+    Vec2 = impl[T,2]:Vector;
+    Vec3 = impl[T,3]:Vector;
+    add2 = impl[T,2]:add;
+    add3 = impl[T,3]:add;
+};
+
+mod impl [T, n] {
+    n :: UInt32;
+    Vector = Array[T,n];
+    BinOpFn = (T, T) -> T;
+    help_apply_piecewise_bin_op :: (Vector, Vector, BinOpFn) -> Vector;
+
+    help_apply_piecewise_bin_op = (v1, v2, bin_op_fn) -> {
+        results = ^mut Array[T,n];
+        for i = ^mut 0; *i < n; i := *i + 1 {
+            results<i> := bin_op_fn(v1<i>, v2<i>);
+        };
+        Vector(*result)
+    };
+
+    add = (v1, v2) -> {
+        help_apply_piecewise_bin_op(v1, v2, (x, y) -> x + y)
+    };
+};

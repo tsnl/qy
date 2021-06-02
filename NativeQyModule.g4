@@ -5,24 +5,38 @@ options {
 }
 
 //
-// Tables & Elements:
+// Module definitions:
 //
 
-module
-    : (imports=moduleImports ';')? (params=moduleParams ';')? (elements+=tableElement ';')*
+topModule
+    : (imports=moduleImports ';')? (exports=moduleExports ';')? (moduleDefs+=moduleDef ';')*
     ;
+
 moduleImports
     : 'imports' '{' (lines+=importLine ';')* '}'
-    ;
-moduleParams
-    : 'params' '[' arg_names+=(VID|TID) (',' arg_names+=(VID|TID))* ']'
     ;
 importLine
     : name=VID 'from' path=stringPrimaryExp
     ;
 
+moduleExports
+    : 'exports' '{' mod_names+=exportLine (',' arg_names+=exportLine)* '}'
+    ;
+exportLine
+    : name=VID ':' '*'
+    ;
+
+moduleDef
+    : 'mod' name=VID ('<' args+=(VID|TID) (',' args+=(VID|TID))* '>')? body=tableWrapper
+    ;
+
+//
+// Tables & Elements:
+//
+
+
 tableElement
-    : lhs_id=VID ':' ts=typeSpec         #typeValIdElement
+    : lhs_id=VID '::' ts=typeSpec        #typeValIdElement
     | lhs_id=VID '=' init_exp=expr       #bindValIdElement
     | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
     | eval_exp=expr                      #forceEvalChainElement
@@ -35,17 +49,18 @@ chainTableWrapper
     : '{' (elements+=tableElement ';')* (tail=expr)? '}'
     ;
 
+
 //
 // Module address prefixes:
 //
 
 moduleAddressPrefix
-    :                            container_mod_name=VID ('[' args+=actualTemplateArg ']')? '::'
-    | prefix=moduleAddressPrefix container_mod_name=VID ('[' args+=actualTemplateArg ']')? '::'
+    :                            container_mod_name=VID ('[' args+=actualTemplateArg ']')? ':'
+    | prefix=moduleAddressPrefix container_mod_name=VID ('[' args+=actualTemplateArg ']')? ':'
     ;
 actualTemplateArg
-    : value=expr
-    | type_spec=typeSpec
+    : e=expr
+    | t=typeSpec
     ;
 
 //
@@ -64,7 +79,7 @@ wrappedExp
 
 primaryExp
     : tk=VID                                #idExp
-    | prefix=moduleAddressPrefix suffix=VID #moduleAddressPrefixedIdExp
+    | prefix=moduleAddressPrefix suffix=VID #idExpInModule
     | through=intPrimaryExp                 #throughIntPrimaryExp
     | tk=DEC_FLOAT                          #decFloatExp
     | it=stringPrimaryExp                   #stringExp
@@ -91,6 +106,7 @@ stringChunk
 postfixExp
     : through=primaryExp                            #throughPostfixExp
     | called_exp=postfixExp arg=wrappedExp          #callExp
+    | container_exp=postfixExp '[' ix=expr ']'      #getArrayElementExp
     | called_ts=primaryTypeSpec arg=wrappedExp      #constructionExp
     | lhs=postfixExp '.' str_key=VID                #dotNameKeyExp
     | lhs=postfixExp '.' int_key=intPrimaryExp      #dotIntKeyExp
@@ -183,19 +199,17 @@ parenTypeSpec
     ;
 primaryTypeSpec
     : tk=TID                                    #idTypeSpec
-    | prefix=moduleAddressPrefix suffix=TID     #moduleAddressPrefixedIdTypeSpec
+    | prefix=moduleAddressPrefix suffix=TID     #idTypeSpecInModule
     | through=parenTypeSpec                     #throughParenTypeSpec
     ;
 unaryTypeSpec
-    : through=primaryTypeSpec                      #throughUnaryTypeSpec
-    | 'Struct' elements=tableWrapper               #structTypeSpec
-    | 'Enum' elements=tableWrapper                 #taggedUnionTypeSpec
-    | 'Union' elements=tableWrapper                #untaggedUnionTypeSpec
-    | 'Array' '[' t=typeSpec ',' n=expr ']'        #arrayTypeSpec
-    | 'Slice' '[' t=typeSpec ']'                   #sliceTypeSpec
-    | 'Opt' '[' it=typeSpec ']'                    #optTypeSpec
-    | '^' ts=typeSpec                              #immutablePtrTypeSpec
-    | '^' 'mut' ts=typeSpec                        #mutablePtrTypeSpec
+    : through=primaryTypeSpec                           #throughUnaryTypeSpec
+    | 'Struct' elements=tableWrapper                    #structTypeSpec
+    | 'Enum' elements=tableWrapper                      #taggedUnionTypeSpec
+    | 'Union' elements=tableWrapper                     #untaggedUnionTypeSpec
+    | (is_mut='mut')? '[' t=typeSpec ',' n=expr ']'     #arrayTypeSpec
+    | (is_mut='mut')? '[' t=typeSpec ',' '?' ']'        #sliceTypeSpec
+    | (is_mut='mut')? '[' t=typeSpec ']'                #ptrTypeSpec
     ;
 binaryTypeSpec
     : through=unaryTypeSpec                         #throughBinaryTypeSpec

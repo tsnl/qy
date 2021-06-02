@@ -1,0 +1,23 @@
+mod test4 {
+    Vec2f = struct {
+        x :: F32;
+        y :: F32;
+    };
+
+    Vec3f = struct {
+        v2 :: Vec2f;
+        z :: F32;
+    };
+
+    PixelComponent = enum {
+        red :: ();
+        green :: ();
+        blue :: ();
+    };
+
+    p1 = Vec3f((0f, 0f), 0f);
+    p1_v2 = p1.v2;
+    x1 = p1.v2.x;
+    y1 = p1.v2.y;
+    z1 = p1.z;
+};

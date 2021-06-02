@@ -1,0 +1,15 @@
+mod test3 {
+    fake_predecessor = (x) -> {x};
+
+    fake_multiply = (i, j) -> {j};
+
+    factorial = (x) -> {
+    #    if (x == 0) {
+        fake_multiply (x, fake_predecessor(x))
+    #    } else {
+    #        fake_predecessor(0)
+    #    }
+    };
+
+    w = fake_multiply(0, 1f);
+};
