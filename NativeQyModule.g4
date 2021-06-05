@@ -121,8 +121,6 @@ unaryOp
     | '+'
     | '-'
     | '*'
-    | '^' 'mut'
-    | '^'
     ;
 
 binaryExp

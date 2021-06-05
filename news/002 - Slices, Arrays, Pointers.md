@@ -39,7 +39,8 @@ The unified syntax to type this is...
         - too spooky: no way to load from an array at index as well as set to a pointer without overloading/refs
     - only pointers support `*` to de-reference, but there is no `get-pointer-to` syntax.
         - `int const* x = &42` in C++ would be replaced by `x = new(42)`
-        - this is because `&` in C++ uses the fact that memory for the argument is stored on the stack first
+        - this is because `&` in C++ uses the fact that memory for the argument is stored on the stack or data segment 
+          first
 
 When the program begins execution, it has no memory views.
 A program may acquire a memory view from an allocator or any function.
@@ -63,6 +64,8 @@ Use the built-in `new <memory-view-constructor>` allocator to allocate memory.
     - `new mut[T^n]` returns an array or slice with mutable elements with each element un-initialized
     - `new mut[T^n](x)` is as above, but also initializes each element with `x :: T`
 
+Finally, `array[index]` and `slice[index]` return pointers.
+
 Note that every allocator simply returns a slice. This means there is no way to allocate a pointer.
 This is intentional.
 
@@ -71,18 +74,18 @@ mod print_fib {
     print_until = (n) -> {
         fibonacci_table :: mut[UInt64, ?];
         fibonacci_table = new mut[UInt64, n];
-        if n > 0 {
+        if (n > 0) {
             print_int(0);
             print_newline();
         };
-        if n > 1 {
+        if (n > 1) {
             print_int(1);
             print_newline();
         };
-        if n > 2 {
+        if (n > 2) {
             fibonacci_table[0] := 0;
             fibonacci_table[1] := 1;
-            for i = new mut(2); *i < n; i := *i + 1 {
+            for (i = new mut(2); *i < n; i := *i + 1) {
                 x0 = *fibonacci_table[i-1];
                 x1 = *fibonacci_table[i-2];
                 sum = x0 + x1;
@@ -118,9 +121,9 @@ mod vec <T, dim> {
     MutVec = mut[T, dim]; 
 }; 
 ```
-
 ---
 
 Applied changes to array syntax.
 
 TODO: add `new`
+- removed '^' and '^mut'
