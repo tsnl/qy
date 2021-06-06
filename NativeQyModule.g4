@@ -121,8 +121,6 @@ unaryOp
     | '+'
     | '-'
     | '*'
-    | '^' 'mut'
-    | '^'
     ;
 
 binaryExp
@@ -173,6 +171,7 @@ bulkyExp
     : through=assignExp
     | if_exp=ifExp
     | fn_exp=fnExp
+    | new_exp=newExp
     ;
 ifExp
     : 'if' cond=binaryExp then_branch=chainPrimaryExp ('else' opt_else_branch=elseBranchExp)?
@@ -183,6 +182,13 @@ elseBranchExp
     ;
 fnExp
     : '(' (args+=VID ',')* (args+=VID)? ')' '->' body=expr
+    ;
+newExp
+    : allocator_hint=newExpAllocatorHint '(' initializer=expr ')'
+    | allocator_hint=newExpAllocatorHint '[' collection_ts=typeSpec '^' (size=expr|'?') ']' ('(' initializer=expr ')')?
+    ;
+newExpAllocatorHint
+    : allocator_hint=('make'|'push')
     ;
 
 //
