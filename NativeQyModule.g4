@@ -90,7 +90,9 @@ intPrimaryExp
     | tk=HEX_INT    #hexIntExp
     ;
 chainPrimaryExp
-    : wrapper=chainTableWrapper
+    :                 wrapper=chainTableWrapper
+    | primaryTypeSpec wrapper=chainTableWrapper
+    | effectsSpec     wrapper=chainTableWrapper
     ;
 
 stringPrimaryExp
@@ -107,7 +109,6 @@ postfixExp
     : through=primaryExp                            #throughPostfixExp
     | called_exp=postfixExp arg=wrappedExp          #callExp
     | container_exp=postfixExp '[' ix=expr ']'      #getArrayElementExp
-    | called_ts=primaryTypeSpec arg=wrappedExp      #constructionExp
     | lhs=postfixExp '.' str_key=VID                #dotNameKeyExp
     | lhs=postfixExp '.' int_key=intPrimaryExp      #dotIntKeyExp
     ;
@@ -120,7 +121,6 @@ unaryOp
     : 'not'
     | '+'
     | '-'
-    | '*'
     ;
 
 binaryExp
@@ -220,6 +220,14 @@ unaryTypeSpec
 binaryTypeSpec
     : through=unaryTypeSpec                         #throughBinaryTypeSpec
     | lt=parenTypeSpec '->' rt=binaryTypeSpec       #fnSgnTypeSpec
+    ;
+
+//
+// Effects specifiers:
+//
+
+effectsSpec
+    : kw=('TOT'|'DV'|'ST'|'EXN'|'ML')
     ;
 
 //
