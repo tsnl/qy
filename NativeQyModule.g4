@@ -41,7 +41,6 @@ tableElement
     | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
     | eval_exp=expr                      #forceEvalChainElement
     ;
-
 tableWrapper
     : '{' (elements+=tableElement ';')* '}'
     ;
@@ -106,11 +105,11 @@ stringChunk
     ;
 
 postfixExp
-    : through=primaryExp                            #throughPostfixExp
-    | called_exp=postfixExp arg=wrappedExp          #callExp
-    | container_exp=postfixExp '[' ix=expr ']'      #getArrayElementExp
-    | lhs=postfixExp '.' str_key=VID                #dotNameKeyExp
-    | lhs=postfixExp '.' int_key=intPrimaryExp      #dotIntKeyExp
+    : through=primaryExp                                    #throughPostfixExp
+    | called_exp=postfixExp (has_se='!')? arg=wrappedExp    #callExp
+    | container_exp=postfixExp '[' ix=expr ']'              #getArrayElementExp
+    | lhs=postfixExp '.' str_key=VID                        #dotNameKeyExp
+    | lhs=postfixExp '.' int_key=intPrimaryExp              #dotIntKeyExp
     ;
 
 unaryExp
@@ -253,8 +252,8 @@ fragment L: [a-z] ;
 fragment U: [A-Z] ;
 fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
-fragment INT_SUFFIX: (FLOAT_SUFFIX|[bBuUiI]) ;
-fragment FLOAT_SUFFIX: [fF] ;
+fragment INT_SUFFIX: (FLOAT_SUFFIX|[bBhHiIlLqQnN]) ;
+fragment FLOAT_SUFFIX: [efd] ;
 
 fragment ANY_ESC: (
     ('\\' ('\\' | 'n' | 'r' | 't')) |
