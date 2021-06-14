@@ -1,8 +1,8 @@
 """
-This system obtains types that make up other types, i.e. type 'elements'.
-- e.g. arg and return types for functions
-- e.g. field types for structs, unions, and enums
-- e.g. pointed types for pointers, arrays, and slices.
+This system obtains type that make up other type, i.e. type 'elements'.
+- e.g. arg and return type for functions
+- e.g. field type for structs, unions, and enums
+- e.g. pointed type for pointers, arrays, and slices.
 """
 
 import dataclasses

@@ -1,7 +1,0 @@
-NativeQyModule.interp
-NativeQyModule.tokens
-NativeQyModuleLexer.interp
-NativeQyModuleLexer.py
-NativeQyModuleLexer.tokens
-NativeQyModuleParser.py
-NativeQyModuleVisitor.py

@@ -126,6 +126,9 @@ This scheme excellently complements the `new` statements `push/make`.
   - we do not need to defer information and perform checks later
 
 This scheme lets us add compile-time-checked exceptions in the future.
+- since exceptions can be faster than branching for uncommon paths,
+- this could enable a whole class of optimizations by the programmer
+- statistical analysis can encourage conversion of if/match into exceptions
 
 IMPLEMENTATION
 

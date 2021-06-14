@@ -69,7 +69,7 @@ def of(tid: identity.TID):
         return f"{prefix_keyword} {{ {', '.join(field_text_iterator)} }}"
 
     elif type_kind in (kind.TK.BoundVar, kind.TK.FreeVar):
-        return var_names[tid]
+        return f"{tid}:{var_names[tid]}"
 
     else:
         raise NotImplementedError(f"`spell` for type of kind {type_kind}")

@@ -1,0 +1,5 @@
+# files cannot import themselves.
+
+imports {
+    oops1 from "oops1.qy";
+};

@@ -1,0 +1,3 @@
+imports {
+    t2 from "test2.qy";
+};

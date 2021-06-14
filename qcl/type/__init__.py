@@ -1,7 +1,7 @@
 """
 Each type is just a unique integer ID.
-Each sub-module of this package manages a system, or a co-located facet some types.
-We guarantee a structural type system using `functools.cache` + a nominal wrapper to create types.
+Each sub-module of this package manages a system, or a co-located facet some type.
+We guarantee a structural type system using `functools.cache` + a nominal wrapper to create type.
 """
 
 import functools
@@ -122,7 +122,11 @@ def new_module_type(field_elem_info_iterable: Iterable[elem.ElemInfo]) -> identi
     return tid
 
 
-@functools.cache
+#
+# NOTE: variable creation is not cached, even if the created variables share a name.
+#
+
+
 def new_bound_var(name: str) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.BoundVar)
@@ -130,7 +134,6 @@ def new_bound_var(name: str) -> identity.TID:
     return tid
 
 
-@functools.cache
 def new_free_var(name: str) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.FreeVar)

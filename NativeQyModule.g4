@@ -267,4 +267,4 @@ fragment ANY_ESC: (
 
 WS: (' '|'\t'|'\n') -> skip;
 
-LINE_COMMENT: ('#' ~('\n'|'\r')*) -> skip;
+LINE_COMMENT: ('#' ~('\n')*) -> skip;

@@ -62,3 +62,31 @@ NOTE:
       };
   };
   ```
+
+- note: EXN can handle OS signals rather than built-in interfaces
+  - TODO: ask Nitin if this violates 'the lattice'
+  - but `signal` is supported on Windows and Linux
+  - C++ forbids throwing exceptions in signal handlers, likely because it uses signals too
+      - signals invoke a separate stack, and cannot be recursed
+  - if we restrict signal handlers to `Tot` rather than `Dv`, we can pre-determine the maximum
+    size of the signal stack ahead of time.
+      - if we can determine the signal stack is quite small, this could make a whole class of
+        asynchronous, signal-based programming very, very efficient
+      - signal handlers receive the stack as an argument: we can forward this stack pointer 
+        to support continuations using exceptions in the future.
+
+---
+
+Jun 13
+
+Standard Library Ideas:
+
+- consider a template-based multithreading model based on Intel TBB
+  - https://software.intel.com/content/www/us/en/develop/documentation/onetbb-documentation/top.html
+
+- consider USD (Universal Scene Descriptor) support in the standard library?
+
+- consider a Vulkan wrapper?
+
+- allow imports relative to the working directory using `$`
+  - just substitute the `$` character for the project working dir path

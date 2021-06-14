@@ -10,6 +10,11 @@ class ParserCompilationError(CompilationError):
     pass
 
 
+class DependencyDispatchCompilationError(CompilationError):
+    def __init__(self, message_suffix):
+        super().__init__(message_suffix)
+
+
 class TyperCompilationError(CompilationError):
     pass
 

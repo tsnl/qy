@@ -1,14 +1,17 @@
 import os
 import os.path as path
 import argparse
+import traceback
 
 from qcl import fs_scaffold
+from qcl import fs_scaffold_builder
+from qcl import excepts
 
 
-def main(*raw_args_seq):
+def main():
     project = fs_scaffold.Project(os.getcwd())
 
-    args_obj = parse_args(raw_args_seq)
+    args_obj = parse_args()
     if not validate_args(args_obj):
         print_detailed_help()
         return 1
@@ -17,17 +20,33 @@ def main(*raw_args_seq):
     in_c_mode = args_obj.c_mode_entry_point is not None
 
     if in_c_mode:
-        # todo: run dependency dispatch here by recursively parsing and dispatching: build fs_scaffold
+        # build fs_scaffold: run dependency dispatch by recursively parsing and dispatching:
+        try:
+            sm_list = fs_scaffold_builder.build_scaffold_from(project, args_obj.c_mode_entry_point)
+        except (excepts.DependencyDispatchCompilationError, excepts.ParserCompilationError) as e:
+            # TODO: fold exception data into feedback, print, and exit elegantly.
+            raise e from e
+        else:
+            # DEBUG:
+            print(f"CWD: {project.abs_working_dir_path}")
+            print(f"LOADED {len(sm_list)} modules:")
+            for sm in sm_list:
+                print(f"- {sm.file_path}")
 
         # todo: run typer here on the fs_scaffold
+        print("WARNING: skipping typer")
 
         # todo: perform 'basic' checks: side-effect-specs respected, existence of initialization order
+        print("WARNING: skipping basic checks")
 
         # todo: perform SMT analysis: no de-referencing `nullptr`, pointer escape analysis with `push`
         #   - using Z3 library
+        print("WARNING: skipping SMT checks")
 
         # todo: emit LLVM IR from Qy and C/C++ source code in `fs_scaffold` (using `libclang`).
-        raise NotImplementedError("Compiler driver for C-mode")
+        print("WARNING: skipping emitting output")
+
+        return 0
 
     elif in_s_mode:
         raise NotImplementedError("Compiler driver for S-mode")
@@ -36,20 +55,20 @@ def main(*raw_args_seq):
         raise NotImplementedError("Unknown compiler mode.")
 
 
-def parse_args(raw_args_seq):
+def parse_args():
     arg_parser.add_argument(
-        '-s', '--server-mode', type=str, nargs=1,
-        dest='s_mode_cwd', default=None,
+        '-s', '--server-mode', type=str,
+        dest='s_mode_cwd', action='store',
         help="Run an LSP server using the parameter path as the working directory"
     )
     arg_parser.add_argument(
-        '-c', '--compiler-mode', type=str, nargs=1,
-        dest='c_mode_entry_point', default=None,
+        '-c', '--compiler-mode', type=str,
+        dest='c_mode_entry_point', action='store',
         help="Compile a source tree using the parameter path as the entry point, and its container directory as the "
              "working directory"
     )
 
-    args_obj = arg_parser.parse_args(raw_args_seq)
+    args_obj = arg_parser.parse_args()
 
     return args_obj
 
@@ -85,15 +104,7 @@ def eprint(message):
     print(f"CLI-ERROR: {message}")
 
 
-arg_parser = argparse.ArgumentParser(
-    description=qc_driver_desc.strip(),
-    allow_abbrev=True,
-    add_help=True
-)
-
-
-qc_driver_desc = (
-"""
+arg_parser_desc = """
 The Command-line QC Tool
 
 - run in either `compiler-mode` or `server-mode` (see below)
@@ -110,4 +121,8 @@ The Command-line QC Tool
         2. copied misc. text and binary files
     - locations of output files 
 """
+arg_parser = argparse.ArgumentParser(
+    description=arg_parser_desc.strip(),
+    allow_abbrev=True,
+    add_help=True
 )
