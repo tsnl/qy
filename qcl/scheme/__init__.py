@@ -1,4 +1,5 @@
 from typing import *
+import copy
 
 from qcl import type
 
@@ -17,6 +18,14 @@ class Scheme(object):
 
         if self.bound_vars:
             args_text = ', '.join(map(type.spelling.of, self.bound_vars))
-            return f"({args_text}) => {body_spelling}"
+            return f"∀ ({args_text}) {body_spelling}"
         else:
             return body_spelling
+
+    def sub_body(self, new_body):
+        """
+        :return: a new `Scheme` instance with the `body` attribute replaced by this argument.
+        """
+        new_scheme = copy.copy(self)
+        new_scheme.body = new_body
+        return new_body

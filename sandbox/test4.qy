@@ -1,15 +1,15 @@
 mod test4 {
-    Vec2f = struct {
+    Vec2f = Struct {
         x :: F32;
         y :: F32;
     };
 
-    Vec3f = struct {
+    Vec3f = Struct {
         v2 :: Vec2f;
         z :: F32;
     };
 
-    PixelComponent = enum {
+    PixelComponent = Enum {
         red :: ();
         green :: ();
         blue :: ();

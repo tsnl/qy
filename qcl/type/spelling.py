@@ -59,7 +59,7 @@ def of(tid: identity.TID):
             kind.TK.Union: "Union"
         }
 
-        elem_count = elem.count_elems(tid)
+        elem_count = elem.count(tid)
         prefix_keyword = prefix_keyword_map[type_kind]
         field_text_iterator = (
             of(elem.tid_of_field_ix(tid, i))

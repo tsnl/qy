@@ -1,5 +1,5 @@
 mod test5 {
-    hello = (x, y) -> {
+    hello = (x, y) -> Tot {
         w = x;
         (x, y, w)
     };

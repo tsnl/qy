@@ -18,6 +18,10 @@ def init_slice(slice_tid, is_mutable):
         mutable_tid_set.add(slice_tid)
 
 
+def ptr_or_array_or_slice(tid):
+    return tid in mutable_tid_set
+
+
 def ptr(ptr_tid):
     return ptr_tid in mutable_tid_set
 

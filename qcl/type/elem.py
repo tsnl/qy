@@ -5,8 +5,9 @@ This system obtains type that make up other type, i.e. type 'elements'.
 - e.g. pointed type for pointers, arrays, and slices.
 """
 
-import dataclasses
 from typing import *
+import dataclasses
+import copy
 
 from . import identity
 from . import kind
@@ -109,8 +110,12 @@ def init_module(tid: identity.TID, field_elem_info_tuple):
     return help_init_any(tid, elem_info_tuple=field_elem_info_tuple, allow_type_fields=True)
 
 
-def count_elems(tid: identity.TID):
+def count(tid: identity.TID):
     return len(components[tid].elem_info_tuple)
+
+
+def copy_elem_info_tuple(tid: identity.TID):
+    return copy.copy(components[tid].elem_info_tuple)
 
 
 def tid_of_fn_arg(tid: identity.TID):
@@ -119,6 +124,10 @@ def tid_of_fn_arg(tid: identity.TID):
 
 def tid_of_fn_ret(tid: identity.TID):
     return components[tid].elem_info_tuple[1]
+
+
+def field_name_at_ix(algebraic_tid: identity.TID, field_index: int):
+    return components[algebraic_tid].elem_info_tuple[field_index].name
 
 
 def tid_of_field_ix(algebraic_tid: identity.TID, field_index: int):

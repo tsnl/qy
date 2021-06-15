@@ -1,3 +1,4 @@
 imports {
+    test2 from "test2.qy";
     utils from "$/utils/test1.qy";
 };

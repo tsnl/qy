@@ -8,7 +8,7 @@ options {
 // Module definitions:
 //
 
-topModule
+fileModule
     : (imports=moduleImports ';')? (exports=moduleExports ';')? (moduleDefs+=moduleDef ';')*
     ;
 
@@ -20,7 +20,7 @@ importLine
     ;
 
 moduleExports
-    : 'exports' '{' mod_names+=exportLine (',' arg_names+=exportLine)* '}'
+    : 'exports' '{' lines+=exportLine (',' lines+=exportLine)* '}'
     ;
 exportLine
     : name=VID ':' '*'
@@ -54,8 +54,8 @@ chainTableWrapper
 //
 
 moduleAddressPrefix
-    :                            container_mod_name=VID ('[' args+=actualTemplateArg ']')? ':'
-    | prefix=moduleAddressPrefix container_mod_name=VID ('[' args+=actualTemplateArg ']')? ':'
+    :                            container_mod_name=VID ('<' args+=actualTemplateArg '>')? ':'
+    | prefix=moduleAddressPrefix container_mod_name=VID ('<' args+=actualTemplateArg '>')? ':'
     ;
 actualTemplateArg
     : e=expr
@@ -69,11 +69,24 @@ actualTemplateArg
 expr: bulkyExp
     ;
 
+parenWrappedExp
+    : '(' ')'                #unitExp
+    | '(' wrapped=expr ')'   #identityParenExp
+    | it=tuplePrimaryExp     #tupleExp
+    ;
 wrappedExp
-    : '(' ')'                                   #unitExp
-    | '(' wrapped=expr ')'                      #identityParenExp
-    | '(' items+=expr (',' items+=expr)* ')'    #tupleExp
-    | it=chainPrimaryExp                        #chainExp
+    : it=parenWrappedExp    #throughWrappedExp
+    | it=chainPrimaryExp    #chainExp
+    | it=castPrimaryExp     #castExp
+    ;
+tuplePrimaryExp
+    : '(' items+=expr (',' items+=expr)* ')'
+    ;
+chainPrimaryExp
+    : (es=effectsSpec)? (ts=primaryTypeSpec)? chain_table_wrapper=chainTableWrapper
+    ;
+castPrimaryExp
+    : ts=primaryTypeSpec data=parenWrappedExp
     ;
 
 primaryExp
@@ -87,11 +100,6 @@ primaryExp
 intPrimaryExp
     : tk=DEC_INT    #decIntExp
     | tk=HEX_INT    #hexIntExp
-    ;
-chainPrimaryExp
-    :                 wrapper=chainTableWrapper
-    | primaryTypeSpec wrapper=chainTableWrapper
-    | effectsSpec     wrapper=chainTableWrapper
     ;
 
 stringPrimaryExp
@@ -170,10 +178,10 @@ bulkyExp
     : through=assignExp
     | if_exp=ifExp
     | fn_exp=fnExp
-    | new_exp=newExp
+    | allocate_exp=allocateExp
     ;
 ifExp
-    : 'if' cond=binaryExp then_branch=chainPrimaryExp ('else' opt_else_branch=elseBranchExp)?
+    : 'if' cond=wrappedExp then_branch=chainPrimaryExp ('else' opt_else_branch=elseBranchExp)?
     ;
 elseBranchExp
     : chain_exp=chainPrimaryExp
@@ -182,13 +190,11 @@ elseBranchExp
 fnExp
     : '(' (args+=VID ',')* (args+=VID)? ')' '->' body=expr
     ;
-newExp
-    : allocator_hint=newExpAllocatorHint '(' initializer=expr ')'
-    | allocator_hint=newExpAllocatorHint '[' collection_ts=typeSpec '^' (size=expr|'?') ']' ('(' initializer=expr ')')?
+allocateExp
+    : hint=allocatorHint (initializer=parenWrappedExp)
+    | hint=allocatorHint '[' collection_ts=typeSpec '^' (size=expr|'?') ']' (initializer=parenWrappedExp)?
     ;
-newExpAllocatorHint
-    : allocator_hint=('make'|'push')
-    ;
+allocatorHint: 'make' | 'push' ;
 
 //
 // Type specs:
@@ -226,7 +232,7 @@ binaryTypeSpec
 //
 
 effectsSpec
-    : kw=('TOT'|'DV'|'ST'|'EXN'|'ML')
+    : kw=('Tot'|'Dv'|'ST'|'Exn'|'ML')
     ;
 
 //

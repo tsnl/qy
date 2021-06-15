@@ -1,0 +1,129 @@
+"""
+A substitution is a mapping from named type variables to types.
+"""
+
+from qcl import type
+from qcl import scheme
+
+from . import context
+
+
+class Substitution(object):
+    def __init__(self, sub_map=None):
+        super().__init__()
+        if sub_map is None:
+            self.sub_map = {}
+        else:
+            self.sub_map = sub_map
+
+    def __getitem__(self, tid: type.identity.TID):
+        pass
+
+    def __setitem__(self, replaced_tid: type.identity.TID, replacement_tid: type.identity.TID):
+        assert type.kind.of(replaced_tid) == type.kind.TK.FreeVar
+        self.sub_map[replaced_tid] = replacement_tid
+
+    def apply_to_scheme(self, s: scheme.Scheme):
+        if s.bound_vars:
+            sub_without_bound_vars = Substitution()
+            for k, v in self.sub_map.items():
+                if k not in s.bound_vars:
+                    sub_without_bound_vars[k] = v
+        else:
+            sub_without_bound_vars = self
+
+        new_body = sub_without_bound_vars.apply_to_type(s.body)
+
+        return s.sub_body(new_body)
+
+    def apply_to_type(self, tid: type.identity.TID):
+        t_kind = type.kind.of(tid)
+
+        # variables:
+        var_replacement = self.sub_map.get(tid, None)
+        if var_replacement is not None:
+            return var_replacement
+
+        # atoms:
+        primitive_tk_set = {
+            type.kind.TK.Unit, type.kind.TK.String,
+            type.kind.TK.SignedInt, type.kind.TK.UnsignedInt, type.kind.TK.Float
+        }
+        if t_kind in primitive_tk_set:
+            return tid
+
+        # memory views: ptr, array, slice
+        mem_view_tk_set = {
+            type.kind.TK.Pointer, type.kind.TK.Array, type.kind.TK.Slice
+        }
+        if t_kind in mem_view_tk_set:
+            replacement_ctor_map = {
+                type.kind.TK.Pointer: type.new_ptr_type,
+                type.kind.TK.Array: type.new_array_type,
+                type.kind.TK.Slice: type.new_slice_type
+            }
+            mem_view_is_mut = type.is_mut.ptr_or_array_or_slice(tid)
+            return replacement_ctor_map[t_kind](
+                self.apply_to_type(type.elem.tid_of_ptd(tid)),
+                mem_view_is_mut
+            )
+
+        # compounds: tuple, struct, union, enum, module
+        compound_tk_set = {
+            type.kind.TK.Tuple, type.kind.TK.Struct, type.kind.TK.Union, type.kind.TK.Enum,
+            type.kind.TK.Module
+        }
+        if t_kind in compound_tk_set:
+            replacement_elem_tid_list = []
+            for element_index in range(type.elem.count(tid)):
+                element_tid = type.elem.tid_of_field_ix(tid, element_index)
+                replacement_elem_tid = self.apply_to_type(element_tid)
+                replacement_elem_tid_list.append(replacement_elem_tid)
+
+            if t_kind == type.kind.TK.Tuple:
+                return type.new_tuple_type(replacement_elem_tid_list)
+            else:
+                replacement_elem_info_list = list(type.elem.copy_elem_info_tuple(tid))
+                for new_elem_info, replacement_field_tid in zip(replacement_elem_info_list, replacement_elem_tid_list):
+                    new_elem_info.tid = replacement_field_tid
+                replacement_elem_info_tuple = tuple(replacement_elem_info_list)
+
+                replacement_ctor_map = {
+                    type.kind.TK.Struct: type.new_struct_type,
+                    type.kind.TK.Enum: type.new_enum_type,
+                    type.kind.TK.Union: type.new_union_type,
+                    type.kind.TK.Module: type.new_module_type
+                }
+                return replacement_ctor_map[t_kind](replacement_elem_info_tuple)
+
+        # functions:
+        if t_kind == type.kind.TK.Fn:
+            return type.new_fn_type(
+                self.apply_to_type(type.elem.tid_of_fn_arg(tid)),
+                self.apply_to_type(type.elem.tid_of_fn_ret(tid)),
+                type.side_effects.of(tid)
+            )
+
+        # unknown:
+        raise NotImplementedError(f"Substitution.apply_to_type for TK {t_kind}")
+
+    def apply_to_context(self, ctx: "context.Context"):
+        new_symbol_table = {
+            def_name: def_obj.copy_with_new_scheme(self.apply_to_scheme(def_obj.scheme))
+            for def_name, def_obj in ctx.symbol_table.items()
+        }
+        return context.Context(symbol_table=new_symbol_table)
+
+    def compose(self, applied_first: "Substitution"):
+        # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1
+
+        s1 = self
+        s2 = applied_first
+
+        s1_sub_map = s1.sub_map
+        s2_sub_map = {
+            key: s1.apply_to_type(value)
+            for key, value in s2.sub_map.items()
+        }
+
+        return Substitution(sub_map=(s1_sub_map | s2_sub_map))

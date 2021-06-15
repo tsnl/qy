@@ -3,13 +3,13 @@ import os.path as path
 import argparse
 import traceback
 
-from qcl import fs_scaffold
-from qcl import fs_scaffold_builder
 from qcl import excepts
+from qcl import frontend
+from qcl import typer
 
 
 def main():
-    project = fs_scaffold.Project(os.getcwd())
+    project = frontend.Project(os.getcwd())
 
     args_obj = parse_args()
     if not validate_args(args_obj):
@@ -20,21 +20,28 @@ def main():
     in_c_mode = args_obj.c_mode_entry_point is not None
 
     if in_c_mode:
-        # build fs_scaffold: run dependency dispatch by recursively parsing and dispatching:
+        # build frontend: run dependency dispatch by recursively parsing and dispatching:
         try:
-            sm_list = fs_scaffold_builder.build_scaffold_from(project, args_obj.c_mode_entry_point)
+            sm_list = frontend.load_project(project, args_obj.c_mode_entry_point)
         except (excepts.DependencyDispatchCompilationError, excepts.ParserCompilationError) as e:
             # TODO: fold exception data into feedback, print, and exit elegantly.
             raise e from e
         else:
             # DEBUG:
-            print(f"CWD: {project.abs_working_dir_path}")
             print(f"LOADED {len(sm_list)} modules:")
+            print(f"* CWD: {project.abs_working_dir_path}")
             for sm in sm_list:
                 print(f"- {sm.file_path}")
 
-        # todo: run typer here on the fs_scaffold
-        print("WARNING: skipping typer")
+        # run typer on the frontend:
+        try:
+            typer.type_project(project)
+        except excepts.TyperCompilationError as e:
+            # TODO: fold exception data into feedback, print, and exit elegantly.
+            raise e from e
+        else:
+            # DEBUG:
+            print(f"INFO: Typer successful.")
 
         # todo: perform 'basic' checks: side-effect-specs respected, existence of initialization order
         print("WARNING: skipping basic checks")
@@ -43,7 +50,7 @@ def main():
         #   - using Z3 library
         print("WARNING: skipping SMT checks")
 
-        # todo: emit LLVM IR from Qy and C/C++ source code in `fs_scaffold` (using `libclang`).
+        # todo: emit LLVM IR from Qy and C/C++ source code in `frontend` (using `libclang`).
         print("WARNING: skipping emitting output")
 
         return 0

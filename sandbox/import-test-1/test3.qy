@@ -1,5 +1,4 @@
 imports {
     t2 from "test2.qy";
-    t1 from "test1.qy";
 };
 
