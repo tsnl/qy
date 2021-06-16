@@ -1,3 +1,4 @@
+from typing import *
 from os import path
 
 from . import file
@@ -27,7 +28,8 @@ class Project(object):
         return source_module
 
     def help_register_source_module(self, rel_path):
-        source_module_path = path.normpath(path.join(self.abs_working_dir_path, rel_path))
+        # source_module_path = path.normpath(path.join(self.abs_working_dir_path, rel_path))
+        source_module_path = path.normpath(rel_path)
 
         cached_source_module = self.all_sm_map.get(source_module_path, None)
         if cached_source_module is not None:

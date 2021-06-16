@@ -28,13 +28,15 @@ class ElemInfo:
     tid: identity.TID
     is_type_field: bool = False
 
+    def __hash__(self):
+        return hash((self.name, self.tid, self.is_type_field))
+
 
 def help_init_any(
         tid: identity.TID,
         elem_info_tuple, allow_type_fields=False
 ) -> ProjComponent:
     assert isinstance(elem_info_tuple, tuple)
-    assert elem_info_tuple
     assert all(map(lambda it: isinstance(it, ElemInfo), elem_info_tuple))
 
     # checking elem_info_tuples:
@@ -110,36 +112,36 @@ def init_module(tid: identity.TID, field_elem_info_tuple):
     return help_init_any(tid, elem_info_tuple=field_elem_info_tuple, allow_type_fields=True)
 
 
-def count(tid: identity.TID):
+def count(tid: identity.TID) -> int:
     return len(components[tid].elem_info_tuple)
 
 
-def copy_elem_info_tuple(tid: identity.TID):
+def copy_elem_info_tuple(tid: identity.TID) -> Tuple[ElemInfo]:
     return copy.copy(components[tid].elem_info_tuple)
 
 
-def tid_of_fn_arg(tid: identity.TID):
-    return components[tid].elem_info_tuple[0]
+def tid_of_fn_arg(tid: identity.TID) -> identity.TID:
+    return components[tid].elem_info_tuple[0].tid
 
 
-def tid_of_fn_ret(tid: identity.TID):
-    return components[tid].elem_info_tuple[1]
+def tid_of_fn_ret(tid: identity.TID) -> identity.TID:
+    return components[tid].elem_info_tuple[1].tid
 
 
-def field_name_at_ix(algebraic_tid: identity.TID, field_index: int):
+def field_name_at_ix(algebraic_tid: identity.TID, field_index: int) -> str:
     return components[algebraic_tid].elem_info_tuple[field_index].name
 
 
-def tid_of_field_ix(algebraic_tid: identity.TID, field_index: int):
+def tid_of_field_ix(algebraic_tid: identity.TID, field_index: int) -> identity.TID:
     assert field_index >= 0
     return components[algebraic_tid].elem_info_tuple[field_index].tid
 
 
-def is_type_field_at_field_ix(algebraic_tid: identity.TID, field_index: int):
+def is_type_field_at_field_ix(algebraic_tid: identity.TID, field_index: int) -> bool:
     return components[algebraic_tid].elem_info_tuple[field_index].is_type_field
 
 
-def field_ix_of_name(algebraic_tid: identity.TID, field_name: str):
+def field_ix_of_name(algebraic_tid: identity.TID, field_name: str) -> int:
     if components[algebraic_tid].field_name_index_lut is not None:
         # cache present for TIDs of this kind
         return components[algebraic_tid].field_name_index_lut.get(field_name, None)
@@ -148,6 +150,6 @@ def field_ix_of_name(algebraic_tid: identity.TID, field_name: str):
         raise NotImplementedError(f"No field index cache for type of kind {kind.of(algebraic_tid)}")
 
 
-def tid_of_ptd(tid: identity.TID):
+def tid_of_ptd(tid: identity.TID) -> identity.TID:
     assert kind.of(tid) in (kind.TK.Pointer, kind.TK.Array, kind.TK.Slice)
     return components[tid].elem_info_tuple[0].tid

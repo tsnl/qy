@@ -10,29 +10,23 @@ from qcl import type
 from .file import FileModuleSource
 
 
-cached_file_module_exp_map = {}
-
-
 def lazily_parse_module_file(source_module: FileModuleSource):
-    norm_source_file_path = source_module.file_path
+    if source_module.ast_file_mod_exp_from_frontend is not None:
+        return source_module.ast_file_mod_exp_from_frontend
 
-    cached_parse_tree = cached_file_module_exp_map.get(norm_source_file_path, None)
-    if cached_parse_tree is not None:
-        return cached_parse_tree
-
-    file_module_exp_node = parse_fresh_module_tree(norm_source_file_path)
-    cached_file_module_exp_map[norm_source_file_path] = file_module_exp_node
+    file_module_exp_node = parse_fresh_module_tree(source_module)
+    source_module.ast_file_mod_exp_from_frontend = file_module_exp_node
     return file_module_exp_node
 
 
-def parse_fresh_module_tree(norm_source_file_path):
-    if not path.isfile(norm_source_file_path):
-        raise excepts.ParserCompilationError(f"Source file does not exist: {norm_source_file_path}")
+def parse_fresh_module_tree(source_module: FileModuleSource):
+    if not path.isfile(source_module.file_path):
+        raise excepts.ParserCompilationError(f"Source file does not exist: {source_module.file_path_rel_cwd}")
 
     # NOTE: we first read the file into a Python string to...
     #   1. convert all CRLF ('\r\n') and CR ('\r') into LF ('\n'), therby normalizing input
     #   2. keep a copy of text and lines for error reporting later.
-    with open(norm_source_file_path, 'r') as source_file:
+    with open(source_module.file_path, 'r') as source_file:
         source_text = source_file.read()
         # source_lines = source_text.split('\n')
 
@@ -49,7 +43,7 @@ def parse_fresh_module_tree(norm_source_file_path):
 
     antlr_parse_tree = antlr_parser.fileModule()
 
-    file_module_exp_node = AstConstructorVisitor(norm_source_file_path).visit(antlr_parse_tree)
+    file_module_exp_node = AstConstructorVisitor(source_module).visit(antlr_parse_tree)
     return file_module_exp_node
 
 
@@ -75,9 +69,10 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     #
     #
 
-    def __init__(self, module_file_path):
+    def __init__(self, source_module: FileModuleSource):
         super().__init__()
-        self.module_file_path = module_file_path
+        self.source_module = source_module
+        self.module_file_path = self.source_module.file_path_rel_cwd
 
     def ctx_loc(self, ctx: antlr.ParserRuleContext):
         # setting the start line and column according to ANTLR:
@@ -110,8 +105,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     #
 
     def visitFileModule(self, ctx):
-        return ast.node.FileModuleExp(
+        return ast.node.FileModExp(
             self.ctx_loc(ctx),
+            self.source_module,
             self.visit(ctx.imports) if ctx.imports else {},
             self.visit(ctx.exports) if ctx.exports else [],
             dict((self.visit(mod_def) for mod_def in ctx.moduleDefs))
@@ -134,7 +130,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         module_args = [id_tok.text for id_tok in ctx.args]
         module_elements = self.visit(ctx.body)
 
-        module_exp = ast.node.SubModuleExp(self.ctx_loc(ctx), module_args, module_elements)
+        module_exp = ast.node.SubModExp(self.ctx_loc(ctx), module_args, module_elements)
 
         return module_name, module_exp
 
@@ -148,21 +144,21 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return [self.visit(element) for element in ctx.elements]
 
     def visitTypeValIdElement(self, ctx):
-        return ast.node.TypingValueIDElement(
+        return ast.node.Type1VElem(
             self.ctx_loc(ctx),
             ctx.lhs_id.text,
             self.visit(ctx.ts)
         )
 
     def visitBindValIdElement(self, ctx):
-        return ast.node.BindOneValueIDElement(
+        return ast.node.Bind1VElem(
             self.ctx_loc(ctx),
             ctx.lhs_id.text,
             self.visit(ctx.init_exp)
         )
 
     def visitBindTypeIdElement(self, ctx):
-        return ast.node.BindOneTypeIDElement(
+        return ast.node.Bind1TElem(
             self.ctx_loc(ctx),
             ctx.lhs_id.text,
             self.visit(ctx.init_ts)
@@ -180,6 +176,37 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitIdExp(self, ctx):
         return ast.node.IdExp(self.ctx_loc(ctx), ctx.tk.text)
+
+    def visitIdExpInModule(self, ctx):
+        container_exp = self.visit(ctx.prefix)
+        suffix_name = ctx.suffix.text
+
+        assert container_exp is not None
+
+        return ast.node.GetModElementExp(
+            self.ctx_loc(ctx),
+            opt_container=container_exp,
+            elem_name=suffix_name
+        )
+
+    def visitModuleAddressPrefix(self, ctx):
+        # NOTE: this function returns a `GetModElementExp` to access the module of the prefix.
+        #       thus, idExpInModule must further construct `GetModElementExp` as well.
+        opt_prefix = self.visit(ctx.opt_prefix) if ctx.opt_prefix is not None else None
+        suffix_name = ctx.mod_name.text
+        suffix_args = [self.visit(arg) for arg in ctx.args]
+        return ast.node.GetModElementExp(
+            self.ctx_loc(ctx),
+            opt_container=opt_prefix,
+            elem_name=suffix_name, elem_args=suffix_args
+        )
+
+    def visitActualTemplateArg(self, ctx):
+        if ctx.e is not None:
+            return self.visit(ctx.e)
+        else:
+            assert ctx.t is not None
+            return self.visit(ctx.t)
 
     #
     # Numbers:
@@ -355,14 +382,14 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         )
 
     def visitDotNameKeyExp(self, ctx):
-        return ast.node.GetElementByNameExp(
+        return ast.node.GetElementByDotNameExp(
             self.ctx_loc(ctx),
             self.visit(ctx.lhs),
             ctx.str_key.text
         )
 
     def visitDotIntKeyExp(self, ctx):
-        return ast.node.GetElementByIndexExp(
+        return ast.node.GetElementByDotIndexExp(
             self.ctx_loc(ctx),
             self.visit(ctx.lhs),
             self.visit(ctx.int_key),

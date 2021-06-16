@@ -9,6 +9,7 @@ import abc
 from collections import defaultdict
 from typing import *
 
+from qcl import frontend
 from qcl import feedback
 from qcl import type
 
@@ -69,10 +70,10 @@ class NumberExp(BaseExp):
         # checking coarse 'kind' based on suffix:
         assert self.suffix is None or self.suffix in 'fFbBuUiI'
         self.is_explicitly_float = (self.suffix in ('f', 'F')) or ('.' in self.digits)
-        self.is_explicitly_unsigned = self.suffix in ('b', 'B', 'u', 'U')
-        self.is_explicitly_signed = self.suffix in ('i', 'I') or (
+        self.is_explicitly_unsigned_int = self.suffix in ('b', 'B', 'u', 'U')
+        self.is_explicitly_signed_int = self.suffix in ('i', 'I') or (
                 not self.is_explicitly_float and
-                not self.is_explicitly_unsigned
+                not self.is_explicitly_unsigned_int
         )
         self.is_implicitly_typed = self.suffix is None
 
@@ -216,7 +217,7 @@ class IfExp(BaseExp):
 # Tabular Expressions:
 #
 
-class BaseModuleExp(BaseNode):
+class BaseModExp(BaseNode):
     module_id_counter = 0
 
     def __init__(self, loc, template_arg_names: List[str]):
@@ -226,26 +227,37 @@ class BaseModuleExp(BaseNode):
 
     @staticmethod
     def generate_fresh_module_id():
-        BaseModuleExp.module_id_counter += 1
-        return BaseModuleExp.module_id_counter
+        BaseModExp.module_id_counter += 1
+        return BaseModExp.module_id_counter
 
 
-class FileModuleExp(BaseModuleExp):
+class FileModExp(BaseModExp):
     def __init__(
             self, loc: feedback.ILoc,
+            source: frontend.FileModuleSource,
             imports_map: Dict[str, str], exports_list: List[str],
-            sub_module_map: Dict[str, "SubModuleExp"]
+            sub_module_map: Dict[str, "SubModExp"]
     ):
         super().__init__(loc, template_arg_names=[])
+        self.source = source
         self.sub_module_map = sub_module_map
-        self.import_map = imports_map
+        self.imports_path_map = imports_map
         self.export_sub_module_names = exports_list
 
+        # linking `self` back to the source:
+        self.source.ast_file_mod_exp_from_frontend = self
 
-class SubModuleExp(BaseModuleExp):
+        # creating a map for `frontend` to write to with FileModuleSource instances:
+        self.imports_source_map_from_frontend = {}
+
+    def __str__(self):
+        return self.source.file_path_rel_cwd
+
+
+class SubModExp(BaseModExp):
     def __init__(
             self, loc: feedback.ILoc,
-            template_arg_names: List[str], elements: List["BaseElement"]
+            template_arg_names: List[str], elements: List["BaseElem"]
     ):
         super().__init__(loc, template_arg_names)
         self.table = Table(
@@ -421,7 +433,7 @@ class Table(object):
     """
 
     def __init__(
-            self, loc, alias: str, elements: List["BaseElement"],
+            self, loc, alias: str, elements: List["BaseElem"],
             accepts_binding_elements=True,
             accepts_typing_elements=True,
             accepts_imperative_elements=False,
@@ -483,13 +495,13 @@ class Table(object):
         return parse_ok
 
     def parse_element(self, element):
-        if isinstance(element, BaseBindElement):
+        if isinstance(element, BaseBindElem):
             return self.parse_binding_elem(element)
 
-        elif isinstance(element, BaseTypingElement):
+        elif isinstance(element, BaseTypingElem):
             return self.parse_typing_elem(element)
 
-        elif isinstance(element, BaseImperativeElement):
+        elif isinstance(element, BaseImperativeElem):
             return self.parse_imperative_elem(element)
 
         # Failure cases:
@@ -498,10 +510,10 @@ class Table(object):
         else:
             assert False and "Unknown element type."
 
-    def parse_binding_elem(self, elem: "BaseBindElement"):
-        if isinstance(elem, BindOneValueIDElement):
+    def parse_binding_elem(self, elem: "BaseBindElem"):
+        if isinstance(elem, Bind1VElem):
             self.ordered_value_imp_bind_elems.append(elem)
-        elif isinstance(elem, BindOneTypeIDElement):
+        elif isinstance(elem, Bind1TElem):
             self.ordered_typing_bind_elems.append(elem)
         else:
             assert "Unknown binding 'elem' subclass" and False
@@ -509,12 +521,12 @@ class Table(object):
         self.binding_elems_map[elem.id_name].append(elem)
         return True
 
-    def parse_typing_elem(self, elem: "BaseTypingElement"):
+    def parse_typing_elem(self, elem: "BaseTypingElem"):
         self.ordered_typing_elems.append(elem)
         self.typing_elems_map[elem.id_name].append(elem)
         return True
 
-    def parse_imperative_elem(self, elem: "BaseImperativeElement"):
+    def parse_imperative_elem(self, elem: "BaseImperativeElem"):
         self.ordered_value_imp_bind_elems.append(elem)
         return self.accepts_imperative_elems
 
@@ -530,15 +542,15 @@ class Table(object):
 
         # ensuring each element type is accepted:
         for element in self.elements:
-            if isinstance(element, BaseBindElement):
+            if isinstance(element, BaseBindElem):
                 if not self.accepts_binding_elems:
                     print(f"ERROR: Binding element not permitted in table: {element.loc}")
                     return False
-            elif isinstance(element, BaseTypingElement):
+            elif isinstance(element, BaseTypingElem):
                 if not self.accepts_typing_elems:
                     print(f"ERROR: Typing element not permitted in table: {element.loc}")
                     return False
-            elif isinstance(element, BaseImperativeElement):
+            elif isinstance(element, BaseImperativeElem):
                 if not self.accepts_imperative_elems:
                     print(f"ERROR: Imperative element not permitted in table: {element.loc}")
                     return False
@@ -566,14 +578,14 @@ class ElementKind(enum.Enum):
     Do = enum.auto()
 
 
-class BaseElement(BaseNode):
+class BaseElem(BaseNode):
     element_kind: ElementKind
 
 
 # Typing elements:
 # used to specify the types of any bound element in this table.
 
-class BaseTypingElement(BaseElement):
+class BaseTypingElem(BaseElem):
     id_name: str
 
     def __init__(self, loc, id_name: str):
@@ -581,7 +593,7 @@ class BaseTypingElement(BaseElement):
         self.id_name = id_name
 
 
-class TypingValueIDElement(BaseTypingElement):
+class Type1VElem(BaseTypingElem):
     type_spec: "BaseTypeSpec"
 
     def __init__(self, loc, id_name, type_spec: "BaseTypeSpec"):
@@ -592,34 +604,34 @@ class TypingValueIDElement(BaseTypingElement):
 # Binding elements:
 # used to bind a new variable while providing minimal type information.
 
-class BaseBindElement(BaseElement):
+class BaseBindElem(BaseElem):
     def __init__(self, loc, id_name):
         super().__init__(loc)
         self.id_name = id_name
 
 
-class BindOneValueIDElement(BaseBindElement):
-    bind_exp: "BaseExp"
+class Bind1VElem(BaseBindElem):
+    bound_exp: "BaseExp"
 
     def __init__(self, loc, id_name: str, exp: "BaseExp"):
         super().__init__(loc, id_name)
-        self.bind_exp = exp
+        self.bound_exp = exp
 
 
-class BindOneTypeIDElement(BaseBindElement):
+class Bind1TElem(BaseBindElem):
     id_name: str
-    bind_type_spec: "BaseTypeSpec"
+    bound_type_spec: "BaseTypeSpec"
 
     def __init__(self, loc, id_name: str, type_spec: "BaseTypeSpec"):
         super().__init__(loc, id_name)
-        self.bind_type_spec = type_spec
+        self.bound_type_spec = type_spec
 
 
-class BaseImperativeElement(BaseElement, metaclass=abc.ABCMeta):
+class BaseImperativeElem(BaseElem, metaclass=abc.ABCMeta):
     pass
 
 
-class ForceEvalElement(BaseImperativeElement):
+class ForceEvalElement(BaseImperativeElem):
     discarded_exp: BaseExp
 
     def __init__(self, loc, discarded_exp):
@@ -628,10 +640,29 @@ class ForceEvalElement(BaseImperativeElement):
 
 
 #
-# GetElementBy / Dot Expressions:
+# GetModElement expressions:
 #
 
-class GetElementByNameExp(BaseExp):
+class GetModElementExp(BaseExp):
+    opt_container: Optional["GetModElementExp"]
+    elem_args: List[Union[BaseExp, BaseTypeSpec]]
+    elem_name: str
+
+    def __init__(self, loc, opt_container, elem_name, elem_args=None):
+        super().__init__(loc)
+        self.opt_container = opt_container
+        self.elem_name = elem_name
+        if elem_args is not None:
+            self.elem_args = elem_args
+        else:
+            self.elem_args = []
+
+
+#
+# GetElementByDot expressions:
+#
+
+class GetElementByDotNameExp(BaseExp):
     container: BaseExp
     key_name: str
 
@@ -641,7 +672,7 @@ class GetElementByNameExp(BaseExp):
         self.key_name = key_name
 
 
-class GetElementByIndexExp(BaseExp):
+class GetElementByDotIndexExp(BaseExp):
     container: BaseExp
     index: BaseExp
     index_wrapped_by_parens: bool
@@ -655,13 +686,9 @@ class GetElementByIndexExp(BaseExp):
 
 #
 # TODO: add/amend AST nodes for pointers, arrays, and slices.
-#   - this could include literal expressions
+#   - this could include literal array expressions
 #
 
 #
 # TODO: add/amend AST nodes for 'new' expressions using keywords `make` and `push`.
-#
-
-#
-#
 #

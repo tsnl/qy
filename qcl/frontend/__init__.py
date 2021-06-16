@@ -36,7 +36,7 @@ def load_project(p: Project, rel_entry_point_path: str):
         # before proceeding to the next node.
         index += 1
 
-    return source_module_list
+    return list(map(parser.lazily_parse_module_file, source_module_list))
 
 
 def check_dependency_source_module_list_of_source_module(parent_sm: FileModuleSource):
@@ -61,8 +61,8 @@ def get_dependency_source_module_list_of_source_module(parent_source_module: Fil
         return raw_path.replace('$', content_dir)
 
     return [
-        parent_source_module.load_relative_source_module(process_import_path(raw_import_path))
-        for import_name, raw_import_path in file_module_exp.import_map.items()
+        parent_source_module.load_relative_source_module(import_name, process_import_path(raw_import_path))
+        for import_name, raw_import_path in file_module_exp.imports_path_map.items()
     ]
 
 
