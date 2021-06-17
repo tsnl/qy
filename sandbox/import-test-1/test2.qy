@@ -1,3 +1,8 @@
 imports {
     t3 from "test3.qy";
 };
+
+mod about2 {
+    count2 = 2;
+    count3_copy = t3:about3:count3;
+};

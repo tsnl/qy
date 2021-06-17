@@ -31,11 +31,35 @@ def type_project(project, all_file_module_list):
 
     root_context = context.make_default_root()
 
-    seeding.seed_project_types(root_context, project, all_file_module_list)
-    inference.infer_project_types(project, all_file_module_list)
+    debug_path = True
+    if debug_path:
+        # trying seeding:
+        try:
+            seeding.seed_project_types(root_context, project, all_file_module_list)
+        except excepts.TyperCompilationError as e:
+            root_context.print("SEEDING ERROR:")
+            print()
+            raise e from e
 
-    # DEBUG: so we can inspect types:
-    root_context.print()
+        root_context.print("normal post-seed:")
+        print()
+
+        # trying inference:
+        try:
+            inference.infer_project_types(project, all_file_module_list)
+        except excepts.TyperCompilationError as e:
+            # DEBUG: so we can inspect types:
+            root_context.print("INFERENCE ERROR:")
+            print()
+            raise e from e
+
+        root_context.print("normal post-inference:")
+        print()
+
+    else:
+        seeding.seed_project_types(root_context, project, all_file_module_list)
+        inference.infer_project_types(project, all_file_module_list)
+
 
 '''
 # TODO: ensure all tables' contexts define symbols before typing any RHS

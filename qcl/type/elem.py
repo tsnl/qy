@@ -29,6 +29,9 @@ class ElemInfo:
     is_type_field: bool = False
 
     def __hash__(self):
+        assert isinstance(self.name, str)
+        assert isinstance(self.tid, identity.TID)
+        assert isinstance(self.is_type_field, bool)
         return hash((self.name, self.tid, self.is_type_field))
 
 

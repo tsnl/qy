@@ -32,7 +32,30 @@ class Substitution(object):
 
         return s.sub_body(new_body)
 
-    def rewrite_type(self, tid: type.identity.TID) -> type.identity.TID:
+    def rewrite_type(self, tid: type.identity.TID, rw_in_progress_tid_set=None) -> type.identity.TID:
+        """
+        performs substitution on types and their contents/elements.
+        :param tid: the type to rewrite after the substitution
+        :param rw_in_progress_tid_set: if tid is in this set, its rewrite does not take the substitution.
+            - means rewrite already in progress.
+            - e.g. consider case where two modules import each other, so each is an element of the other
+            - we must still infer infinite types to handle modules, so delay reporting these to basic checks.
+        :return: the rewritten type.
+        """
+
+        # TODO: test to see if ignoring rewrites in cycles results in incorrect substitution application.
+        #   - for now, the incorrect sub always results in a free-var that is always eliminated
+        #   - janky at best
+
+        if rw_in_progress_tid_set is None:
+            rw_in_progress_tid_set = set()
+        elif tid in rw_in_progress_tid_set:
+            return tid
+        else:
+            # FIXME: rather than copying rw_in_progress_tid_set, use a linked list of visited TIDs
+            rw_in_progress_tid_set = set(rw_in_progress_tid_set)
+            rw_in_progress_tid_set.add(tid)
+
         t_kind = type.kind.of(tid)
 
         # variables replaced:
@@ -74,7 +97,7 @@ class Substitution(object):
             replacement_elem_tid_list = []
             for element_index in range(type.elem.count(tid)):
                 element_tid = type.elem.tid_of_field_ix(tid, element_index)
-                replacement_elem_tid = self.rewrite_type(element_tid)
+                replacement_elem_tid = self.rewrite_type(element_tid, rw_in_progress_tid_set=rw_in_progress_tid_set)
                 replacement_elem_tid_list.append(replacement_elem_tid)
 
             if t_kind == type.kind.TK.Tuple:

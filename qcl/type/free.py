@@ -10,18 +10,17 @@ def occurs(container_tid: identity.TID, var_id: identity.TID) -> bool:
     assert v_kind in (kind.TK.FreeVar, kind.TK.BoundVar)
 
     if container_tid == var_id:
-        assert c_kind in (kind.TK.FreeVar, kind.TK.BoundVar)
         return True
+    else:
+        compound_tk_set = {
+            kind.TK.Fn, kind.TK.Tuple,
+            kind.TK.Struct, kind.TK.Enum, kind.TK.Union,
+            kind.TK.Module
+        }
+        if c_kind in compound_tk_set:
+            return any((
+                occurs(elem.tid_of_field_ix(container_tid, i), var_id)
+                for i in range(elem.count(container_tid))
+            ))
 
-    compound_tk_set = {
-        kind.TK.Fn, kind.TK.Tuple,
-        kind.TK.Struct, kind.TK.Enum, kind.TK.Union,
-        kind.TK.Module
-    }
-    if v_kind in compound_tk_set:
-        return any((
-            occurs(elem.tid_of_field_ix(container_tid, i), var_id)
-            for i in range(elem.count(container_tid))
-        ))
-
-    return False
+        return False

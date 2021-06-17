@@ -21,8 +21,14 @@ def unify(t: type.identity.TID, u: type.identity.TID):
             var_type = u
             rewritten_type = t
 
+        # FIXME: we relax the occurs check to ignore `{a: a}` substitutions as a 'pass', BUT
+        #   - this could lead to termination errors
+        #   - this is required because of cyclic imports
         if type.free.occurs(rewritten_type, var_type):
-            raise excepts.TyperCompilationError("unification failed: occurs check failed")
+            var_type_text = type.spelling.of(var_type)
+            rewritten_type_text = type.spelling.of(rewritten_type)
+            msg_suffix = f"unification failed: occurs check failed: {var_type_text} occurs in {rewritten_type_text}"
+            raise excepts.TyperCompilationError(msg_suffix)
 
         return substitution.Substitution({var_type: rewritten_type})
 

@@ -62,10 +62,13 @@ class Context(object):
         else:
             return None
 
-    def print(self, indent_count=0):
+    def print(self, title=None, indent_count=0):
         indent_text = ' ' * indent_count
 
-        print(f"{indent_text}* {self.purpose} @ {hex(id(self))}")
+        if title is not None:
+            print(f"{indent_text}{title}")
+
+        print(f"{indent_text}+ {self.purpose} @ {hex(id(self))}")
         for name, def_obj in self.symbol_table.items():
             if def_obj.universe in (definition.Universe.Value, definition.Universe.Module):
                 sep = "::"

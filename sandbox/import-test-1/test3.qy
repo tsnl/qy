@@ -2,3 +2,6 @@ imports {
     t2 from "test2.qy";
 };
 
+mod about3 {
+    count3 = t2:about2:count2;
+};
