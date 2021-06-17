@@ -1,13 +1,13 @@
 mod alphabet_soup <T> {
     a = "hello";
-    x = 0;
+    x = T(0);
     y = 1;
     z = 2;
 };
 
 mod modernism {
     a = 0x42;
-    another_a = alphabet_soup<Int32>:a;
+    another_x = alphabet_soup<Float32>:x;
 };
 
 mod postmodernism {

@@ -85,6 +85,9 @@ class NumberExp(BaseExp):
             None: None
         }[self.suffix]
 
+    def __str__(self):
+        return self.text
+
 
 class StringExp(BaseExp):
     def __init__(self, loc, chunks: List["StringExpChunk"]):
@@ -98,6 +101,9 @@ class StringExp(BaseExp):
             self.runes += chunk.runes
             self.text += chunk.text
 
+    def __str__(self):
+        return ' '.join(map(str, self.chunks))
+
 
 class StringExpChunk(BaseExp):
     def __init__(self, loc, runes: List[int], quote_str: str):
@@ -107,6 +113,9 @@ class StringExpChunk(BaseExp):
         self.rune_count = len(self.runes)
         self.quote_str = quote_str
 
+    def __str__(self):
+        return repr(self.text)
+
 
 class IdExp(BaseExp):
     name: str
@@ -115,7 +124,8 @@ class IdExp(BaseExp):
         super().__init__(loc)
         self.name = name
 
-        self.x_found_def = None
+    def __str__(self):
+        return self.name
 
 
 class LambdaExp(BaseExp):
@@ -299,10 +309,10 @@ class ChainExp(BaseExp):
 
 
 class CastExp(BaseExp):
-    def __init__(self, loc, constructor_ts: "BaseTypeSpec", data: "BaseExp"):
+    def __init__(self, loc, constructor_ts: "BaseTypeSpec", initializer_data: "BaseExp"):
         super().__init__(loc)
         self.constructor_ts = constructor_ts
-        self.data = data
+        self.initializer_data = initializer_data
 
 
 #
@@ -348,7 +358,8 @@ class IdTypeSpec(BaseTypeSpec):
         super().__init__(loc)
         self.name = name
 
-        self.x_found_def = None
+    def __str__(self):
+        return self.name
 
 
 class TupleTypeSpec(BaseTypeSpec):
@@ -656,6 +667,13 @@ class GetModElementExp(BaseExp):
             self.elem_args = elem_args
         else:
             self.elem_args = []
+
+    def __str__(self):
+        elem_args_str = f"<{','.join(map(str, self.elem_args))}>"
+        if self.opt_container is not None:
+            return f"{self.opt_container}:{self.elem_name}{elem_args_str}"
+        else:
+            return f"{self.elem_name}{elem_args_str}"
 
 
 #

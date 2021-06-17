@@ -52,7 +52,11 @@ class ErrorListener(antlr.ANTLRErrorListener):
         raise excepts.ParserCompilationError(f"Syntax error: {message}")
 
     def reportAmbiguity(self, recognizer, dfa, start_index, stop_index, exact, ambig_alts, configs):
-        raise excepts.ParserCompilationError(f"Parser ambiguity detected (...)")
+        if not exact:
+            # raise excepts.ParserCompilationError(f"Inexact parser ambiguity detected (...)")
+            # FIXME: ignoring SLL ambiguity for now because the grammar is designed to eventually resolve. RISKY.
+            #   - https://www.antlr.org/api/Java/org/antlr/v4/runtime/atn/AmbiguityInfo.html
+            pass
 
     def reportAttemptingFullContext(self, recognizer, dfa, start_index, stop_index, conflicting_alts, configs):
         pass
@@ -183,11 +187,12 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
         assert container_exp is not None
 
-        return ast.node.GetModElementExp(
+        out_exp = ast.node.GetModElementExp(
             self.ctx_loc(ctx),
             opt_container=container_exp,
             elem_name=suffix_name
         )
+        return out_exp
 
     def visitModuleAddressPrefix(self, ctx):
         # NOTE: this function returns a `GetModElementExp` to access the module of the prefix.
@@ -195,11 +200,12 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         opt_prefix = self.visit(ctx.opt_prefix) if ctx.opt_prefix is not None else None
         suffix_name = ctx.mod_name.text
         suffix_args = [self.visit(arg) for arg in ctx.args]
-        return ast.node.GetModElementExp(
+        out_exp = ast.node.GetModElementExp(
             self.ctx_loc(ctx),
             opt_container=opt_prefix,
             elem_name=suffix_name, elem_args=suffix_args
         )
+        return out_exp
 
     def visitActualTemplateArg(self, ctx):
         if ctx.e is not None:
@@ -345,8 +351,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return ast.node.ChainExp(
             self.ctx_loc(ctx),
             elements, opt_tail,
-            opt_prefix_ts=self.visit(ctx.ts),
-            opt_prefix_es=self.visit(ctx.es)
+            opt_prefix_ts=self.visit(ctx.ts) if ctx.ts is not None else None,
+            opt_prefix_es=self.visit(ctx.es) if ctx.es is not None else None
         )
 
     def visitChainTableWrapper(self, ctx):

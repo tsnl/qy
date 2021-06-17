@@ -119,6 +119,10 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: ast.n
     for template_val_arg_name in template_val_arg_names:
         seed_template_val_arg(sub_mod_ctx, sub_mod_exp.loc, template_val_arg_name)
 
+    # Defining each type template arg USING THE BoundVar INSTANCES in `sub_mod_scheme`
+    for template_type_arg_name, bound_var in zip(template_type_arg_names, sub_mod_scheme.bound_vars):
+        seed_template_type_arg(sub_mod_ctx, sub_mod_exp.loc, template_type_arg_name, bound_var)
+
     # Defining each bound ID in this context:
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
@@ -133,8 +137,24 @@ def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, temp
     def_obj = definition.ValueRecord(loc, value_tid)
     def_ok = sub_mod_ctx.try_define(template_val_arg_name, def_obj)
     if not def_ok:
-        msg_suffix = f"template arg {template_val_arg_name} conflicts with another definition in this sub-module scope."
+        msg_suffix = (
+            f"template arg {template_val_arg_name} conflicts with another definition in this sub-module scope."
+        )
         raise excepts.TyperCompilationError(msg_suffix)
+
+
+def seed_template_type_arg(
+        sub_mod_ctx: context.Context, loc: feedback.ILoc,
+        template_type_arg_name: str, bound_var_tid: type.identity.TID
+):
+    def_obj = definition.TypeRecord(loc, bound_var_tid)
+    def_ok = sub_mod_ctx.try_define(template_type_arg_name, def_obj)
+    if not def_ok:
+        msg_suffix = (
+            f"template arg {template_type_arg_name} conflicts with another definition in this sub-module scope."
+        )
+        raise excepts.TyperCompilationError(msg_suffix)
+
 
 
 def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: ast.node.BaseBindElem):

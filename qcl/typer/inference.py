@@ -11,7 +11,6 @@ from . import context
 from . import definition
 from . import unifier
 from . import substitution
-from . import names
 
 
 class SubModTypeInferenceInfo(object):
@@ -109,6 +108,7 @@ def infer_file_mod_exp_tid(
         # creating a new module type:
         new_mod_tid = type.new_module_type(tuple(elem_info_list))
         out_sub = out_sub.compose(substitution.Substitution({seeded_file_mod_exp_tid: new_mod_tid}))
+        new_mod_tid = out_sub.rewrite_type(new_mod_tid)
 
         # updating caches (including seeded values, called re-seeding):
         # NOTE: re-seeding is 'unsafe', but much more efficient than creating a copy map.
@@ -193,30 +193,36 @@ def infer_exp_tid(
     #
 
     if isinstance(exp, ast.node.IdExp):
-        found_def = ctx.lookup(exp.name)
-        if found_def is not None:
-            sub, def_tid = found_def.scheme.instantiate()
+        # TODO: validate that the found definition is in the right universe.
+
+        found_def_obj = ctx.lookup(exp.name)
+        if found_def_obj is not None:
+            sub, def_tid = found_def_obj.scheme.instantiate()
             return sub, def_tid
         else:
             raise excepts.TyperCompilationError(f"Symbol {exp.name} used but not defined.")
 
     elif isinstance(exp, ast.node.GetModElementExp):
+        # FIXME: something is really fishy about how we handle containers here...
+        #   - elem_args should instantiate the found elem independent of the container
+
+        sub = substitution.empty
+
         if exp.opt_container is None:
             # look up an imported mod-def:
-            assert not exp.elem_args
             file_mod_name = exp.elem_name
-            found_def = ctx.lookup(file_mod_name, shallow=False)
+            found_def_obj = ctx.lookup(file_mod_name)
 
-            if found_def is None:
+            if found_def_obj is None:
                 msg_suffix = f"symbol {file_mod_name} not found"
                 raise excepts.TyperCompilationError(msg_suffix)
-            elif not isinstance(found_def, definition.ModRecord):
+            elif not isinstance(found_def_obj, definition.ModRecord):
                 msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
                 raise excepts.TyperCompilationError(msg_suffix)
-            else:
-                sub, file_mod_tid = found_def.scheme.instantiate()
-                # TODO: why not retrieve and also return the GetModElementExp from Defn?
-                return sub, file_mod_tid
+            # else:
+            #     sub, file_mod_tid = found_def_obj.scheme.instantiate()
+            #     # TODO: why not retrieve and also return the GetModElementExp from Defn?
+            #     return sub, file_mod_tid
         else:
             assert exp.opt_container is not None
 
@@ -231,85 +237,96 @@ def infer_exp_tid(
                 msg_suffix = f"element {exp.elem_name} not found in existing module"
                 raise excepts.TyperCompilationError(msg_suffix)
 
-            # instantiating the found definition's scheme, using actual arguments if provided:
-            found_scheme = found_def_obj.scheme
-            if not exp.elem_args:
-                sub, found_tid = found_scheme.instantiate()
-                return sub, found_tid
-            else:
-                #
-                # actual arg validation + processing:
-                #
+            sub = sub.compose(container_sub)
 
-                expected_arg_count = len(container_mod_exp.template_arg_names)
-                actual_arg_count = len(exp.elem_args)
-                if actual_arg_count != expected_arg_count:
-                    msg_suffix = f"expected {expected_arg_count} template args, but received {actual_arg_count}"
-                    raise excepts.TyperCompilationError(msg_suffix)
+        # instantiating the found definition's scheme, using actual arguments if provided:
+        found_scheme = found_def_obj.scheme
+        if not exp.elem_args:
+            instantiation_sub, found_tid = found_scheme.instantiate()
+            sub = sub.compose(instantiation_sub)
+            return sub, sub.rewrite_type(found_tid)
+        else:
+            #
+            # actual arg validation + processing:
+            #
 
-                # sifting type args from value args:
-                actual_v_args = []
-                actual_t_args = []
-                for elem_arg_ast_node in exp.elem_args:
-                    if isinstance(elem_arg_ast_node, ast.node.BaseExp):
-                        actual_v_args.append(actual_v_args)
-                    else:
-                        assert isinstance(elem_arg_ast_node, ast.node.BaseTypeSpec)
-                        actual_t_args.append(actual_t_args)
+            expected_arg_count = len(found_scheme.bound_vars)
+            actual_arg_count = len(exp.elem_args)
+            if actual_arg_count != expected_arg_count:
+                msg_suffix = f"expected {expected_arg_count} template args, but received {actual_arg_count}"
+                raise excepts.TyperCompilationError(msg_suffix)
 
-                #
-                # inferring types of type & value actual args:
-                #
-
-                sub = substitution.empty
-
-                # inferring TIDs of value args
-                actual_v_arg_tid_list = []
-                for actual_v_arg in actual_v_args:
-                    e_sub, e_tid = infer_exp_tid(ctx, actual_v_arg)
-                    sub = sub.compose(e_sub)
-                    actual_v_arg_tid_list.append(e_tid)
-
-                # inferring TIDs of type args from context:
-                actual_t_arg_tid_list = []
-                for actual_t_arg in actual_t_args:
-                    ts_sub, ts_tid = infer_type_spec_tid(ctx, actual_t_arg)
-                    sub = sub.compose(ts_sub)
-
-                #
-                # unifying TIDs of value args
-                # - only perform this when value args are actually passed (even if formally defined)
-                #
-
-                if actual_v_arg_tid_list:
-                    # acquiring a list of value arg names in the container:
-                    val_arg_names = names.filter_vals(container_mod_exp.template_arg_names)
-
-                    # looking up their defined types:
-                    # - note template args should always be pre-seeded and monomorphic in the scheme context.
-                    formal_v_arg_tid_list = []
-                    for val_arg_name in val_arg_names:
-                        val_arg_def_obj = ctx.lookup(val_arg_name, shallow=True)
-                        assert val_arg_def_obj is not None
-                        assert not val_arg_def_obj.scheme.bound_vars
-                        val_arg_tid = val_arg_def_obj.scheme.instantiate()
-                        formal_v_arg_tid_list.append(val_arg_tid)
-
-                    # unifying formal and actual value arg types:
-                    assert len(formal_v_arg_tid_list) == len(actual_v_arg_tid_list)
-                    for formal_tid, actual_tid in zip(formal_v_arg_tid_list, actual_v_arg_tid_list):
-                        sub = sub.compose(unifier.unify(formal_tid, actual_tid))
+            # sifting type args from value args:
+            actual_v_args = []
+            actual_t_args = []
+            for elem_arg_ast_node in exp.elem_args:
+                if isinstance(elem_arg_ast_node, ast.node.BaseExp):
+                    actual_v_args.append(elem_arg_ast_node)
                 else:
-                    pass
+                    assert isinstance(elem_arg_ast_node, ast.node.BaseTypeSpec)
+                    actual_t_args.append(elem_arg_ast_node)
 
+            #
+            # inferring types of type & value actual args:
+            #
+
+            # inferring TIDs of value args
+            actual_v_arg_tid_list = []
+            for actual_v_arg in actual_v_args:
+                e_sub, e_tid = infer_exp_tid(ctx, actual_v_arg)
+                sub = sub.compose(e_sub)
+                actual_v_arg_tid_list.append(e_tid)
+
+            # inferring TIDs of type args from context:
+            actual_t_arg_tid_list = []
+            for actual_t_arg in actual_t_args:
+                ts_sub, ts_tid = infer_type_spec_tid(ctx, actual_t_arg)
+                sub = sub.compose(ts_sub)
+                actual_t_arg_tid_list.append(ts_tid)
+
+            #
+            # unifying TIDs of value args
+            # - only perform this when value args are actually passed (even if formally defined)
+            #
+
+            if actual_v_arg_tid_list:
+                # TODO: figure out how to get the instantiated module from the definition (from seeding)
+                #   - this way, we can get the value arg names.
+
+                # TODO: this code incorrectly admits reordering type and value args as long as the ordering
+                #       between type and value args is correct.
+                #       We should check for this once we can acquire the original formal args.
+
+                raise NotImplementedError("passing value actual args to a template.")
+
+                # acquiring a list of value arg names in the container:
+                # val_arg_names = names.filter_vals(container_mod_exp.template_arg_names)
                 #
-                # unifying TIDs of type args using `Scheme.instantiate`:
+                # # looking up their defined types:
+                # # - note template args should always be pre-seeded and monomorphic in the scheme context.
+                # formal_v_arg_tid_list = []
+                # for val_arg_name in val_arg_names:
+                #     val_arg_def_obj = ctx.lookup(val_arg_name, shallow=True)
+                #     assert val_arg_def_obj is not None
+                #     assert not val_arg_def_obj.scheme.bound_vars
+                #     val_arg_tid = val_arg_def_obj.scheme.instantiate()
+                #     formal_v_arg_tid_list.append(val_arg_tid)
                 #
+                # # unifying formal and actual value arg types:
+                # assert len(formal_v_arg_tid_list) == len(actual_v_arg_tid_list)
+                # for formal_tid, actual_tid in zip(formal_v_arg_tid_list, actual_v_arg_tid_list):
+                #     sub = sub.compose(unifier.unify(formal_tid, actual_tid))
+            else:
+                pass
 
-                instantiate_sub, final_tid = found_scheme.instantiate(actual_t_arg_tid_list)
-                sub = sub.compose(instantiate_sub)
+            #
+            # unifying TIDs of type args using `Scheme.instantiate`:
+            #
 
-                return sub, final_tid
+            instantiate_sub, final_tid = found_scheme.instantiate(actual_t_arg_tid_list)
+            sub = sub.compose(instantiate_sub)
+
+            return sub, final_tid
 
     #
     # context-independent branches:
@@ -322,6 +339,8 @@ def infer_exp_tid(
         return substitution.empty, type.get_str_type()
 
     elif isinstance(exp, ast.node.NumberExp):
+        # FIXME: the type module truncates single-bit variables by only storing byte-count.
+
         default_number_width_in_bits = 32
 
         if exp.width_in_bits is None:
@@ -359,6 +378,14 @@ def infer_exp_tid(
 
         return s123, ret_tid
 
+    elif isinstance(exp, ast.node.CastExp):
+        s1, src_tid = infer_exp_tid(ctx, exp.initializer_data)
+        s2, dst_tid = infer_type_spec_tid(ctx, exp.constructor_ts)
+        # s3 = unifier.unify(src_tid, dst_tid)
+        # TODO: compare src_tid and dst_tid to ensure they can be inter-converted.
+        sub = s1.compose(s2)
+        return sub, sub.rewrite_type(dst_tid)
+
     # TODO: type a chain expression
     elif isinstance(exp, ast.node.ChainExp):
         raise NotImplementedError("Type inference for chain expressions")
@@ -370,4 +397,13 @@ def infer_exp_tid(
 def infer_type_spec_tid(
         ctx: context.Context, ts: ast.node.BaseTypeSpec
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
+    if isinstance(ts, ast.node.IdTypeSpec):
+        found_def_obj = ctx.lookup(ts.name)
+        # TODO: validate that the found definition is in the right universe.
+        if found_def_obj is not None:
+            sub, def_tid = found_def_obj.scheme.instantiate()
+            return sub, def_tid
+        else:
+            raise excepts.TyperCompilationError(f"Symbol {ts.name} used but not defined.")
+
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
