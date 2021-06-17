@@ -6,9 +6,10 @@ mod alphabet_soup {
 };
 
 mod modernism {
-    a = alphabet_soup:a;
+    a = 0x42;
+    another_a = alphabet_soup:a;
 };
 
 mod postmodernism {
-    a = modernism:a;
+    # a = modernism:a;
 };

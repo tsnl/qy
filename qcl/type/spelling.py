@@ -23,11 +23,11 @@ def of(tid: identity.TID):
         return "String"
 
     elif type_kind == kind.TK.SignedInt:
-        return f"Int{scalar_width_in_bytes.of(tid)}"
+        return f"Int{8 * scalar_width_in_bytes.of(tid)}"
     elif type_kind == kind.TK.UnsignedInt:
-        return f"UInt{scalar_width_in_bytes.of(tid)}"
+        return f"UInt{8 * scalar_width_in_bytes.of(tid)}"
     elif type_kind == kind.TK.Float:
-        return f"Float{scalar_width_in_bytes.of(tid)}"
+        return f"Float{8 * scalar_width_in_bytes.of(tid)}"
 
     elif type_kind == kind.TK.Pointer:
         if is_mut.ptr(tid):

@@ -21,7 +21,7 @@ def unify(t: type.identity.TID, u: type.identity.TID):
             var_type = u
             rewritten_type = t
 
-        if type.free.occurs(var_type, rewritten_type):
+        if type.free.occurs(rewritten_type, var_type):
             raise excepts.TyperCompilationError("unification failed: occurs check failed")
 
         return substitution.Substitution({var_type: rewritten_type})
@@ -44,7 +44,9 @@ def unify(t: type.identity.TID, u: type.identity.TID):
 
         if tk_t == tk_u == type.kind.TK.Fn:
             # FIXME: if either side-effect-specifier of a function is `Elim_?`, we currently do nothing.
-            #   - cannot substitute a function for another function.
+            #   - cannot substitute a function for another function, only var for another var
+            #   - may be able to rename SES, but that would violate unique TID per structural type
+            #   - perhaps can bundle into basic-check-style post-check
 
             s1 = unify(type.elem.tid_of_fn_arg(t), type.elem.tid_of_fn_arg(u))
             s2 = unify(s1.rewrite_type(type.elem.tid_of_fn_ret(t)), s1.rewrite_type(type.elem.tid_of_fn_ret(u)))

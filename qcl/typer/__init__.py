@@ -29,9 +29,13 @@ def type_project(project, all_file_module_list):
     # - seeding: we generate the types of all file modules in terms of free-vars so imports will resolve
     # - inference: we resolve imports, then generate the types of all sub-modules
 
-    seeding.seed_project_types(project, all_file_module_list)
+    root_context = context.make_default_root()
+
+    seeding.seed_project_types(root_context, project, all_file_module_list)
     inference.infer_project_types(project, all_file_module_list)
 
+    # DEBUG: so we can inspect types:
+    root_context.print()
 
 '''
 # TODO: ensure all tables' contexts define symbols before typing any RHS

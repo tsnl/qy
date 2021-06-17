@@ -17,11 +17,14 @@ class Substitution(object):
             self.sub_map = sub_map
 
     def rewrite_scheme(self, s: "scheme.Scheme") -> "scheme.Scheme":
+        assert isinstance(s, scheme.Scheme)
+
         if s.bound_vars:
-            sub_without_bound_vars = Substitution()
+            sub_without_bound_vars_map = {}
             for k, v in self.sub_map.items():
                 if k not in s.bound_vars:
-                    sub_without_bound_vars.sub_map[k] = v
+                    sub_without_bound_vars_map[k] = v
+            sub_without_bound_vars = Substitution(sub_without_bound_vars_map)
         else:
             sub_without_bound_vars = self
 
@@ -101,16 +104,17 @@ class Substitution(object):
         # unknown:
         raise NotImplementedError(f"Substitution.apply_to_type for TK {t_kind}")
 
-    def overwrite_context_manager(self, cm: "context.ContextManager"):
+    def rewrite_contexts_everywhere(self, ctx: "context.Context"):
         """
         updates all frames in a context in-place.
-        :param cm: the context manager to update IN-PLACE.
+        :param ctx: the context manager to update IN-PLACE.
         """
 
-        @cm.map
+        @ctx.map_everyone
         def update_defs(frame: context.Context):
             for def_name, def_obj in frame.symbol_table.items():
                 def_obj.scheme = self.rewrite_scheme(def_obj.scheme)
+                assert isinstance(def_obj.scheme, scheme.Scheme)
 
     def compose(self, applied_first: "Substitution"):
         # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1

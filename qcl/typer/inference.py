@@ -6,7 +6,6 @@ from qcl import ast
 from qcl import type
 from qcl import excepts
 
-from . import scheme
 from . import seeding
 from . import context
 from . import definition
@@ -30,10 +29,12 @@ class FileModTypeInferenceInfo(object):
 
 file_mod_inferences: Dict[ast.node.FileModExp, FileModTypeInferenceInfo] = {}
 sub_mod_inferences: Dict[ast.node.SubModExp, SubModTypeInferenceInfo]
-mod_exp_map: Dict[type.identity.TID, ast.node.BaseModExp] = {}
 
 
-def infer_project_types(project: frontend.Project, all_file_module_list: List[ast.node.FileModExp]):
+def infer_project_types(
+        project: frontend.Project,
+        all_file_module_list: List[ast.node.FileModExp]
+):
     """
     this pass uses `unify` to generate substitutions that, once all applied, eliminate all free type variables from the
     system.
@@ -41,154 +42,153 @@ def infer_project_types(project: frontend.Project, all_file_module_list: List[as
     :param all_file_module_list: a list of all discovered FileModuleExp nodes.
     """
 
-    cm = context.ContextManager()
-
     # each imported file module is looked up in the global context and stored.
     # Later, it is mapped to a file-module-scope-native symbol.
     for file_module_exp in all_file_module_list:
-        infer_file_mod_exp_tid(cm, file_module_exp)
+        infer_file_mod_exp_tid(file_module_exp)
 
 
 def infer_file_mod_exp_tid(
-        cm: context.ContextManager, file_mod_exp: ast.node.FileModExp
+        file_mod_exp: ast.node.FileModExp
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     # we use `seeding.mod_tid[...]` to resolve module imports out-of-order
     cached_mod_inference = file_mod_inferences.get(file_mod_exp, None)
     if cached_mod_inference is not None:
         return cached_mod_inference.sub, cached_mod_inference.tid
     else:
-        seeded_file_mod_exp_tid = seeding.mod_tid_map[file_mod_exp]
-        mod_exp_map[seeded_file_mod_exp_tid] = file_mod_exp
+        seeded_file_mod_exp_tid = seeding.mod_exp_tid_map[file_mod_exp]
         out_sub = substitution.empty
 
         # storing the seeded values in the inference cache so that cyclic imports will work:
         file_mod_inferences[file_mod_exp] = FileModTypeInferenceInfo(seeded_file_mod_exp_tid, out_sub)
 
         #
-        # now, our goal is to add all import and 'mod' elements to the elem info list:
+        # now, our goal is to construct a module type.
+        # we need to add all 'import' and 'mod' elements to the elem info list, unifying along the way.
+        # remember that all globally-accessible symbols are already defined.
         #
-
-        # cm.push_context()
 
         elem_info_list = []
 
+        # adding elem_info for each import:
         for import_mod_name, import_mod_source in file_mod_exp.imports_source_map_from_frontend.items():
             assert isinstance(import_mod_source, frontend.FileModuleSource)
             imported_file_mod_exp = import_mod_source.ast_file_mod_exp_from_frontend
-            import_sub, imported_mod_tid = infer_file_mod_exp_tid(cm, imported_file_mod_exp)
+            import_sub, imported_mod_tid = infer_file_mod_exp_tid(imported_file_mod_exp)
+
+            # composing substitutions:
+            # NOTE: all previous elements are now invalidated.
             out_sub = out_sub.compose(import_sub)
 
-            # updating elem_info_list:
-            for elem_info in elem_info_list:
-                assert isinstance(elem_info, type.elem.ElemInfo)
-                elem_info.tid = out_sub.rewrite_type(elem_info.tid)
+            # adding the new elem_info_list:
             new_elem_info = type.elem.ElemInfo(import_mod_name, imported_mod_tid)
             elem_info_list.append(new_elem_info)
 
-            # defining the symbol:
-            def_name = import_mod_name
-            def_obj = definition.ModDef(imported_file_mod_exp.loc, scheme.Scheme(imported_mod_tid))
-            cm.try_define(def_name, def_obj)
-
+        # adding elem_info for each sub-mod:
         for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
-            sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(cm, sub_mod_exp)
+            sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(sub_mod_exp)
 
-            # todo: update elem_info_list
+            # composing substitutions:
+            # NOTE: all previous elements are now invalidated.
+            out_sub = out_sub.compose(sub_mod_substitution)
 
-            # todo: fetch defined symbol from the active context
-            #   - first, fetch active context using `seeding.context_map`
-            #   - then, perform lookup for a definition to get a scheme
-            #   - then, instantiate and unify with `sub_mod_tid`
-            #   - finally, apply sub to `cm`
+            new_elem_info = type.elem.ElemInfo(sub_mod_name, sub_mod_tid)
+            elem_info_list.append(new_elem_info)
 
+        # before creation, all but the last elem_info needs to be updated with `out_sub`:
+        for i in range(len(elem_info_list) - 1):
+            old_tid = elem_info_list[i].tid
+            new_tid = out_sub.rewrite_type(old_tid)
+            elem_info_list[i].tid = new_tid
+
+        # creating a new module type:
         new_mod_tid = type.new_module_type(tuple(elem_info_list))
         out_sub = out_sub.compose(substitution.Substitution({seeded_file_mod_exp_tid: new_mod_tid}))
 
-        # cm.pop_context()
-
+        # updating caches (including seeded values, called re-seeding):
+        # NOTE: re-seeding is 'unsafe', but much more efficient than creating a copy map.
+        # THUS, both the original and new TIDs correctly map to the correct file-mod-exp.
         file_mod_inferences[file_mod_exp] = FileModTypeInferenceInfo(new_mod_tid, out_sub)
-        mod_exp_map[new_mod_tid] = file_mod_exp
+        seeding.mod_tid_exp_map[new_mod_tid] = file_mod_exp
 
         return out_sub, new_mod_tid
 
 
 def infer_sub_mod_exp_tid(
-        cm: context.ContextManager, sub_mod_exp: ast.node.SubModExp
+        sub_mod_exp: ast.node.SubModExp
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
-    seeded_sub_mod_exp_tid = seeding.mod_tid_map[sub_mod_exp]
+    # acquiring the seeded context, updating our caches:
+    seeded_sub_mod_exp_tid = seeding.mod_exp_tid_map[sub_mod_exp]
+    seeded_sub_mod_exp_ctx = seeding.mod_context_map[sub_mod_exp]
 
     out_sub = substitution.empty
 
     elem_info_list: List[type.elem.ElemInfo] = []
 
-    for index, template_arg_name in enumerate(sub_mod_exp.template_arg_names):
-        # TODO: check if type arg or value
-        # - if type arg, create a BoundVar and store in `sub_mod_inferences_map`
-        # - if value arg, create a FreeVar, subject to further inference.
-        # - regardless, need to ALSO DEFINE in the top context.
-
-        def_universe = infer_template_arg_def_universe(template_arg_name)
-        if def_universe == definition.DefinitionUniverse.Type:
-            arg_var_tid = type.new_free_var(f"template-t-arg:{template_arg_name}")
-            def_ok = cm.try_define(
-                template_arg_name,
-                definition.TypeDef(sub_mod_exp.loc, arg_var_tid)
-            )
-        else:
-            assert def_universe == definition.DefinitionUniverse.Value
-            arg_var_tid = type.new_free_var(f"template-v-arg:{template_arg_name}")
-            def_ok = cm.try_define(
-                template_arg_name,
-                definition.ValueDef(sub_mod_exp.loc, arg_var_tid)
-            )
-
-        if not def_ok:
-            raise excepts.TyperCompilationError(
-                f"template arg name {template_arg_name} conflicts with another definition."
-            )
-
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
-        infer_binding_elem_types(cm, elem)
+        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem)
 
     for elem in sub_mod_exp.table.ordered_typing_elems:
-        infer_typing_elem_types(cm, elem)
+        infer_typing_elem_types(seeded_sub_mod_exp_ctx, elem)
 
     sub_mod_exp_tid = type.new_module_type(tuple(elem_info_list))
-
     out_sub = out_sub.compose(substitution.Substitution({seeded_sub_mod_exp_tid: sub_mod_exp_tid}))
+
+    # re-seeding the new sub_mod's TID:
+    seeding.mod_tid_exp_map[sub_mod_exp_tid] = sub_mod_exp
 
     return out_sub, sub_mod_exp_tid
 
 
-def infer_binding_elem_types(cm: context.ContextManager, elem: ast.node.BaseElem):
+def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem):
     if isinstance(elem, ast.node.Bind1VElem):
-        s1, rhs_tid = infer_exp_tid(cm, elem.bound_exp)
-        # TODO: need a way to get the defined symbol's type so we can unify with RHS
-        s2 = s1
-        s2.overwrite_context_manager(cm)
+        s1, rhs_tid = infer_exp_tid(ctx, elem.bound_exp)
+        lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
+        if lhs_def_obj is not None:
+            # pre-seeded:
+            s2, lhs_tid = s1.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+        else:
+            # un-seeded: bound inside a chain
+            raise NotImplementedError("binding elem in chains")
+
+        s3 = unifier.unify(lhs_tid, rhs_tid)
+        sub = s2.compose(s3)
+
+        sub.rewrite_contexts_everywhere(ctx)
+
     elif isinstance(elem, ast.node.Bind1TElem):
-        s1, rhs_tid = infer_type_spec_tid(cm, elem.bound_type_spec)
-        # TODO: need a way to get the defined symbol's types so we can unify with RHS
-        s2 = s1
-        s2.overwrite_context_manager(cm)
+        s1, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
+        lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
+        if lhs_def_obj is not None:
+            # pre-seeded:
+            s2, lhs_tid = s1.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+        else:
+            # un-seeded: bound inside a chain
+            raise NotImplementedError("binding elem in chains")
+
+        s3 = unifier.unify(lhs_tid, rhs_tid)
+        sub = s2.compose(s3)
+
+        sub.rewrite_contexts_everywhere(ctx)
+
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
-def infer_typing_elem_types(cm: context.ContextManager, elem: ast.node.BaseElem):
-    pass
+def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem):
+    raise NotImplementedError("Typing any BaseTypingElem")
 
 
 def infer_exp_tid(
-        cm: context.ContextManager, exp: ast.node.BaseExp
+        ctx: context.Context, exp: ast.node.BaseExp
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     #
     # context-dependent branches: ID, ModAddressID
     #
 
     if isinstance(exp, ast.node.IdExp):
-        found_def = cm.lookup(exp.name)
+        found_def = ctx.lookup(exp.name)
         if found_def is not None:
             sub, def_tid = found_def.scheme.instantiate()
             return sub, def_tid
@@ -197,26 +197,85 @@ def infer_exp_tid(
 
     elif isinstance(exp, ast.node.GetModElementExp):
         if exp.opt_container is None:
-            # look up a file mod def in the active scope:
+            # look up an imported mod-def:
             assert not exp.elem_args
             file_mod_name = exp.elem_name
-            found_def = cm.lookup(file_mod_name)
-            if not isinstance(found_def, definition.ModDef):
-                raise excepts.TyperCompilationError(f"Expected {exp.elem_name} to refer to a file-mod, not other.")
+            found_def = ctx.lookup(file_mod_name, shallow=False)
+
+            if found_def is None:
+                msg_suffix = f"symbol {exp.elem_name} not found"
+                raise excepts.TyperCompilationError(msg_suffix)
+            elif not isinstance(found_def, definition.ModRecord):
+                msg_suffix = f"expected {exp.elem_name} to refer to a file-mod, not other"
+                raise excepts.TyperCompilationError(msg_suffix)
             else:
                 sub, file_mod_tid = found_def.scheme.instantiate()
+                # TODO: why not retrieve and also return the GetModElementExp from Defn?
                 return sub, file_mod_tid
         else:
             assert exp.opt_container is not None
 
             # getting a mod-exp for the container:
-            container_sub, contained_tid = infer_exp_tid(cm, exp.opt_container)
-            container_mod_exp = mod_exp_map[contained_tid]
+            container_sub, container_tid = infer_exp_tid(ctx, exp.opt_container)
+            container_mod_exp = seeding.mod_tid_exp_map[container_tid]
+            container_ctx = seeding.mod_context_map[container_mod_exp]
 
-            # looking up an element in the container:
-            pass
+            # looking up the element in the container:
+            found_def_obj = container_ctx.lookup(exp.elem_name, shallow=True)
+            if found_def_obj is None:
+                msg_suffix = f"sub-module {exp.elem_name} not found in existing container module"
+                raise excepts.TyperCompilationError(msg_suffix)
 
-            raise NotImplementedError("Looking up a submodule in a file-module")
+            # instantiating the found definition's scheme, using actual arguments if provided:
+            found_scheme = found_def_obj.scheme
+            if not exp.elem_args:
+                sub, found_tid = found_scheme.instantiate()
+                return sub, found_tid
+            else:
+                # sifting type args from value args:
+                actual_v_args = []
+                actual_t_args = []
+                for elem_arg_ast_node in exp.elem_args:
+                    if isinstance(elem_arg_ast_node, ast.node.BaseExp):
+                        actual_v_args.append(actual_v_args)
+                    else:
+                        assert isinstance(elem_arg_ast_node, ast.node.BaseTypeSpec)
+                        actual_t_args.append(actual_t_args)
+
+                #
+                # inferring types of type & value actual args:
+                #
+
+                sub = substitution.empty
+
+                # inferring TIDs of value args
+                actual_v_arg_tid_list = []
+                for actual_v_arg in actual_v_args:
+                    e_sub, e_tid = infer_exp_tid(ctx, actual_v_arg)
+                    sub = sub.compose(e_sub)
+                    actual_v_arg_tid_list.append(e_tid)
+
+                # inferring TIDs of type args from context:
+                actual_t_arg_tid_list = []
+                for actual_t_arg in actual_t_args:
+                    ts_sub, ts_tid = infer_type_spec_tid(ctx, actual_t_arg)
+                    sub = sub.compose(ts_sub)
+
+                #
+                # todo: unifying TIDs of value args
+                #
+
+                if actual_v_arg_tid_list:
+                    raise NotImplementedError("unifying value template args... almost there!")
+
+                #
+                # unifying TIDs of type args using `Scheme.instantiate`:
+                #
+
+                instantiate_sub, final_tid = found_scheme.instantiate(actual_t_arg_tid_list)
+                sub = sub.compose(instantiate_sub)
+
+                return sub, final_tid
 
     #
     # context-independent branches:
@@ -249,9 +308,9 @@ def infer_exp_tid(
     elif isinstance(exp, ast.node.PostfixVCallExp):
         ret_tid = type.new_free_var(f"fn-call")
 
-        s1, formal_fn_tid = infer_exp_tid(cm, exp.called_exp)
+        s1, formal_fn_tid = infer_exp_tid(ctx, exp.called_exp)
 
-        s2, arg_tid = infer_exp_tid(cm, exp.arg_exp)
+        s2, arg_tid = infer_exp_tid(ctx, exp.arg_exp)
         arg_tid = s1.rewrite_type(arg_tid)
 
         s12 = s1.compose(s2)
@@ -267,24 +326,14 @@ def infer_exp_tid(
         return s123, ret_tid
 
     # TODO: type a chain expression
+    elif isinstance(exp, ast.node.ChainExp):
+        raise NotImplementedError("Type inference for chain expressions")
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
 
 
 def infer_type_spec_tid(
-        cm: context.ContextManager, ts: ast.node.BaseTypeSpec
+        ctx: context.Context, ts: ast.node.BaseTypeSpec
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
-
-
-def infer_template_arg_def_universe(name: str) -> definition.DefinitionUniverse:
-    for ch in name:
-        if ch.isalpha():
-            if ch.isupper():
-                return definition.DefinitionUniverse.Type
-            else:
-                assert ch.islower()
-                return definition.DefinitionUniverse.Value
-    else:
-        raise excepts.TyperCompilationError("Invalid template arg name")

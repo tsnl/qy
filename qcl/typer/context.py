@@ -1,6 +1,7 @@
 """
 A context is a mapping of value-level variable names to schemes.
-It is broken into a tree of frames to introduce and remove symbols.
+Each `Context` object is part of a larger tree data-structure that efficiently
+handles shadowing definitions and substitution mappings.
 """
 
 from typing import *
@@ -8,110 +9,99 @@ from typing import *
 from qcl import type
 from qcl import feedback as fb
 
-from . import scheme
 from . import definition
 
 
-class ContextManager(object):
-    def __init__(self, root_context: "Context" = None):
-        super().__init__()
-        if root_context is not None:
-            self.root_context = root_context
-        else:
-            self.root_context = default_root_context
-
-        assert self.root_context is not None
-        self.context_stack = [root_context]
-
-    @property
-    def top_context(self) -> Optional["Context"]:
-        return self.context_stack[-1]
-
-    def push_context(self, opt_new_context=None):
-        if opt_new_context is None:
-            new_context = Context(opt_parent_frame=self.top_context)
-        else:
-            new_context = opt_new_context
-
-        assert new_context is not None
-        self.context_stack.append(new_context)
-
-    def pop_context(self):
-        self.context_stack.pop()
-
-    def try_define(self, def_name: str, def_obj: definition.BaseDef) -> bool:
-        assert self.top_context is not None
-
-        if def_name in self.top_context:
-            return False
-        else:
-            self.top_context[def_name] = def_obj
-            return True
-
-    def lookup(self, def_name):
-        for context in reversed(self.context_stack):
-            found_def = context.symbol_table.get(def_name, None)
-            if found_def is not None:
-                assert isinstance(found_def, definition.Definition)
-                return found_def
-        else:
-            return None
-
-    def map(self, fn: Callable[["Context"], None]):
-        self.root_context.map(fn)
-
-
 class Context(object):
+    opt_parent_context: Optional["Context"]
+    root_context: "Context"
+    child_context_list: List["Context"]
+    symbol_table: Dict[str, definition.BaseRecord]
+
     def __init__(
-            self,
-            opt_parent_frame: Optional["Context"],
-            symbol_table: Dict[str, definition.BaseDef] = None
+            self, purpose: str,
+            opt_parent_context: Optional["Context"],
+            symbol_table: Dict[str, definition.BaseRecord] = None
     ):
         super().__init__()
 
-        self.opt_parent_frame = opt_parent_frame
-        self.child_frames = []
-        if self.opt_parent_frame is not None:
-            self.opt_parent_frame.child_frames.append(self)
+        self.purpose = purpose
+
+        self.child_context_list = []
+
+        self.opt_parent_context = opt_parent_context
+        if self.opt_parent_context is None:
+            self.root_context = self
+        else:
+            self.root_context = self.opt_parent_context.root_context
+            self.opt_parent_context.child_context_list.append(self)
 
         if symbol_table is None:
             self.symbol_table = {}
         else:
             self.symbol_table = symbol_table
 
-    def __contains__(self, name: str):
-        return name in self.symbol_table
+    def push_context(self, purpose: str, opt_symbol_table=None):
+        return Context(purpose, self, opt_symbol_table)
 
-    def __setitem__(self, key: str, value: definition.BaseDef):
-        self.symbol_table[key] = value
+    def try_define(self, def_name: str, def_obj: definition.BaseRecord) -> bool:
+        if def_name in self.symbol_table:
+            return False
+        else:
+            assert def_obj is not None
+            self.symbol_table[def_name] = def_obj
+            return True
 
-    def __getitem__(self, key: str) -> definition.BaseDef:
-        return self.symbol_table[key]
+    def lookup(self, def_name, shallow=False):
+        found_def = self.symbol_table.get(def_name, None)
+        if found_def is not None:
+            return found_def
 
-    def print(self):
+        if not shallow and self.opt_parent_context:
+            return self.opt_parent_context.lookup(def_name, shallow=False)
+        else:
+            return None
+
+    def print(self, indent_count=0):
+        indent_text = ' ' * indent_count
+
+        print(f"{indent_text}* {self.purpose} @ {hex(id(self))}")
         for name, def_obj in self.symbol_table.items():
-            if def_obj.universe == definition.DefinitionUniverse.Type:
-                print(f"- {name} = {def_obj.scheme.spell()}")
-            elif def_obj.universe == definition.DefinitionUniverse.Value:
-                print(f"- {name} = {def_obj.scheme.spell()}")
+            if def_obj.universe in (definition.Universe.Value, definition.Universe.Module):
+                sep = "::"
             else:
-                raise NotImplementedError(f"Unknown definition.py universe: {def_obj.universe}")
+                sep = "="
 
-    def map(self, fn: Callable[["Context"], None]):
+            print(f"{indent_text}  - {name} {sep} {def_obj.scheme.spell()}")
+
+        for child_context in self.child_context_list:
+            child_context.print(indent_count=indent_count+2)
+
+    def map_everyone(self, fn: Callable[["Context"], None]):
+        self.root_context.map_descendants(fn)
+
+    def map_descendants(self, fn):
         fn(self)
 
-        for child_frame in self.child_frames:
-            child_frame.map(fn)
+        for child_context in self.child_context_list:
+            child_context.map_descendants(fn)
+
+    def map_ancestors(self, fn: Callable[["Context"], None]):
+        context = self
+        while context is not None:
+            fn(context)
+            context = context.opt_parent_context
 
 
-def make_default_root_context():
-    def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeDef:
+def make_default_root():
+    def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeRecord:
         loc = fb.BuiltinLoc(def_name)
-        def_obj = definition.TypeDef(loc, def_type_id)
+        def_obj = definition.TypeRecord(loc, def_type_id)
         return def_obj
 
     return Context(
-        opt_parent_frame=None,
+        purpose="default-root-context",
+        opt_parent_context=None,
         symbol_table=dict(
             **{
                 "String": new_builtin_type_def("String", type.get_str_type()),
@@ -136,6 +126,3 @@ def make_default_root_context():
             }
         )
     )
-
-
-default_root_context = make_default_root_context()

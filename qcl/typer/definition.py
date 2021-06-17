@@ -1,6 +1,5 @@
 import abc
 import enum
-import dataclasses
 
 from qcl import feedback
 from qcl import type
@@ -8,31 +7,32 @@ from qcl import type
 from . import scheme
 
 
-class BaseDef(object, metaclass=abc.ABCMeta):
+class BaseRecord(object, metaclass=abc.ABCMeta):
     loc: feedback.ILoc
     scheme: scheme.Scheme
-    universe: "DefinitionUniverse"
+    universe: "Universe"
 
-    def __init__(self, loc, new_scheme, universe):
+    def __init__(self, loc: "feedback.ILoc", new_scheme: "scheme.Scheme", universe: "Universe"):
+        assert isinstance(new_scheme, scheme.Scheme)
         super().__init__()
         self.loc = loc
         self.scheme = new_scheme
         self.universe = universe
 
 
-class ValueDef(BaseDef):
-    def __init__(self, loc, value_tid):
-        super().__init__(loc, scheme.Scheme(value_tid), DefinitionUniverse.Value)
+class ValueRecord(BaseRecord):
+    def __init__(self, loc: feedback.ILoc, value_tid: type.identity.TID):
+        super().__init__(loc, scheme.Scheme(value_tid), Universe.Value)
 
 
-class TypeDef(BaseDef):
-    def __init__(self, loc, value_tid):
-        super().__init__(loc, scheme.Scheme(value_tid), DefinitionUniverse.Type)
+class TypeRecord(BaseRecord):
+    def __init__(self, loc: feedback.ILoc, type_tid: type.identity.TID):
+        super().__init__(loc, scheme.Scheme(type_tid), Universe.Type)
 
 
-class ModDef(BaseDef):
-    def __init__(self, loc, mod_scheme):
-        super().__init__(loc, mod_scheme, DefinitionUniverse.Module)
+class ModRecord(BaseRecord):
+    def __init__(self, loc: feedback.ILoc, mod_scheme: scheme.Scheme):
+        super().__init__(loc, mod_scheme, Universe.Module)
 
 
 # @dataclasses.dataclass
@@ -53,8 +53,7 @@ class ModDef(BaseDef):
 
 
 @enum.unique
-class DefinitionUniverse(enum.Enum):
+class Universe(enum.Enum):
     Type = enum.auto()
     Value = enum.auto()
     Module = enum.auto()
-
