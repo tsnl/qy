@@ -153,5 +153,11 @@ class Substitution(object):
 
         return Substitution(sub_map=(s1_sub_map | s2_sub_map))
 
+    def __str__(self):
+        return '{' + ','.join((
+            f"{type.spelling.of(key)} -> {type.spelling.of(value)}"
+            for (key, value) in self.sub_map.items()
+        )) + '}'
+
 
 empty = Substitution()

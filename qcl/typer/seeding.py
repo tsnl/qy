@@ -84,7 +84,7 @@ def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: ast.node.FileModE
 def seed_import(ctx: context.Context, loc, import_name: str, import_source: frontend.FileModuleSource):
     imported_mod_exp = import_source.ast_file_mod_exp_from_frontend
     imported_tid = mod_exp_tid_map[imported_mod_exp]
-    def_obj = definition.ModRecord(loc, scheme.Scheme(imported_tid))
+    def_obj = definition.ModRecord(loc, scheme.Scheme(imported_tid), imported_mod_exp)
     def_ok = ctx.try_define(import_name, def_obj)
     if not def_ok:
         msg_suffix = f"import name {import_name} clashes with existing definition in this file-module"
@@ -102,7 +102,7 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: ast.n
     # - NOTE: all value template args do not need a polymorphic type variable.
     template_type_arg_names, template_val_arg_names = names.sift_type_from_val(sub_mod_exp.template_arg_names)
     sub_mod_scheme = scheme.Scheme(sub_mod_tid, template_type_arg_names)
-    sub_mod_def_obj = definition.ModRecord(sub_mod_exp.loc, sub_mod_scheme)
+    sub_mod_def_obj = definition.ModRecord(sub_mod_exp.loc, sub_mod_scheme, sub_mod_exp)
     def_ok = ctx.try_define(sub_mod_name, sub_mod_def_obj)
     if not def_ok:
         msg_suffix = f"sub-module {sub_mod_name} conflicts with another definition in a file-module scope"
@@ -156,14 +156,13 @@ def seed_template_type_arg(
         raise excepts.TyperCompilationError(msg_suffix)
 
 
-
 def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: ast.node.BaseBindElem):
     # creating a 'seed':
     def_name = bind1_elem.id_name
     defined_tid = type.new_free_var(f"seed.bind.{def_name}")
 
     # creating an appropriate definition object `def_obj`:
-    def_universe = names.def_universe(def_name)
+    def_universe = names.infer_def_universe_of(def_name)
     if def_universe == definition.Universe.Value:
         def_obj = definition.ValueRecord(bind1_elem.loc, defined_tid)
     elif def_universe == definition.Universe.Type:

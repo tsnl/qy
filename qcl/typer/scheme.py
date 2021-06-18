@@ -60,7 +60,8 @@ class Scheme(object):
                 assert len(args) == len(self.bound_vars)
                 sub = substitution.empty
                 for actual_arg, formal_arg in zip(args, self.bound_vars):
-                    sub = sub.compose(unifier.unify(actual_arg, formal_arg))
+                    unify_sub = unifier.unify(actual_arg, formal_arg)
+                    sub = sub.compose(unify_sub)
 
             # rewriting the type using this sub:
             return sub, sub.rewrite_type(self.body_tid)

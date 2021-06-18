@@ -11,6 +11,7 @@ from . import context
 from . import definition
 from . import unifier
 from . import substitution
+from . import names
 
 
 class SubModTypeInferenceInfo(object):
@@ -208,8 +209,9 @@ def infer_exp_tid(
 
         sub = substitution.empty
 
+        # looking up `found_def_obj` referring to [a:]b in this exp:
         if exp.opt_container is None:
-            # look up an imported mod-def:
+            # the LHS is None, so the RHS must look up in the local context:
             file_mod_name = exp.elem_name
             found_def_obj = ctx.lookup(file_mod_name)
 
@@ -219,10 +221,6 @@ def infer_exp_tid(
             elif not isinstance(found_def_obj, definition.ModRecord):
                 msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
                 raise excepts.TyperCompilationError(msg_suffix)
-            # else:
-            #     sub, file_mod_tid = found_def_obj.scheme.instantiate()
-            #     # TODO: why not retrieve and also return the GetModElementExp from Defn?
-            #     return sub, file_mod_tid
         else:
             assert exp.opt_container is not None
 
@@ -231,102 +229,107 @@ def infer_exp_tid(
             container_mod_exp = seeding.mod_tid_exp_map[container_tid]
             container_ctx = seeding.mod_context_map[container_mod_exp]
 
+            # updating the existing sub with the sub from this inference:
+            sub = sub.compose(container_sub)
+
             # looking up the element in the container:
             found_def_obj = container_ctx.lookup(exp.elem_name, shallow=True)
             if found_def_obj is None:
                 msg_suffix = f"element {exp.elem_name} not found in existing module"
                 raise excepts.TyperCompilationError(msg_suffix)
 
-            sub = sub.compose(container_sub)
-
         # instantiating the found definition's scheme, using actual arguments if provided:
-        found_scheme = found_def_obj.scheme
+        instantiated_scheme = found_def_obj.scheme
         if not exp.elem_args:
-            instantiation_sub, found_tid = found_scheme.instantiate()
+            # no template arg call required/automatically instantiate:
+            instantiation_sub, found_tid = instantiated_scheme.instantiate()
             sub = sub.compose(instantiation_sub)
             return sub, sub.rewrite_type(found_tid)
         else:
+            # template args provided: must be matched against the definition.
+
             #
-            # actual arg validation + processing:
+            # first, checking that the def of the called object actually points to a sub-module:
             #
 
-            expected_arg_count = len(found_scheme.bound_vars)
+            if not isinstance(found_def_obj, definition.ModRecord):
+                msg = f"cannot use any ({len(exp.elem_args)}) template args to instantiate a non-module definition"
+                raise excepts.TyperCompilationError(msg)
+
+            if not isinstance(found_def_obj.mod_exp, ast.node.SubModExp):
+                msg = f"only submodules can accept template args"
+                raise excepts.TyperCompilationError(msg)
+
+            #
+            # next, comparing definitions in the sub-module against the actual parameters received:
+            #
+
+            # checking arg counts:
+            instantiated_mod_exp = found_def_obj.mod_exp
+            instantiated_mod_ctx = seeding.mod_context_map[instantiated_mod_exp]
+            expected_arg_count = len(instantiated_mod_exp.template_arg_names)
             actual_arg_count = len(exp.elem_args)
-            if actual_arg_count != expected_arg_count:
-                msg_suffix = f"expected {expected_arg_count} template args, but received {actual_arg_count}"
+            if expected_arg_count != actual_arg_count:
+                msg = f"template argument count wrong: expected {expected_arg_count}, received {actual_arg_count}"
+                raise excepts.TyperCompilationError(msg)
+
+            arg_count = actual_arg_count
+            assert arg_count == actual_arg_count == expected_arg_count
+
+            # checking universes for actual-formal mismatches:
+            # - in other words, ensuring values passed to value args, types to type args.
+            # - also sifting arguments by universe to perform appropriate checks:
+            actual_type_arg_tid_list = []
+            mismatch_list = []
+            zipped_args = zip(instantiated_mod_exp.template_arg_names, exp.elem_args)
+            for arg_index, (formal_name, actual_arg_node) in enumerate(zipped_args):
+                name_universe = names.infer_def_universe_of(formal_name)
+                if isinstance(actual_arg_node, ast.node.BaseExp):
+                    if name_universe != definition.Universe.Value:
+                        mismatch_list.append(f"- arg #{arg_index}: expected type arg, received a value")
+                    else:
+                        actual_arg_exp = actual_arg_node
+                        actual_arg_sub, actual_value_arg_tid = infer_exp_tid(ctx, actual_arg_exp)
+                        sub = sub.compose(actual_arg_sub)
+
+                        assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
+                        formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
+                        assert isinstance(formal_val_def_obj, definition.ValueRecord)
+                        instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
+                        sub = sub.compose(instantiate_sub)
+
+                        # unifying value args:
+                        this_val_arg_sub = unifier.unify(
+                            sub.rewrite_type(formal_value_arg_tid),
+                            sub.rewrite_type(actual_value_arg_tid)
+                        )
+                        sub = sub.compose(this_val_arg_sub)
+                else:
+                    assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
+                    if name_universe != definition.Universe.Type:
+                        mismatch_list.append(f"- arg #{arg_index}: expected value arg, received a type")
+                    else:
+                        assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
+                        assert names.infer_def_universe_of(formal_name) == definition.Universe.Type
+
+                        actual_arg_ts = actual_arg_node
+                        actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
+                        sub = sub.compose(actual_arg_sub)
+
+                        actual_type_arg_tid_list.append(actual_type_arg_tid)
+
+            if mismatch_list:
+                mismatch_text = '\n'.join(mismatch_list)
+                msg_suffix = f"Mismatched template args:\n{mismatch_text}"
                 raise excepts.TyperCompilationError(msg_suffix)
 
-            # sifting type args from value args:
-            actual_v_args = []
-            actual_t_args = []
-            for elem_arg_ast_node in exp.elem_args:
-                if isinstance(elem_arg_ast_node, ast.node.BaseExp):
-                    actual_v_args.append(elem_arg_ast_node)
-                else:
-                    assert isinstance(elem_arg_ast_node, ast.node.BaseTypeSpec)
-                    actual_t_args.append(elem_arg_ast_node)
-
-            #
-            # inferring types of type & value actual args:
-            #
-
-            # inferring TIDs of value args
-            actual_v_arg_tid_list = []
-            for actual_v_arg in actual_v_args:
-                e_sub, e_tid = infer_exp_tid(ctx, actual_v_arg)
-                sub = sub.compose(e_sub)
-                actual_v_arg_tid_list.append(e_tid)
-
-            # inferring TIDs of type args from context:
-            actual_t_arg_tid_list = []
-            for actual_t_arg in actual_t_args:
-                ts_sub, ts_tid = infer_type_spec_tid(ctx, actual_t_arg)
-                sub = sub.compose(ts_sub)
-                actual_t_arg_tid_list.append(ts_tid)
-
-            #
-            # unifying TIDs of value args
-            # - only perform this when value args are actually passed (even if formally defined)
-            #
-
-            if actual_v_arg_tid_list:
-                # TODO: figure out how to get the instantiated module from the definition (from seeding)
-                #   - this way, we can get the value arg names.
-
-                # TODO: this code incorrectly admits reordering type and value args as long as the ordering
-                #       between type and value args is correct.
-                #       We should check for this once we can acquire the original formal args.
-
-                raise NotImplementedError("passing value actual args to a template.")
-
-                # acquiring a list of value arg names in the container:
-                # val_arg_names = names.filter_vals(container_mod_exp.template_arg_names)
-                #
-                # # looking up their defined types:
-                # # - note template args should always be pre-seeded and monomorphic in the scheme context.
-                # formal_v_arg_tid_list = []
-                # for val_arg_name in val_arg_names:
-                #     val_arg_def_obj = ctx.lookup(val_arg_name, shallow=True)
-                #     assert val_arg_def_obj is not None
-                #     assert not val_arg_def_obj.scheme.bound_vars
-                #     val_arg_tid = val_arg_def_obj.scheme.instantiate()
-                #     formal_v_arg_tid_list.append(val_arg_tid)
-                #
-                # # unifying formal and actual value arg types:
-                # assert len(formal_v_arg_tid_list) == len(actual_v_arg_tid_list)
-                # for formal_tid, actual_tid in zip(formal_v_arg_tid_list, actual_v_arg_tid_list):
-                #     sub = sub.compose(unifier.unify(formal_tid, actual_tid))
-            else:
-                pass
-
-            #
-            # unifying TIDs of type args using `Scheme.instantiate`:
-            #
-
-            instantiate_sub, final_tid = found_scheme.instantiate(actual_t_arg_tid_list)
+            # instantiating the scheme using type args:
+            # - unifies bound and actual type args, thereby monomorphizing
+            instantiate_sub, found_tid = instantiated_scheme.instantiate(args=actual_type_arg_tid_list)
             sub = sub.compose(instantiate_sub)
 
-            return sub, final_tid
+            # returning the resulting substitution and TID:
+            return sub, sub.rewrite_type(found_tid)
 
     #
     # context-independent branches:

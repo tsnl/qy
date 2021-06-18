@@ -5,7 +5,7 @@ from qcl import excepts
 from . import definition
 
 
-def def_universe(name: str) -> definition.Universe:
+def infer_def_universe_of(name: str) -> definition.Universe:
     for ch in name:
         if ch.isalpha():
             if ch.isupper():
@@ -19,7 +19,7 @@ def def_universe(name: str) -> definition.Universe:
 
 def filter_in_universe(names: Iterable[str], du: definition.Universe) -> Iterable[str]:
     for name in names:
-        if def_universe(name) == du:
+        if infer_def_universe_of(name) == du:
             yield name
 
 
@@ -36,9 +36,9 @@ def sift_type_from_val(names: Iterable[str]):
     all_t_names = []
 
     for name in names:
-        if def_universe(name) == definition.Universe.Value:
+        if infer_def_universe_of(name) == definition.Universe.Value:
             all_v_names.append(name)
-        elif def_universe(name) == definition.Universe.Type:
+        elif infer_def_universe_of(name) == definition.Universe.Type:
             all_t_names.append(name)
 
     return all_t_names, all_v_names

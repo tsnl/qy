@@ -54,8 +54,8 @@ chainTableWrapper
 //
 
 moduleAddressPrefix
-    :                                mod_name=VID ('<' args+=actualTemplateArg '>')? ':'
-    | opt_prefix=moduleAddressPrefix mod_name=VID ('<' args+=actualTemplateArg '>')? ':'
+    :                                mod_name=VID ('<' args+=actualTemplateArg (',' args+=actualTemplateArg)* '>')? ':'
+    | opt_prefix=moduleAddressPrefix mod_name=VID ('<' args+=actualTemplateArg (',' args+=actualTemplateArg)* '>')? ':'
     ;
 actualTemplateArg
     : e=expr
