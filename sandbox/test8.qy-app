@@ -1,13 +1,13 @@
-mod alphabet_soup [T] {
+mod alphabet_soup [T, u] {
     a = "hello";
     # x = T(0);
-    y = 1;
+    x = u;
     z = 2;
 };
 
 mod modernism {
     a = 0x42;
-    # another_x = alphabet_soup[String]:x;
+    another_x = alphabet_soup[String, 42Q]:u;
 };
 
 mod postmodernism {
@@ -19,7 +19,7 @@ mod effing {
     f2 = (y) -> (y);
 
     f3 = (z) -> (42f);
-    z = f3(2Q);
+    z = f3(2q);
 
-    w = f1(f2(0e));
+    w = f1(f2(0d));
 };
