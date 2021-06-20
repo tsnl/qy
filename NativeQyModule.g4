@@ -27,7 +27,7 @@ exportLine
     ;
 
 moduleDef
-    : 'mod' name=VID ('<' args+=(VID|TID) (',' args+=(VID|TID))* '>')? body=tableWrapper
+    : 'mod' name=VID ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')? body=tableWrapper
     ;
 
 //
@@ -54,8 +54,8 @@ chainTableWrapper
 //
 
 moduleAddressPrefix
-    :                                mod_name=VID ('<' args+=actualTemplateArg (',' args+=actualTemplateArg)* '>')? ':'
-    | opt_prefix=moduleAddressPrefix mod_name=VID ('<' args+=actualTemplateArg (',' args+=actualTemplateArg)* '>')? ':'
+    :                                mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
+    | opt_prefix=moduleAddressPrefix mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
     ;
 actualTemplateArg
     : e=expr
@@ -177,7 +177,7 @@ assignExp
 bulkyExp
     : through=assignExp
     | if_exp=ifExp
-    | fn_exp=fnExp
+    | fn_exp=lambdaExp
     | allocate_exp=allocateExp
     ;
 ifExp
@@ -187,12 +187,12 @@ elseBranchExp
     : chain_exp=chainPrimaryExp
     | if_exp=ifExp
     ;
-fnExp
-    : '(' (args+=VID ',')* (args+=VID)? ')' '->' body=expr
+lambdaExp
+    : '(' (args+=VID ',')* (args+=VID)? ')' '->' (ses=effectsSpec)? body=expr
     ;
 allocateExp
     : hint=allocatorHint (initializer=parenWrappedExp)
-    | hint=allocatorHint '[' collection_ts=typeSpec '^' (size=expr|'?') ']' (initializer=parenWrappedExp)?
+    | hint=allocatorHint '[' collection_ts=typeSpec '*' (size=expr|'?') ']' (initializer=parenWrappedExp)?
     ;
 allocatorHint: 'make' | 'push' ;
 
@@ -218,8 +218,8 @@ unaryTypeSpec
     | 'Struct' elements=tableWrapper                    #structTypeSpec
     | 'Enum' elements=tableWrapper                      #taggedUnionTypeSpec
     | 'Union' elements=tableWrapper                     #untaggedUnionTypeSpec
-    | (is_mut='mut')? '[' t=typeSpec ',' n=expr ']'     #arrayTypeSpec
-    | (is_mut='mut')? '[' t=typeSpec ',' '?' ']'        #sliceTypeSpec
+    | (is_mut='mut')? '[' t=typeSpec '*' n=expr ']'     #arrayTypeSpec
+    | (is_mut='mut')? '[' t=typeSpec '*' '?' ']'        #sliceTypeSpec
     | (is_mut='mut')? '[' t=typeSpec ']'                #ptrTypeSpec
     ;
 binaryTypeSpec
@@ -232,7 +232,7 @@ binaryTypeSpec
 //
 
 effectsSpec
-    : kw=('Tot'|'Dv'|'ST'|'Exn'|'ML')
+    : kw=('TOT'|'DV'|'ST'|'EXN'|'ML')
     ;
 
 //

@@ -47,10 +47,11 @@ def of(tid: identity.TID):
 
     elif type_kind == kind.TK.Fn:
         lhs_spelling = of(elem.tid_of_fn_arg(tid))
+        rhs_spelling = of(elem.tid_of_fn_ret(tid))
         if lhs_spelling[0] == '(':
-            return f"{lhs_spelling} -> {elem.tid_of_fn_ret(tid)}"
+            return f"{lhs_spelling} -> {rhs_spelling}"
         else:
-            return f"({lhs_spelling}) -> {elem.tid_of_fn_ret(tid)}"
+            return f"({lhs_spelling}) -> {rhs_spelling}"
 
     elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Enum):
         prefix_keyword_map = {

@@ -68,20 +68,26 @@ class NumberExp(BaseExp):
         self.digits = self.digits.replace('_', '')
 
         # checking coarse 'kind' based on suffix:
-        assert self.suffix is None or self.suffix in 'fFbBuUiI'
-        self.is_explicitly_float = (self.suffix in ('f', 'F')) or ('.' in self.digits)
-        self.is_explicitly_unsigned_int = self.suffix in ('b', 'B', 'u', 'U')
-        self.is_explicitly_signed_int = self.suffix in ('i', 'I') or (
-                not self.is_explicitly_float and
-                not self.is_explicitly_unsigned_int
+        assert self.suffix is None or self.suffix in 'bBhHiIlLqQnNefd'
+        self.is_explicitly_float = (self.suffix in ('e', 'f', 'd')) or ('.' in self.digits)
+        self.is_explicitly_unsigned_int = self.suffix in ('B', 'H', 'I', 'L', 'Q', 'N')
+        self.is_explicitly_signed_int = self.suffix in ('b', 'h', 'i', 'l', 'q', 'n') or (
+            not self.is_explicitly_float and
+            not self.is_explicitly_unsigned_int
         )
         self.is_implicitly_typed = self.suffix is None
 
         # setting width in bits based on suffix:
+        # TODO: acquire pointer-size in bytes based on target; currently hard-coded for 64-bit.
+        pointer_size_in_bytes = 8
         self.width_in_bits = {
-            'f': 32, 'F': 64,
-            'b': 1, 'B': 8, 'u': 32, 'U': 64,
-            'i': 32, 'I': 64,
+            'b': 8, 'B': 8,
+            'h': 16, 'H': 16,
+            'i': 32, 'I': 32,
+            'l': 64, 'L': 64,
+            'q': 128, 'Q': 128,
+            'n': 8 * pointer_size_in_bytes, 'N': 8 * pointer_size_in_bytes,
+            'e': 16, 'f': 32, 'd': 64,
             None: None
         }[self.suffix]
 
@@ -129,10 +135,12 @@ class IdExp(BaseExp):
 
 
 class LambdaExp(BaseExp):
-    def __init__(self, loc: "feedback.ILoc", arg_names: List[str], body: BaseExp):
+    def __init__(self, loc: "feedback.ILoc", arg_names: List[str], body: BaseExp,
+                 opt_ses: Optional[type.side_effects.SES]):
         super().__init__(loc)
         self.arg_names = arg_names
         self.body = body
+        self.opt_ses = opt_ses
 
 
 class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
@@ -669,9 +677,9 @@ class GetModElementExp(BaseExp):
             self.elem_args = []
 
     def __str__(self):
-        elem_args_str = f"<{','.join(map(str, self.elem_args))}>"
+        elem_args_str = ','.join(map(str, self.elem_args))
         if self.opt_container is not None:
-            return f"{self.opt_container}:{self.elem_name}{elem_args_str}"
+            return f"{self.opt_container}:{self.elem_name}({elem_args_str})"
         else:
             return f"{self.elem_name}{elem_args_str}"
 

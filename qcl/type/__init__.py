@@ -91,34 +91,34 @@ def get_fn_type(
 
 
 @functools.cache
-def get_tuple_type(elem_tid_iterable: Tuple[identity.TID]) -> identity.TID:
+def get_tuple_type(elem_tid_tuple: Tuple[identity.TID]) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Tuple)
-    elem.init_tuple(tid, elem_tid_iterable)
+    elem.init_tuple(tid, elem_tid_tuple)
     return tid
 
 
 @functools.cache
-def get_struct_type(field_elem_info_iterable: Tuple[elem.ElemInfo]) -> identity.TID:
+def get_struct_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Struct)
-    elem.init_struct(tid, field_elem_info_iterable)
+    elem.init_struct(tid, field_elem_info_tuple)
     return tid
 
 
 @functools.cache
-def get_union_type(field_elem_info_iterable: Tuple[elem.ElemInfo]) -> identity.TID:
+def get_union_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Union)
-    elem.init_union(tid, field_elem_info_iterable)
+    elem.init_union(tid, field_elem_info_tuple)
     return tid
 
 
 @functools.cache
-def get_enum_type(field_elem_info_iterable: Tuple[elem.ElemInfo]) -> identity.TID:
+def get_enum_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Enum)
-    elem.init_enum(tid, field_elem_info_iterable)
+    elem.init_enum(tid, field_elem_info_tuple)
     return tid
 
 
@@ -126,10 +126,10 @@ def get_enum_type(field_elem_info_iterable: Tuple[elem.ElemInfo]) -> identity.TI
 # NOTE: module creation is not cached, because we want each module to have a unique type.
 #
 
-def new_module_type(field_elem_info_iterable: Tuple[elem.ElemInfo]) -> identity.TID:
+def new_module_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Module)
-    elem.init_module(tid, field_elem_info_iterable)
+    elem.init_module(tid, field_elem_info_tuple)
     return tid
 
 

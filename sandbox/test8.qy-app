@@ -1,15 +1,23 @@
-mod alphabet_soup <T> {
+mod alphabet_soup [T] {
     a = "hello";
-    x = T(0);
+    # x = T(0);
     y = 1;
     z = 2;
 };
 
 mod modernism {
     a = 0x42;
-    another_x = alphabet_soup<Float32>:x;
+    # another_x = alphabet_soup[String]:x;
 };
 
 mod postmodernism {
     a_re_examined = modernism:a;
+};
+
+mod effing {
+    f1 = (x) -> (x);
+    f2 = (y) -> (y);
+
+    f3 = (z) -> (42f);
+    z = f3(2Q);
 };

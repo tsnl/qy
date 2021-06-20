@@ -1,22 +1,23 @@
 exports {
-    vec:{*}
+    vec;
 };
 
-mod vec <T> {
-    Vec2 = impl<T,2>:Vector;
-    Vec3 = impl<T,3>:Vector;
-    add2 = impl<T,2>:add;
-    add3 = impl<T,3>:add;
+mod vec [T] {
+    Vec2 = impl[T,2]:Vector;
+    Vec3 = impl[T,3]:Vector;
+    add2 = impl[T,2]:add;
+    add3 = impl[T,3]:add;
 };
 
 mod impl [T, n] {
     n :: UInt32;
+    help_apply_piecewise_bin_op :: (Vector, Vector, BinOpFn) -> TOT Vector;
+
     Vector = Array[T,n];
-    BinOpFn = (T, T) -> Tot T;
-    help_apply_piecewise_bin_op :: (Vector, Vector, BinOpFn) -> Tot Vector;
+    BinOpFn = (T, T) -> TOT T;
 
     help_apply_piecewise_bin_op = (v1, v2, bin_op_fn) -> {
-        results = push Array[T,n];
+        results = push [T * n];
         for i = push(0); *i < n; i := *i + 1 {
             results[i] := bin_op_fn(*v1[i], *v2[i]);
         };

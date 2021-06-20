@@ -523,11 +523,12 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         else:
             assert False and "Unknown 'elseBranchExp'"
 
-    def visitFnExp(self, ctx):
+    def visitLambdaExp(self, ctx):
         return ast.node.LambdaExp(
             self.ctx_loc(ctx),
             [fn_arg.text for fn_arg in ctx.args],
-            self.visit(ctx.body)
+            self.visit(ctx.body),
+            self.visit(ctx.ses) if ctx.ses else None
         )
 
     #
@@ -594,9 +595,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitEffectsSpec(self, ctx):
         return {
-            'Tot': type.side_effects.SES.Tot,
-            'Dv': type.side_effects.SES.Dv,
-            'Exn': type.side_effects.SES.Exn,
+            'TOT': type.side_effects.SES.Tot,
+            'DV': type.side_effects.SES.Dv,
+            'EXN': type.side_effects.SES.Exn,
             'ST': type.side_effects.SES.ST,
             'ML': type.side_effects.SES.ML
         }[ctx.getText()]

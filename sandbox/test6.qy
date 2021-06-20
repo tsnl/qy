@@ -4,7 +4,7 @@ mod test6 {
         y :: F32;
         z :: F32;
     };
-    new_vec3f = (x, y, z) -> Tot Vector3f {
+    new_vec3f = (x, y, z) -> TOT Vector3f {
         (x, y, z)
     };
 };

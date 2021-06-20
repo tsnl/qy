@@ -148,33 +148,24 @@ def infer_sub_mod_exp_tid(
 
 
 def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem):
-    if isinstance(elem, ast.node.Bind1VElem):
-        s1, rhs_tid = infer_exp_tid(ctx, elem.bound_exp)
-        lhs_v_def_obj = ctx.lookup(elem.id_name, shallow=True)
-        if lhs_v_def_obj is not None:
+    if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
+        if isinstance(elem, ast.node.Bind1VElem):
+            sub, rhs_tid = infer_exp_tid(ctx, elem.bound_exp)
+        else:
+            assert isinstance(elem, ast.node.Bind1TElem)
+            sub, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
+
+        lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
+        if lhs_def_obj is not None:
             # pre-seeded:
-            s2, lhs_v_tid = s1.rewrite_scheme(lhs_v_def_obj.scheme).instantiate()
+            sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+            sub = sub.compose(sub_lhs)
         else:
             # un-seeded: bound inside a chain
             raise NotImplementedError("binding elem in chains")
 
-        s3 = unifier.unify(lhs_v_tid, rhs_tid)
-        sub = s2.compose(s3)
-
-        sub.rewrite_contexts_everywhere(ctx)
-
-    elif isinstance(elem, ast.node.Bind1TElem):
-        s1, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
-        lhs_ts_def_obj = ctx.lookup(elem.id_name, shallow=True)
-        if lhs_ts_def_obj is not None:
-            # pre-seeded:
-            s2, lhs_ts_tid = s1.rewrite_scheme(lhs_ts_def_obj.scheme).instantiate()
-        else:
-            # un-seeded: bound inside a chain
-            raise NotImplementedError("binding elem in chains")
-
-        s3 = unifier.unify(lhs_ts_tid, rhs_tid)
-        sub = s2.compose(s3)
+        unify_sub = unifier.unify(lhs_tid, rhs_tid)
+        sub = sub.compose(unify_sub)
 
         sub.rewrite_contexts_everywhere(ctx)
 
@@ -198,8 +189,8 @@ def infer_exp_tid(
 
         found_def_obj = ctx.lookup(exp.name)
         if found_def_obj is not None:
-            sub, def_tid = found_def_obj.scheme.instantiate()
-            return sub, def_tid
+            ret_sub, def_tid = found_def_obj.scheme.instantiate()
+            return ret_sub, def_tid
         else:
             raise excepts.TyperCompilationError(f"Symbol {exp.name} used but not defined.")
 
@@ -207,7 +198,7 @@ def infer_exp_tid(
         # FIXME: something is really fishy about how we handle containers here...
         #   - elem_args should instantiate the found elem independent of the container
 
-        sub = substitution.empty
+        ret_sub = substitution.empty
 
         # looking up `found_def_obj` referring to [a:]b in this exp:
         if exp.opt_container is None:
@@ -230,7 +221,7 @@ def infer_exp_tid(
             container_ctx = seeding.mod_context_map[container_mod_exp]
 
             # updating the existing sub with the sub from this inference:
-            sub = sub.compose(container_sub)
+            ret_sub = ret_sub.compose(container_sub)
 
             # looking up the element in the container:
             found_def_obj = container_ctx.lookup(exp.elem_name, shallow=True)
@@ -243,8 +234,8 @@ def infer_exp_tid(
         if not exp.elem_args:
             # no template arg call required/automatically instantiate:
             instantiation_sub, found_tid = instantiated_scheme.instantiate()
-            sub = sub.compose(instantiation_sub)
-            return sub, sub.rewrite_type(found_tid)
+            ret_sub = ret_sub.compose(instantiation_sub)
+            return ret_sub, ret_sub.rewrite_type(found_tid)
         else:
             # template args provided: must be matched against the definition.
 
@@ -290,20 +281,20 @@ def infer_exp_tid(
                     else:
                         actual_arg_exp = actual_arg_node
                         actual_arg_sub, actual_value_arg_tid = infer_exp_tid(ctx, actual_arg_exp)
-                        sub = sub.compose(actual_arg_sub)
+                        ret_sub = ret_sub.compose(actual_arg_sub)
 
                         assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
                         formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
                         assert isinstance(formal_val_def_obj, definition.ValueRecord)
                         instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
-                        sub = sub.compose(instantiate_sub)
+                        ret_sub = ret_sub.compose(instantiate_sub)
 
                         # unifying value args:
                         this_val_arg_sub = unifier.unify(
-                            sub.rewrite_type(formal_value_arg_tid),
-                            sub.rewrite_type(actual_value_arg_tid)
+                            ret_sub.rewrite_type(formal_value_arg_tid),
+                            ret_sub.rewrite_type(actual_value_arg_tid)
                         )
-                        sub = sub.compose(this_val_arg_sub)
+                        ret_sub = ret_sub.compose(this_val_arg_sub)
                 else:
                     assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
                     if name_universe != definition.Universe.Type:
@@ -314,7 +305,7 @@ def infer_exp_tid(
 
                         actual_arg_ts = actual_arg_node
                         actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
-                        sub = sub.compose(actual_arg_sub)
+                        ret_sub = ret_sub.compose(actual_arg_sub)
 
                         actual_type_arg_tid_list.append(actual_type_arg_tid)
 
@@ -326,10 +317,10 @@ def infer_exp_tid(
             # instantiating the scheme using type args:
             # - unifies bound and actual type args, thereby monomorphizing
             instantiate_sub, found_tid = instantiated_scheme.instantiate(args=actual_type_arg_tid_list)
-            sub = sub.compose(instantiate_sub)
+            ret_sub = ret_sub.compose(instantiate_sub)
 
             # returning the resulting substitution and TID:
-            return sub, sub.rewrite_type(found_tid)
+            return ret_sub, ret_sub.rewrite_type(found_tid)
 
     #
     # context-independent branches:
@@ -366,32 +357,176 @@ def infer_exp_tid(
 
         s1, formal_fn_tid = infer_exp_tid(ctx, exp.called_exp)
 
-        s2, arg_tid = infer_exp_tid(ctx, exp.arg_exp)
-        arg_tid = s1.rewrite_type(arg_tid)
+        s2, actual_arg_tid = infer_exp_tid(ctx, exp.arg_exp)
+        actual_arg_tid = s1.rewrite_type(actual_arg_tid)
 
         s12 = s1.compose(s2)
 
         ses = type.side_effects.SES.Elim_AnyNonTot if exp.has_se else type.side_effects.SES.Tot
-        actual_fn_tid = type.get_fn_type(arg_tid, ret_tid, ses)
+        actual_fn_tid = type.get_fn_type(actual_arg_tid, ret_tid, ses)
         actual_fn_tid = s12.rewrite_type(actual_fn_tid)
 
         s3 = unifier.unify(actual_fn_tid, formal_fn_tid)
 
         s123 = s12.compose(s3)
 
-        return s123, ret_tid
+        return s123, s123.rewrite_type(ret_tid)
 
     elif isinstance(exp, ast.node.CastExp):
         s1, src_tid = infer_exp_tid(ctx, exp.initializer_data)
         s2, dst_tid = infer_type_spec_tid(ctx, exp.constructor_ts)
-        # s3 = unifier.unify(src_tid, dst_tid)
+        dst_tid = s1.rewrite_type(dst_tid)
+        ret_sub = s1.compose(s2)
+
+        #
+        # checking if conversion is valid:
+        #
+
+        src_tk = type.kind.of(src_tid)
+        dst_tk = type.kind.of(dst_tid)
+
+        simple_monomorphic_tk_set = {
+            type.kind.TK.Unit,
+            type.kind.TK.String
+        }
+        number_tk_set = {
+            type.kind.TK.SignedInt,
+            type.kind.TK.UnsignedInt,
+            type.kind.TK.Float
+        }
+        simple_window_tk_set = {
+            type.kind.TK.Pointer,
+            type.kind.TK.Array
+        }
+        slice_src_tk_set = {
+            type.kind.TK.Slice,
+            type.kind.TK.Array
+        }
+        var_tk_set = {
+            type.kind.TK.FreeVar,
+            type.kind.TK.BoundVar,
+        }
+
         # TODO: compare src_tid and dst_tid to ensure they can be inter-converted.
-        sub = s1.compose(s2)
-        return sub, sub.rewrite_type(dst_tid)
+        #   - Unit only from Unit, String only from String
+        #   - SignedInt, UnsignedInt, Float from SignedInt, UnsignedInt, Float (numbers interchangeable)
+        #   - Struct, Tuple from Struct, Tuple
+        #       - need to perform element-wise conversion
+        #       - length mismatch from tuple or struct unacceptable <=> mostly identity operation on packed bytes
+        #   - Enum, Union from other Enum, Union
+        #       - can construct enum/union branch using `EnumType:variant` or `UnionType:variant` (syntax WIP)
+        #   - Array from Array only, Pointer from Pointer only, Slice from Array or Slice
+        #       - NOTE: can unify content type for all three containers: implies that `reinterpret_cast`-type behavior
+        #         is a totally different expression/function.
+        #       - NOTE: must also ensure `mut` specifier matches: can convert from `mut` to non-mut but not vice-versa.
+        #   - cannot cast any other type kind
+
+        # case 1: String, Unit
+        if dst_tk in simple_monomorphic_tk_set:
+            if src_tid != dst_tid:
+                raise_cast_error(src_tid, dst_tid)
+
+        # case 2: numbers
+        elif dst_tk in number_tk_set:
+            if src_tk not in number_tk_set:
+                raise_cast_error(src_tid, dst_tid)
+
+        # case 3: array/ptr
+        elif dst_tk in simple_window_tk_set:
+            # checking that we are only converting array -> array and ptr -> ptr
+            if src_tk != dst_tk:
+                raise_cast_error(src_tid, dst_tid, "cannot convert array to pointer or vice-versa")
+
+            # checking both share the same mutability:
+            dst_is_mut = bool(type.is_mut.ptr_or_array_or_slice(dst_tid))
+            src_is_mut = bool(type.is_mut.ptr_or_array_or_slice(src_tid))
+            if dst_is_mut and not src_is_mut:
+                raise_cast_error(src_tid, dst_tid, "cannot cast immutable window to a mutable one")
+
+            # attempting to unify content types => error if failed.
+            ptd_unify_sub = unifier.unify(
+                type.elem.tid_of_ptd(src_tid),
+                type.elem.tid_of_ptd(dst_tid)
+            )
+            ret_sub = ret_sub.compose(ptd_unify_sub)
+
+            # if both arrays, check if length is identical:
+            if dst_tk == type.kind.TK.Array:
+                # TODO: need to further validate the arrays are of the same length
+                # NOTE: can also determine this in 'basic checks' later
+                pass
+
+        # case 4: slice
+        elif dst_tk == type.kind.TK.Slice:
+            if src_tk not in slice_src_tk_set:
+                raise_cast_error(src_tid, dst_tid)
+
+        # case 5: ensure no inference errors
+        elif src_tk in var_tk_set or dst_tk in var_tk_set:
+            # TODO: since this is tripped, we should switch to a deferred checking system
+            #   - this means appending `src_tid` and `dst_tid` to a list in the context that admits substitutions
+            #       - consider extending the context with 'orders' so 'sub' works
+            #   - run the above code on `src_tid` and `dst_tid` after inference (introduce a 3rd pass)
+            raise NotImplementedError("cannot check casting of var types")
+
+        #
+        # all OK!
+        #
+
+        return ret_sub, ret_sub.rewrite_type(dst_tid)
+
+    elif isinstance(exp, ast.node.LambdaExp):
+        # each lambda gets its own scope (for formal args)
+        lambda_ctx = ctx.push_context(f"lambda-{exp.loc}")
+
+        # inferring the 'arg_tid':
+        # NOTE: arg kind depends on arg count:
+        # - if 0 args, arg kind is trivially unit
+        # - if 2 or more args, arg kind is trivially tuple
+        # - if 1 arg, arg type is just that arg's type.
+        actual_arg_tid = None
+        if not exp.arg_names:
+            actual_arg_tid = type.get_unit_type()
+        else:
+            elem_arg_tid_list = []
+            for i, arg_name in enumerate(exp.arg_names):
+                actual_arg_tid = type.new_free_var(f"lambda-formal-arg:{arg_name}")
+                arg_def_obj = definition.ValueRecord(exp.loc, actual_arg_tid)
+                formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
+                if not formal_arg_def_ok:
+                    msg_suffix = f"lambda formal arg #{i}: `{arg_name}` clashes with a prior definition in this scope."
+                    raise excepts.TyperCompilationError(msg_suffix)
+
+                elem_arg_tid_list.append(actual_arg_tid)
+
+            assert elem_arg_tid_list
+            if len(elem_arg_tid_list) == 1:
+                actual_arg_tid = elem_arg_tid_list[0]
+            else:
+                actual_arg_tid = type.get_tuple_type(tuple(elem_arg_tid_list))
+
+        assert actual_arg_tid is not None
+
+        # inferring the 'ret_tid' from the body expression:
+        ret_sub, ret_tid = infer_exp_tid(lambda_ctx, exp.body)
+
+        # reading the side-effects specifier from the expression:
+        ses = type.side_effects.SES.Tot
+        if exp.opt_ses is not None:
+            ses = exp.opt_ses
+
+        # now, the type of the lambda is the type of the function that accepts the given args and returns the specified
+        # return expression:
+        fn_tid = type.get_fn_type(actual_arg_tid, ret_tid, ses)
+        return ret_sub, fn_tid
 
     # TODO: type a chain expression
     elif isinstance(exp, ast.node.ChainExp):
         raise NotImplementedError("Type inference for chain expressions")
+
+    # TODO: type an 'if' expression:
+    elif isinstance(exp, ast.node.IfExp):
+        pass
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
@@ -410,3 +545,12 @@ def infer_type_spec_tid(
             raise excepts.TyperCompilationError(f"Symbol {ts.name} used but not defined.")
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
+
+
+def raise_cast_error(src_tid, dst_tid, more=None):
+    spell_src = type.spelling.of(src_tid)
+    spell_dst = type.spelling.of(dst_tid)
+    msg_suffix = f"Cannot cast to {spell_dst} from {spell_src}"
+    if more is not None:
+        msg_suffix += f": {more}"
+    raise excepts.TyperCompilationError(msg_suffix)
