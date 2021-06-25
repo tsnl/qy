@@ -1,43 +1,47 @@
-mod alphabet_soup [T, u] {
-    a = "hello";
-    # x = T(0);
-    x = u;
-    z = 2;
-};
+#mod alphabet_soup [T, u] {
+#    a = "hello";
+#    # x = T(0);
+#    x = u;
+#    z = 2;
+#};
+#
+#mod modernism {
+#    a = 0x42;
+#    another_x = alphabet_soup[String, 42Q]:u;
+#};
+#
+#mod postmodernism {
+#    a_re_examined = modernism:a;
+#};
+#
+#mod effing {
+#    # f is for function
+#
+#    f1 = (x) -> {p = x; p};
+#    f2 = (y) -> {y};
+#    f3 = (z) -> {42f};
+#
+#    z = f3(2q);
+#
+#    w = f1(f2(z));
+#};
+#
+#mod recursion {
+#    g :: (Float32) -> Float32;
+#
+#    g = (x) -> {
+#        w = g(x);
+#        0f
+#    };
+#};
 
-mod modernism {
-    a = 0x42;
-    another_x = alphabet_soup[String, 42Q]:u;
-};
-
-mod postmodernism {
-    a_re_examined = modernism:a;
-};
-
-mod effing {
-    # f is for function
-
-    f1 = (x) -> {p = x; p};
-    f2 = (y) -> {y};
-    f3 = (z) -> {42f};
-
-    z = f3(2q);
-
-    w = f1(f2(z));
-};
-
-mod recursion {
-    g :: (Float32) -> Float32;
-
-    g = (x) -> {
-        w = g(x);
-        0f
+mod lin_alg [T] {
+    Vec2 = Struct {
+        x :: T;
+        y :: T;
     };
 };
-
-mod lin_alg {
-    Vec2f = Struct {
-        x :: Float32;
-        y :: Float32;
-    };
+mod lin_alg_2 {
+    Vec2i = lin_alg[Int32]:Vec2;
+    Vec2f = lin_alg[Float32]:Vec2;
 };

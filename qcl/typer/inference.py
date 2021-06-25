@@ -294,132 +294,7 @@ def infer_exp_tid(
         return ret_sub, def_tid
 
     elif isinstance(exp, ast.node.IdExpInModule):
-        # FIXME: something is really fishy about how we handle containers here...
-        #   - elem_args should instantiate the found elem independent of the container
-
-        ret_sub = substitution.empty
-
-        # looking up `found_def_obj` referring to [a:]b in this exp:
-        if exp.opt_container is None:
-            # the LHS is None, so the RHS must look up in the local context:
-            file_mod_name = exp.elem_name
-            found_def_obj = ctx.lookup(file_mod_name)
-
-            if found_def_obj is None:
-                msg_suffix = f"symbol {file_mod_name} not found"
-                raise excepts.TyperCompilationError(msg_suffix)
-            elif not isinstance(found_def_obj, definition.ModRecord):
-                msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
-                raise excepts.TyperCompilationError(msg_suffix)
-        else:
-            assert exp.opt_container is not None
-
-            # getting a mod-exp for the container:
-            container_sub, container_tid = infer_exp_tid(ctx, exp.opt_container)
-            container_mod_exp = seeding.mod_tid_exp_map[container_tid]
-            container_ctx = seeding.mod_context_map[container_mod_exp]
-
-            # updating the existing sub with the sub from this inference:
-            ret_sub = ret_sub.compose(container_sub)
-
-            # looking up the element in the container:
-            found_def_obj = container_ctx.lookup(exp.elem_name, shallow=True)
-            if found_def_obj is None:
-                msg_suffix = f"element {exp.elem_name} not found in existing module"
-                raise excepts.TyperCompilationError(msg_suffix)
-
-        # instantiating the found definition's scheme, using actual arguments if provided:
-        instantiated_scheme = found_def_obj.scheme
-        if not exp.elem_args:
-            # no template arg call required/automatically instantiate:
-            instantiation_sub, found_tid = instantiated_scheme.instantiate()
-            ret_sub = ret_sub.compose(instantiation_sub)
-            return ret_sub, ret_sub.rewrite_type(found_tid)
-        else:
-            # template args provided: must be matched against the definition.
-
-            #
-            # first, checking that the def of the called object actually points to a sub-module:
-            #
-
-            if not isinstance(found_def_obj, definition.ModRecord):
-                msg = f"cannot use any ({len(exp.elem_args)}) template args to instantiate a non-module definition"
-                raise excepts.TyperCompilationError(msg)
-
-            if not isinstance(found_def_obj.mod_exp, ast.node.SubModExp):
-                msg = f"only submodules can accept template args"
-                raise excepts.TyperCompilationError(msg)
-
-            #
-            # next, comparing definitions in the sub-module against the actual parameters received:
-            #
-
-            # checking arg counts:
-            instantiated_mod_exp = found_def_obj.mod_exp
-            instantiated_mod_ctx = seeding.mod_context_map[instantiated_mod_exp]
-            expected_arg_count = len(instantiated_mod_exp.template_arg_names)
-            actual_arg_count = len(exp.elem_args)
-            if expected_arg_count != actual_arg_count:
-                msg = f"template argument count wrong: expected {expected_arg_count}, received {actual_arg_count}"
-                raise excepts.TyperCompilationError(msg)
-
-            arg_count = actual_arg_count
-            assert arg_count == actual_arg_count == expected_arg_count
-
-            # checking universes for actual-formal mismatches:
-            # - in other words, ensuring values passed to value args, types to type args.
-            # - also sifting arguments by universe to perform appropriate checks:
-            actual_type_arg_tid_list = []
-            mismatch_list = []
-            zipped_args = zip(instantiated_mod_exp.template_arg_names, exp.elem_args)
-            for arg_index, (formal_name, actual_arg_node) in enumerate(zipped_args):
-                name_universe = names.infer_def_universe_of(formal_name)
-                if isinstance(actual_arg_node, ast.node.BaseExp):
-                    if name_universe != definition.Universe.Value:
-                        mismatch_list.append(f"- arg #{arg_index}: expected type arg, received a value")
-                    else:
-                        actual_arg_exp = actual_arg_node
-                        actual_arg_sub, actual_value_arg_tid = infer_exp_tid(ctx, actual_arg_exp)
-                        ret_sub = ret_sub.compose(actual_arg_sub)
-
-                        assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
-                        formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
-                        assert isinstance(formal_val_def_obj, definition.ValueRecord)
-                        instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
-                        ret_sub = ret_sub.compose(instantiate_sub)
-
-                        # unifying value args:
-                        this_val_arg_sub = unifier.unify(
-                            ret_sub.rewrite_type(formal_value_arg_tid),
-                            ret_sub.rewrite_type(actual_value_arg_tid)
-                        )
-                        ret_sub = ret_sub.compose(this_val_arg_sub)
-                else:
-                    assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
-                    if name_universe != definition.Universe.Type:
-                        mismatch_list.append(f"- arg #{arg_index}: expected value arg, received a type")
-                    else:
-                        assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
-                        assert names.infer_def_universe_of(formal_name) == definition.Universe.Type
-
-                        actual_arg_ts = actual_arg_node
-                        actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
-                        ret_sub = ret_sub.compose(actual_arg_sub)
-
-                        actual_type_arg_tid_list.append(actual_type_arg_tid)
-
-            if mismatch_list:
-                mismatch_text = '\n'.join(mismatch_list)
-                msg_suffix = f"Mismatched template args:\n{mismatch_text}"
-                raise excepts.TyperCompilationError(msg_suffix)
-
-            # instantiating the scheme using type args:
-            # - unifies bound and actual type args, thereby monomorphizing
-            instantiate_sub, found_tid = instantiated_scheme.instantiate(args=actual_type_arg_tid_list)
-            ret_sub = ret_sub.compose(instantiate_sub)
-
-            # returning the resulting substitution and TID:
-            return ret_sub, ret_sub.rewrite_type(found_tid)
+        return help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
 
     #
     # context-independent branches:
@@ -715,9 +590,7 @@ def infer_type_spec_tid(
         return sub, adt_tid
 
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        # TODO: implement typing here!
-        #   - similar to `IdExpInModule`, which needs review anyway
-        pass
+        return help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 
@@ -729,3 +602,142 @@ def raise_cast_error(src_tid, dst_tid, more=None):
     if more is not None:
         msg_suffix += f": {more}"
     raise excepts.TyperCompilationError(msg_suffix)
+
+
+def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe):
+    ret_sub = substitution.empty
+
+    # looking up `found_def_obj` referring to [a:]b in this exp:
+    if data.opt_container is None:
+        # the LHS is None, so the RHS must look up in the local context:
+        file_mod_name = data.elem_name
+        found_def_obj = ctx.lookup(file_mod_name)
+
+        if found_def_obj is None:
+            msg_suffix = f"symbol {file_mod_name} not found"
+            raise excepts.TyperCompilationError(msg_suffix)
+        elif not isinstance(found_def_obj, definition.ModRecord):
+            msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
+            raise excepts.TyperCompilationError(msg_suffix)
+    else:
+        assert data.opt_container is not None
+
+        # getting a mod-exp for the container:
+        container_sub, container_tid = help_type_id_in_module_node(ctx, data.opt_container, definition.Universe.Module)
+        container_mod_exp = seeding.mod_tid_exp_map[container_tid]
+        container_ctx = seeding.mod_context_map[container_mod_exp]
+
+        # updating the existing sub with the sub from this inference:
+        ret_sub = ret_sub.compose(container_sub)
+
+        # looking up the element in the container:
+        found_def_obj = container_ctx.lookup(data.elem_name, shallow=True)
+        if found_def_obj is None:
+            msg_suffix = f"element {data.elem_name} not found in existing module"
+            raise excepts.TyperCompilationError(msg_suffix)
+
+        # validating the found definition against the expected DU:
+        if found_def_obj.universe != expect_du:
+            msg_suffix = (
+                f"element {data.elem_name} in the wrong universe: "
+                f"found {found_def_obj.universe.name}, "
+                f"expected {expect_du.name}"
+            )
+            raise excepts.TyperCompilationError(msg_suffix)
+
+    # instantiating the found definition's scheme, using actual arguments if provided:
+    instantiated_scheme = found_def_obj.scheme
+    if not data.elem_args:
+        # no template arg call required/automatically instantiate:
+        instantiation_sub, found_tid = instantiated_scheme.instantiate()
+        ret_sub = ret_sub.compose(instantiation_sub)
+        return ret_sub, ret_sub.rewrite_type(found_tid)
+    else:
+        # template args provided: must be matched against the definition.
+
+        #
+        # first, checking that the def of the called object actually points to a sub-module:
+        #
+
+        if not isinstance(found_def_obj, definition.ModRecord):
+            msg = f"cannot use any ({len(data.elem_args)}) template args to instantiate a non-module definition"
+            raise excepts.TyperCompilationError(msg)
+
+        if not isinstance(found_def_obj.mod_exp, ast.node.SubModExp):
+            msg = f"only submodules can accept template args"
+            raise excepts.TyperCompilationError(msg)
+
+        #
+        # next, comparing definitions in the sub-module against the actual parameters received:
+        #
+
+        # checking arg counts:
+        instantiated_mod_exp = found_def_obj.mod_exp
+        instantiated_mod_ctx = seeding.mod_context_map[instantiated_mod_exp]
+        expected_arg_count = len(instantiated_mod_exp.template_arg_names)
+        actual_arg_count = len(data.elem_args)
+        if expected_arg_count != actual_arg_count:
+            msg = f"template argument count wrong: expected {expected_arg_count}, received {actual_arg_count}"
+            raise excepts.TyperCompilationError(msg)
+
+        arg_count = actual_arg_count
+        assert arg_count == actual_arg_count == expected_arg_count
+
+        # checking universes for actual-formal mismatches:
+        # - in other words, ensuring values passed to value args, types to type args.
+        # - also sifting arguments by universe to perform appropriate checks:
+        actual_type_arg_tid_list = []
+        mismatch_list = []
+        zipped_args = zip(instantiated_mod_exp.template_arg_names, data.elem_args)
+        for arg_index, (formal_name, actual_arg_node) in enumerate(zipped_args):
+            name_universe = names.infer_def_universe_of(formal_name)
+            if isinstance(actual_arg_node, ast.node.BaseExp):
+                if name_universe != definition.Universe.Value:
+                    mismatch_list.append(f"- arg #{arg_index}: expected type arg, received a value")
+                else:
+                    actual_arg_exp = actual_arg_node
+                    actual_arg_sub, actual_value_arg_tid = infer_exp_tid(ctx, actual_arg_exp)
+                    ret_sub = ret_sub.compose(actual_arg_sub)
+
+                    assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
+                    formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
+                    assert isinstance(formal_val_def_obj, definition.ValueRecord)
+                    instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
+                    ret_sub = ret_sub.compose(instantiate_sub)
+
+                    # unifying value args:
+                    this_val_arg_sub = unifier.unify(
+                        ret_sub.rewrite_type(formal_value_arg_tid),
+                        ret_sub.rewrite_type(actual_value_arg_tid)
+                    )
+                    ret_sub = ret_sub.compose(this_val_arg_sub)
+            else:
+                assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
+                if name_universe != definition.Universe.Type:
+                    mismatch_list.append(f"- arg #{arg_index}: expected value arg, received a type")
+                else:
+                    assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
+                    assert names.infer_def_universe_of(formal_name) == definition.Universe.Type
+
+                    actual_arg_ts = actual_arg_node
+                    actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
+                    ret_sub = ret_sub.compose(actual_arg_sub)
+
+                    actual_type_arg_tid_list.append(actual_type_arg_tid)
+
+        if mismatch_list:
+            mismatch_text = '\n'.join(mismatch_list)
+            msg_suffix = f"Mismatched template args:\n{mismatch_text}"
+            raise excepts.TyperCompilationError(msg_suffix)
+
+        # instantiating the scheme using type args:
+        # - unifies bound and actual type args (monomorphization)
+        instantiate_sub, found_tid = instantiated_scheme.instantiate(args=actual_type_arg_tid_list)
+        # NOTE: rather than compose `instantiate_sub`, we should apply it here to all downward contexts,
+        #       thereby preventing overwriting BoundVars in definition scope.
+        #       - how does this handle instantiating a module within itself?
+
+        ret_sub = ret_sub.compose(instantiate_sub)
+
+        # returning the resulting substitution and TID:
+        return ret_sub, ret_sub.rewrite_type(found_tid)

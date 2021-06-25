@@ -566,7 +566,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
         out_exp = ast.node.IdTypeSpecInModule(
             self.ctx_loc(ctx),
-            container=container_exp,
+            opt_container=container_exp,
             elem_name=suffix_name
         )
         return out_exp

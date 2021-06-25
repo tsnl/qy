@@ -47,7 +47,6 @@ class Substitution(object):
             - we must still infer infinite types to handle modules, so delay reporting these to basic checks.
         :return: the rewritten type.
         """
-
         # TODO: test to see if ignoring rewrites in cycles results in incorrect substitution application.
         #   - for now, the incorrect sub always results in a free-var that is always eliminated
         #   - janky at best
@@ -138,11 +137,15 @@ class Substitution(object):
         :param ctx: the context manager to update IN-PLACE.
         """
 
-        @ctx.map_everyone
-        def update_defs(frame: context.Context):
-            for def_name, def_obj in frame.symbol_table.items():
-                def_obj.scheme = self.rewrite_scheme(def_obj.scheme)
-                assert isinstance(def_obj.scheme, scheme.Scheme)
+        ctx.map_everyone(self.help_rewrite_context_defs)
+
+    def rewrite_contexts_downward(self, ctx: "context.Context"):
+        ctx.map_descendants(self.help_rewrite_context_defs)
+
+    def help_rewrite_context_defs(self, frame: "context.Context"):
+        for def_name, def_obj in frame.symbol_table.items():
+            def_obj.scheme = self.rewrite_scheme(def_obj.scheme)
+            assert isinstance(def_obj.scheme, scheme.Scheme)
 
     def compose(self, applied_first: "Substitution"):
         # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1

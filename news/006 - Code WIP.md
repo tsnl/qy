@@ -15,9 +15,9 @@ WIP:
     - need to verify mutability
     - need to verify/prove side-effects-specifiers
     - TODO: consider a different function signature for functions without closure args.
-        - such a signature could be wrapped in a `NoClosures{...}` block
+        - such a signature could be wrapped in a `CFn{...}` block
         - such signatures allow us to inter-operate with C code. 
-        - we must try to aggressively optimize non-`NoClosure` pointers down wherever relevant.
+        - we must try to aggressively optimize non-`CFn` pointers down wherever relevant.
         - lambdas and currying are vital, so no harm in embracing the closure case as default.
 
 ---

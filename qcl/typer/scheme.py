@@ -49,22 +49,31 @@ class Scheme(object):
         #   - the actual argument if provided, otherwise...
         #   - a fresh FreeVar that can be eliminated by inference
         if self.bound_vars:
-            if not args:
-                # generating a sub to replace each bound var by a fresh free-var (to be eliminated):
-                sub = substitution.Substitution({
-                    bound_var: type.new_free_var(f"instantiated-free-var")
-                    for bound_var in self.bound_vars
-                })
-            else:
-                # generating a sub to replace each bound var by the corresponding arg:
+            # generating a sub to replace each bound var by a fresh free-var (to be eliminated):
+            new_free_var_list = [
+                type.new_free_var(f"template-instantiated-free-var-{index}")
+                for index in range(len(self.bound_vars))
+            ]
+            sub = substitution.Substitution({
+                bound_var: free_var
+                for bound_var, free_var in zip(self.bound_vars, new_free_var_list)
+            })
+
+            # if args provided, unifying actuals with fresh free-vars above.
+            # NOTE: before, when actual args were provided, we would unify the actual args with the BoundVar directly.
+            # THIS IS INCORRECT: when a template is instantiated twice with different args, all Bound instances are
+            # replaced by one template arg.
+            # Instead, we want to make a copy (as above) before subbing.
+            if args:
+                # unifying the instantiated free-var
                 assert len(args) == len(self.bound_vars)
-                sub = substitution.empty
-                for actual_arg, formal_arg in zip(args, self.bound_vars):
-                    unify_sub = unifier.unify(actual_arg, formal_arg)
+                for passed_arg, placeholder_arg_var in zip(args, new_free_var_list):
+                    unify_sub = unifier.unify(passed_arg, placeholder_arg_var)
                     sub = sub.compose(unify_sub)
 
             # rewriting the type using this sub:
-            return sub, sub.rewrite_type(self.body_tid)
+            instantiated_tid = sub.rewrite_type(self.body_tid)
+            return sub, instantiated_tid
         else:
             assert args is None
             return substitution.empty, self.body_tid

@@ -371,10 +371,15 @@ class IdTypeSpec(BaseTypeSpec):
 
 
 class IdTypeSpecInModule(BaseTypeSpec):
-    def __init__(self, loc: "feedback.ILoc", container: BaseModExp, elem_name: str):
+    data: "IdNodeInModuleHelper"
+
+    def __init__(self, loc: "feedback.ILoc", opt_container: Optional["IdTypeSpecInModule"], elem_name: str, elem_args=None):
         super().__init__(loc)
-        self.container = container
-        self.elem_name = elem_name
+        opt_container_data = None if opt_container is None else opt_container.data
+        self.data = IdNodeInModuleHelper(loc, opt_container_data, elem_name, elem_args)
+
+    def __str__(self):
+        return str(self.data)
 
 
 class TupleTypeSpec(BaseTypeSpec):
@@ -674,25 +679,15 @@ class ForceEvalElem(BaseImperativeElem):
 #
 
 class IdExpInModule(BaseExp):
-    opt_container: Optional["IdExpInModule"]
-    elem_args: List[Union[BaseExp, BaseTypeSpec]]
-    elem_name: str
+    data: "IdNodeInModuleHelper"
 
-    def __init__(self, loc, opt_container, elem_name, elem_args=None):
+    def __init__(self, loc, opt_container: "IdExpInModule", elem_name: str, elem_args=None):
         super().__init__(loc)
-        self.opt_container = opt_container
-        self.elem_name = elem_name
-        if elem_args is not None:
-            self.elem_args = elem_args
-        else:
-            self.elem_args = []
+        opt_container_data = None if opt_container is None else opt_container.data
+        self.data = IdNodeInModuleHelper(loc, opt_container_data, elem_name, elem_args=elem_args)
 
     def __str__(self):
-        elem_args_str = ','.join(map(str, self.elem_args))
-        if self.opt_container is not None:
-            return f"{self.opt_container}:{self.elem_name}({elem_args_str})"
-        else:
-            return f"{self.elem_name}{elem_args_str}"
+        return str(self.data)
 
 
 #
@@ -729,3 +724,27 @@ class GetElementByDotIndexExp(BaseExp):
 #
 # TODO: add/amend AST nodes for 'new' expressions using keywords `make` and `push`.
 #
+
+
+class IdNodeInModuleHelper(object):
+    opt_container: Optional["IdNodeInModuleHelper"]
+    elem_args: List[Union[BaseExp, BaseTypeSpec]]
+    elem_name: str
+
+    def __init__(self, loc, opt_container, elem_name, elem_args=None):
+        super().__init__()
+        self.loc = loc
+        self.opt_container = opt_container
+        self.elem_name = elem_name
+        if elem_args is not None:
+            self.elem_args = elem_args
+        else:
+            self.elem_args = []
+
+    def __str__(self):
+        elem_args_str = ','.join(map(str, self.elem_args))
+        if self.opt_container is not None:
+            return f"{self.opt_container}:{self.elem_name}({elem_args_str})"
+        else:
+            return f"{self.elem_name}{elem_args_str}"
+
