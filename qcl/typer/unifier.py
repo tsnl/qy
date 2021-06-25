@@ -6,6 +6,13 @@ from . import substitution
 
 def unify(t: type.identity.TID, u: type.identity.TID):
     #
+    # trivial unification: identical types
+    #
+
+    if t == u:
+        return substitution.empty
+
+    #
     # variable elimination:
     #
 

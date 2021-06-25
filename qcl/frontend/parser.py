@@ -187,7 +187,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
         assert container_exp is not None
 
-        out_exp = ast.node.GetModElementExp(
+        out_exp = ast.node.IdExpInModule(
             self.ctx_loc(ctx),
             opt_container=container_exp,
             elem_name=suffix_name
@@ -200,7 +200,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         opt_prefix = self.visit(ctx.opt_prefix) if ctx.opt_prefix is not None else None
         suffix_name = ctx.mod_name.text
         suffix_args = [self.visit(arg) for arg in ctx.args]
-        out_exp = ast.node.GetModElementExp(
+        out_exp = ast.node.IdExpInModule(
             self.ctx_loc(ctx),
             opt_container=opt_prefix,
             elem_name=suffix_name, elem_args=suffix_args
@@ -558,15 +558,24 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             ctx.tk.text
         )
 
+    def visitIdTypeSpecInModule(self, ctx):
+        container_exp = self.visit(ctx.prefix)
+        suffix_name = ctx.suffix.text
+
+        assert container_exp is not None
+
+        out_exp = ast.node.IdTypeSpecInModule(
+            self.ctx_loc(ctx),
+            container=container_exp,
+            elem_name=suffix_name
+        )
+        return out_exp
+
     def visitThroughParenTypeSpec(self, ctx):
         return self.visit(ctx.through)
 
-    def visitFnSgnTypeSpec(self, ctx):
-        return ast.node.FnSignatureTypeSpec(
-            self.ctx_loc(ctx),
-            self.visit(ctx.lt),
-            self.visit(ctx.rt)
-        )
+    def visitThroughUnaryTypeSpec(self, ctx):
+        return self.visit(ctx.through)
 
     def visitStructTypeSpec(self, ctx):
         return ast.node.AdtTypeSpec(
@@ -587,6 +596,17 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             ast.node.AdtKind.UntaggedUnion,
             self.ctx_loc(ctx),
             self.visit(ctx.elements)
+        )
+
+    def visitThroughBinaryTypeSpec(self, ctx):
+        return self.visit(ctx.through)
+
+    def visitFnSgnTypeSpec(self, ctx):
+        return ast.node.FnSignatureTypeSpec(
+            self.ctx_loc(ctx),
+            self.visit(ctx.lt),
+            self.visit(ctx.rt),
+            self.visit(ctx.ses) if ctx.ses is not None else None
         )
 
     #

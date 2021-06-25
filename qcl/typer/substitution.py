@@ -1,5 +1,6 @@
 """
 A substitution is a mapping from named type variables to types.
+`Substitution` instances are immutable and composable.
 """
 
 from qcl import type
@@ -9,6 +10,10 @@ from . import context
 
 
 class Substitution(object):
+    """
+    `Substitution` instances are immutable mappings from variables to other types.
+    """
+
     def __init__(self, sub_map=None):
         super().__init__()
         if sub_map is None:
@@ -145,13 +150,17 @@ class Substitution(object):
         s1 = self
         s2 = applied_first
 
-        s1_sub_map = s1.sub_map
-        s2_sub_map = {
-            key: s1.rewrite_type(value)
-            for key, value in s2.sub_map.items()
-        }
-
-        return Substitution(sub_map=(s1_sub_map | s2_sub_map))
+        if s1 is empty:
+            return s2
+        elif s2 is empty:
+            return s1
+        else:
+            s1_sub_map = s1.sub_map
+            s2_sub_map = {
+                key: s1.rewrite_type(value)
+                for key, value in s2.sub_map.items()
+            }
+            return Substitution(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self):
         return '{' + ','.join((

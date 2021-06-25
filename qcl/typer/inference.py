@@ -135,6 +135,9 @@ def infer_sub_mod_exp_tid(
         assert isinstance(elem, ast.node.BaseBindElem)
         infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem)
 
+    for elem in sub_mod_exp.table.ordered_type_bind_elems:
+        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem)
+
     for elem in sub_mod_exp.table.ordered_typing_elems:
         infer_typing_elem_types(seeded_sub_mod_exp_ctx, elem)
 
@@ -147,25 +150,41 @@ def infer_sub_mod_exp_tid(
     return out_sub, sub_mod_exp_tid
 
 
-def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem):
+def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem) -> None:
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
             sub, rhs_tid = infer_exp_tid(ctx, elem.bound_exp)
+            du = definition.Universe.Value
         else:
             assert isinstance(elem, ast.node.Bind1TElem)
+            assert elem.bound_type_spec is not None
             sub, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
+            du = definition.Universe.Type
 
         lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
         if lhs_def_obj is not None:
-            # pre-seeded:
-            sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
-            sub = sub.compose(sub_lhs)
+            help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, rhs_tid, sub)
         else:
-            # un-seeded: bound inside a chain
-            raise NotImplementedError("binding elem in chains")
+            # un-seeded: bound inside a chain.
+            # we must define a new symbol
 
-        unify_sub = unifier.unify(lhs_tid, rhs_tid)
-        sub = sub.compose(unify_sub)
+            id_name = elem.id_name
+            def_tid = rhs_tid
+
+            # defining the bound symbol using `set_tid`
+            if du == definition.Universe.Value:
+                def_rec = definition.ValueRecord(elem.loc, def_tid)
+            elif du == definition.Universe.Type:
+                def_rec = definition.TypeRecord(elem.loc, def_tid)
+            else:
+                raise NotImplementedError("Unknown universe in binding")
+
+            def_ok = ctx.try_define(id_name, def_rec)
+            if not def_ok:
+                msg_suffix = f"definition `{id_name}` clashes with another definition in this scope."
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            # no substitutions generated-- we're all done.
 
         sub.rewrite_contexts_everywhere(ctx)
 
@@ -173,8 +192,80 @@ def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem):
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
-def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem):
-    raise NotImplementedError("Typing any BaseTypingElem")
+def infer_imp_elem_types(ctx: context.Context, elem: ast.node.BaseImperativeElem) -> None:
+    if isinstance(elem, ast.node.ForceEvalElem):
+        sub, exp_tid = infer_exp_tid(ctx, elem.discarded_exp)
+        sub.rewrite_contexts_everywhere(ctx)
+
+    else:
+        raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
+
+
+def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem) -> None:
+    if isinstance(elem, ast.node.Type1VElem):
+        sub, rhs_tid = infer_type_spec_tid(ctx, elem.type_spec)
+
+        # since binding elements are always processed before typing elements, we can
+        # assume any used symbols are in this context.
+        # NOTE: in order to type formal args, we need to allow searching in a non-shallow way.
+        #       we should generate a warning if query depth > 1, with an exception for formal args
+        #       at depth 2 (since formal args are defined in their own shell-context)
+        lhs_def_obj = ctx.lookup(elem.id_name)
+        if lhs_def_obj is not None:
+            help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, rhs_tid, sub)
+        else:
+            msg_suffix = f"cannot type undefined symbol {elem.id_name}"
+            raise excepts.TyperCompilationError(msg_suffix)
+    else:
+        raise NotImplementedError("Typing any BaseTypingElem")
+
+
+def help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, def_tid, sub):
+    # pre-seeded: unify defined TID with existing TID
+    sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+    sub = sub.compose(sub_lhs)
+
+    unify_sub = unifier.unify(lhs_tid, def_tid)
+    sub = sub.compose(unify_sub)
+
+    sub.rewrite_contexts_everywhere(ctx)
+
+
+# def help_def_id_type_in_context(ctx, elem, id_name, def_tid, sub):
+#     # TODO: factor this function into two separate code-paths:
+#     #  - one for seeded definitions, i.e. module-level binding and typing
+#     #  - one for un-seeded definitions, i.e. chain-level binding and typing
+#     #       - in this case, we can use definitions and lookups to verify initialization order existence
+#     #         using C-like rules, eliding this from basic checks.
+#
+#     lhs_def_obj = ctx.lookup(id_name, shallow=True)
+#     if lhs_def_obj is not None:
+#         # pre-seeded: unify defined TID with existing TID
+#         sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+#         sub = sub.compose(sub_lhs)
+#
+#         unify_sub = unifier.unify(lhs_tid, def_tid)
+#         sub = sub.compose(unify_sub)
+#
+#         sub.rewrite_contexts_everywhere(ctx)
+#     else:
+#         # un-seeded: could be bound/typed inside a chain
+#
+#         # defining the bound symbol using `set_tid`
+#         du = names.infer_def_universe_of(id_name)
+#         if du == definition.Universe.Value:
+#             def_rec = definition.ValueRecord(elem.loc, def_tid)
+#         elif du == definition.Universe.Type:
+#             def_rec = definition.TypeRecord(elem.loc, def_tid)
+#         else:
+#             raise NotImplementedError("Unknown universe in binding")
+#
+#         def_ok = ctx.try_define(id_name, def_rec)
+#         if not def_ok:
+#             msg_suffix = f"definition `{id_name}` clashes with another definition in this scope."
+#             raise excepts.TyperCompilationError(msg_suffix)
+#
+#         # no substitutions generated-- we're all done.
 
 
 def infer_exp_tid(
@@ -185,16 +276,24 @@ def infer_exp_tid(
     #
 
     if isinstance(exp, ast.node.IdExp):
-        # TODO: validate that the found definition is in the right universe.
-
         found_def_obj = ctx.lookup(exp.name)
-        if found_def_obj is not None:
-            ret_sub, def_tid = found_def_obj.scheme.instantiate()
-            return ret_sub, def_tid
-        else:
+
+        # ensuring the definition exists:
+        if found_def_obj is None:
             raise excepts.TyperCompilationError(f"Symbol {exp.name} used but not defined.")
 
-    elif isinstance(exp, ast.node.GetModElementExp):
+        # ensuring the definition is in the right universe (not a module)
+        du = names.infer_def_universe_of(exp.name)
+        if du != definition.Universe.Value:
+            raise excepts.TyperCompilationError(
+                f"Symbol {exp.name} is not defined in the 'Value' universe. Are you missing a `:` suffix?"
+            )
+
+        # returning:
+        ret_sub, def_tid = found_def_obj.scheme.instantiate()
+        return ret_sub, def_tid
+
+    elif isinstance(exp, ast.node.IdExpInModule):
         # FIXME: something is really fishy about how we handle containers here...
         #   - elem_args should instantiate the found elem independent of the container
 
@@ -484,7 +583,6 @@ def infer_exp_tid(
         # - if 0 args, arg kind is trivially unit
         # - if 2 or more args, arg kind is trivially tuple
         # - if 1 arg, arg type is just that arg's type.
-        actual_arg_tid = None
         if not exp.arg_names:
             actual_arg_tid = type.get_unit_type()
         else:
@@ -520,13 +618,36 @@ def infer_exp_tid(
         fn_tid = type.get_fn_type(actual_arg_tid, ret_tid, ses)
         return ret_sub, fn_tid
 
-    # TODO: type a chain expression
+    # typing chain expressions:
     elif isinstance(exp, ast.node.ChainExp):
-        raise NotImplementedError("Type inference for chain expressions")
+        chain_ctx = ctx.push_context("chain-ctx")
+        sub = substitution.empty
 
-    # TODO: type an 'if' expression:
-    elif isinstance(exp, ast.node.IfExp):
-        pass
+        if exp.table.elements:
+            # first, effecting binding and imperative elements in order:
+            #   - this ensures that initialization orders are correct
+            for elem in exp.table.ordered_value_imp_bind_elems:
+                if isinstance(elem, ast.node.BaseBindElem):
+                    infer_binding_elem_types(chain_ctx, elem)
+                else:
+                    assert isinstance(elem, ast.node.BaseImperativeElem)
+                    infer_imp_elem_types(chain_ctx, elem)
+
+            # then, defining each type binding element:
+            for elem in exp.table.ordered_type_bind_elems:
+                infer_binding_elem_types(chain_ctx, elem)
+
+            # then, effecting each 'typing' element:
+            for elem in exp.table.ordered_typing_elems:
+                infer_typing_elem_types(chain_ctx, elem)
+
+        if exp.opt_tail is not None:
+            tail_sub, tail_tid = infer_exp_tid(chain_ctx, exp.opt_tail)
+            sub = sub.compose(tail_sub)
+        else:
+            tail_tid = type.get_unit_type()
+
+        return sub, tail_tid
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
@@ -543,6 +664,60 @@ def infer_type_spec_tid(
             return sub, def_tid
         else:
             raise excepts.TyperCompilationError(f"Symbol {ts.name} used but not defined.")
+
+    elif isinstance(ts, ast.node.FnSignatureTypeSpec):
+        lhs_ts = ts.arg_type_spec
+        rhs_ts = ts.return_type_spec
+        if ts.opt_ses is not None:
+            ses = ts.opt_ses
+        else:
+            # default SES: `Tot`
+            ses = type.side_effects.SES.Tot
+
+        sub = substitution.empty
+
+        lhs_sub, lhs_tid = infer_type_spec_tid(ctx, lhs_ts)
+        sub = sub.compose(lhs_sub)
+
+        rhs_sub, rhs_tid = infer_type_spec_tid(ctx, rhs_ts)
+        sub = sub.compose(rhs_sub)
+
+        fn_ts = type.get_fn_type(lhs_tid, rhs_tid, ses)
+
+        return sub, fn_ts
+
+    elif isinstance(ts, ast.node.AdtTypeSpec):
+        type_ctor = {
+            ast.node.AdtKind.Structure: type.get_struct_type,
+            ast.node.AdtKind.TaggedUnion: type.get_enum_type,
+            ast.node.AdtKind.UntaggedUnion: type.get_union_type
+        }[ts.adt_kind]
+
+        sub = substitution.empty
+        field_elem_info_list = []
+        for field_name, field_type_spec_elem_list in ts.table.typing_elems_map.items():
+            if len(field_type_spec_elem_list) == 1:
+                field_type_spec_elem = field_type_spec_elem_list[0]
+                assert isinstance(field_type_spec_elem, ast.node.Type1VElem)
+                field_sub, field_tid = infer_type_spec_tid(ctx, field_type_spec_elem.type_spec)
+                sub = sub.compose(field_sub)
+            else:
+                # TODO: consider generalizing this constraint to all tables.
+                msg_suffix = f"cannot type the same ID multiple times in an ADT."
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            elem_info = type.elem.ElemInfo(field_name, field_tid)
+            field_elem_info_list.append(elem_info)
+
+        field_elem_info_tuple = tuple(field_elem_info_list)
+        adt_tid = type_ctor(field_elem_info_tuple)
+
+        return sub, adt_tid
+
+    elif isinstance(ts, ast.node.IdTypeSpecInModule):
+        # TODO: implement typing here!
+        #   - similar to `IdExpInModule`, which needs review anyway
+        pass
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 

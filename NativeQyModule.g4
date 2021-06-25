@@ -223,8 +223,8 @@ unaryTypeSpec
     | (is_mut='mut')? '[' t=typeSpec ']'                #ptrTypeSpec
     ;
 binaryTypeSpec
-    : through=unaryTypeSpec                         #throughBinaryTypeSpec
-    | lt=parenTypeSpec '->' rt=binaryTypeSpec       #fnSgnTypeSpec
+    : through=unaryTypeSpec                                         #throughBinaryTypeSpec
+    | lt=parenTypeSpec '->' ses=effectsSpec? rt=binaryTypeSpec      #fnSgnTypeSpec
     ;
 
 //

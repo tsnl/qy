@@ -370,6 +370,13 @@ class IdTypeSpec(BaseTypeSpec):
         return self.name
 
 
+class IdTypeSpecInModule(BaseTypeSpec):
+    def __init__(self, loc: "feedback.ILoc", container: BaseModExp, elem_name: str):
+        super().__init__(loc)
+        self.container = container
+        self.elem_name = elem_name
+
+
 class TupleTypeSpec(BaseTypeSpec):
     items: List[BaseTypeSpec]
 
@@ -381,11 +388,13 @@ class TupleTypeSpec(BaseTypeSpec):
 class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
+    opt_ses: Optional[type.side_effects.SES]
 
-    def __init__(self, loc, arg_type_spec, return_type_spec):
+    def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)
         self.arg_type_spec = arg_type_spec
         self.return_type_spec = return_type_spec
+        self.opt_ses = opt_ses
 
 
 class PtrTypeSpec(BaseTypeSpec):
@@ -471,7 +480,7 @@ class Table(object):
 
         # parsing stores an ordered list of things to do, or specification about
         # the context where these things are done:
-        self.ordered_typing_bind_elems = []
+        self.ordered_type_bind_elems = []
         self.ordered_value_imp_bind_elems = []
         self.ordered_typing_elems = []
 
@@ -533,7 +542,7 @@ class Table(object):
         if isinstance(elem, Bind1VElem):
             self.ordered_value_imp_bind_elems.append(elem)
         elif isinstance(elem, Bind1TElem):
-            self.ordered_typing_bind_elems.append(elem)
+            self.ordered_type_bind_elems.append(elem)
         else:
             assert "Unknown binding 'elem' subclass" and False
 
@@ -642,6 +651,8 @@ class Bind1TElem(BaseBindElem):
     bound_type_spec: "BaseTypeSpec"
 
     def __init__(self, loc, id_name: str, type_spec: "BaseTypeSpec"):
+        assert type_spec is not None
+
         super().__init__(loc, id_name)
         self.bound_type_spec = type_spec
 
@@ -650,7 +661,7 @@ class BaseImperativeElem(BaseElem, metaclass=abc.ABCMeta):
     pass
 
 
-class ForceEvalElement(BaseImperativeElem):
+class ForceEvalElem(BaseImperativeElem):
     discarded_exp: BaseExp
 
     def __init__(self, loc, discarded_exp):
@@ -662,8 +673,8 @@ class ForceEvalElement(BaseImperativeElem):
 # GetModElement expressions:
 #
 
-class GetModElementExp(BaseExp):
-    opt_container: Optional["GetModElementExp"]
+class IdExpInModule(BaseExp):
+    opt_container: Optional["IdExpInModule"]
     elem_args: List[Union[BaseExp, BaseTypeSpec]]
     elem_name: str
 
