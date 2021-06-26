@@ -125,7 +125,10 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: ast.n
 
     # Defining each bound ID in this context:
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
-        assert isinstance(elem, ast.node.BaseBindElem)
+        assert isinstance(elem, ast.node.Bind1VElem)
+        seed_bind1_elem(sub_mod_ctx, elem)
+    for elem in sub_mod_exp.table.ordered_type_bind_elems:
+        assert isinstance(elem, ast.node.Bind1TElem)
         seed_bind1_elem(sub_mod_ctx, elem)
 
     # Closing all define operations & storing the context in cache:

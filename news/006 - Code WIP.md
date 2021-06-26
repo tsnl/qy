@@ -1,4 +1,35 @@
-Jun 25
+Jun 25 (Part II)
+
+Our strategy of looking up contexts using seeded IDs is highly flawed.
+Consider the following example we've been using:
+
+```
+mod basic_linalg [T] {
+    Vec2 = Struct {
+        x :: T;
+        y :: T;
+    };
+};
+mod linalg {
+    Vec2f = basic_linalg[Float32]:Vec2;
+    Vec2i = basic_linalg[Int32]:Vec2;
+};
+```
+
+The issue above was that both `Vec2f` and `Vec2i` were typed as
+`Struct {x :: Int32, y :: Int32}`, as well as `Vec2` in `basic_linalg`!
+
+Clearly, our substitution of `T` cannot be global, otherwise we will rewrite
+bound definitions of it too.
+
+The issue is that types don't really understand ALL the variables bound at a context,
+and cannot instantiate 'everything'.
+
+This can be fixed in a couple of ways: see `inference.py` (WIP).
+
+---
+
+Jun 25 (Part I)
 
 After a brief break, I implemented...
 1. typing chain expressions

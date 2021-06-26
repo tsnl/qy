@@ -42,9 +42,12 @@ class Scheme(object):
         new_scheme.body_tid = new_body
         return new_scheme
 
-    def instantiate(
-            self, args: Optional[List[type.identity.TID]] = None
-    ) -> Tuple[substitution.Substitution, type.identity.TID]:
+    def instantiate(self) -> Tuple[substitution.Substitution, type.identity.TID]:
+        """
+        substitutes bound vars with fresh free-vars.
+        :return: a substitution (including bound var mappings) and the instantiated body
+        """
+
         # we want to sub (substitute) all BoundVar occurrences in the spelling of `body` by
         #   - the actual argument if provided, otherwise...
         #   - a fresh FreeVar that can be eliminated by inference
@@ -59,21 +62,10 @@ class Scheme(object):
                 for bound_var, free_var in zip(self.bound_vars, new_free_var_list)
             })
 
-            # if args provided, unifying actuals with fresh free-vars above.
-            # NOTE: before, when actual args were provided, we would unify the actual args with the BoundVar directly.
-            # THIS IS INCORRECT: when a template is instantiated twice with different args, all Bound instances are
-            # replaced by one template arg.
-            # Instead, we want to make a copy (as above) before subbing.
-            if args:
-                # unifying the instantiated free-var
-                assert len(args) == len(self.bound_vars)
-                for passed_arg, placeholder_arg_var in zip(args, new_free_var_list):
-                    unify_sub = unifier.unify(passed_arg, placeholder_arg_var)
-                    sub = sub.compose(unify_sub)
-
             # rewriting the type using this sub:
             instantiated_tid = sub.rewrite_type(self.body_tid)
+
+            # returning the sub (INCLUDING SUBS FOR BOUND VARS)
             return sub, instantiated_tid
         else:
-            assert args is None
             return substitution.empty, self.body_tid

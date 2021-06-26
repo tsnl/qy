@@ -46,16 +46,14 @@ def infer_project_types(
     # each imported file module is looked up in the global context and stored.
     # Later, it is mapped to a file-module-scope-native symbol.
     for file_module_exp in all_file_module_list:
-        infer_file_mod_exp_tid(file_module_exp)
+        file_mod_tid = infer_file_mod_exp_tid(file_module_exp)
 
 
-def infer_file_mod_exp_tid(
-        file_mod_exp: ast.node.FileModExp
-) -> Tuple[substitution.Substitution, type.identity.TID]:
+def infer_file_mod_exp_tid(file_mod_exp: ast.node.FileModExp) -> type.identity.TID:
     # we use `seeding.mod_tid[...]` to resolve module imports out-of-order
     cached_mod_inference = file_mod_inferences.get(file_mod_exp, None)
     if cached_mod_inference is not None:
-        return cached_mod_inference.sub, cached_mod_inference.tid
+        return cached_mod_inference.tid
     else:
         seeded_file_mod_exp_tid = seeding.mod_exp_tid_map[file_mod_exp]
         file_mod_ctx = seeding.mod_context_map[file_mod_exp]
@@ -117,7 +115,8 @@ def infer_file_mod_exp_tid(
         file_mod_inferences[file_mod_exp] = FileModTypeInferenceInfo(new_mod_tid, out_sub)
         seeding.mod_tid_exp_map[new_mod_tid] = file_mod_exp
 
-        return out_sub, new_mod_tid
+        out_sub.rewrite_contexts_everywhere(file_mod_ctx)
+        return new_mod_tid
 
 
 def infer_sub_mod_exp_tid(
@@ -133,10 +132,10 @@ def infer_sub_mod_exp_tid(
 
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
-        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem)
+        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_type_bind_elems:
-        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem)
+        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_typing_elems:
         infer_typing_elem_types(seeded_sub_mod_exp_ctx, elem)
@@ -150,16 +149,21 @@ def infer_sub_mod_exp_tid(
     return out_sub, sub_mod_exp_tid
 
 
-def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem) -> None:
+def infer_binding_elem_types(
+        ctx: context.Context, elem: ast.node.BaseBindElem,
+        elem_info_list: List[type.elem.ElemInfo]
+) -> None:
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
             sub, rhs_tid = infer_exp_tid(ctx, elem.bound_exp)
             du = definition.Universe.Value
+            is_type_field = False
         else:
             assert isinstance(elem, ast.node.Bind1TElem)
             assert elem.bound_type_spec is not None
             sub, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
             du = definition.Universe.Type
+            is_type_field = True
 
         lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
         if lhs_def_obj is not None:
@@ -186,7 +190,12 @@ def infer_binding_elem_types(ctx: context.Context, elem: ast.node.BaseBindElem) 
 
             # no substitutions generated-- we're all done.
 
+        # updating contexts globally:
         sub.rewrite_contexts_everywhere(ctx)
+
+        # appending to the `ElemInfo` list to construct fields:
+        elem_info = type.elem.ElemInfo(elem.id_name, rhs_tid, is_type_field)
+        elem_info_list.append(elem_info)
 
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
@@ -216,6 +225,7 @@ def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem)
         else:
             msg_suffix = f"cannot type undefined symbol {elem.id_name}"
             raise excepts.TyperCompilationError(msg_suffix)
+
     else:
         raise NotImplementedError("Typing any BaseTypingElem")
 
@@ -605,6 +615,11 @@ def raise_cast_error(src_tid, dst_tid, more=None):
 
 
 def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe):
+    # FIXME: this must use substitution, unification, and 'elements' of a module rather than querying contexts
+    #   - otherwise, looking up contexts yields IDs that may be substituted in terms of 'BoundVar' instances that cannot
+    #     be substituted out without also substituting the module of definition.
+    #   - instead, cf. function calls.
+
     ret_sub = substitution.empty
 
     # looking up `found_def_obj` referring to [a:]b in this exp:
@@ -625,6 +640,11 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
         # getting a mod-exp for the container:
         container_sub, container_tid = help_type_id_in_module_node(ctx, data.opt_container, definition.Universe.Module)
         container_mod_exp = seeding.mod_tid_exp_map[container_tid]
+
+        # FIXME: THIS IS A PROBLEM WITH TEMPLATE INSTANTIATIONS
+        #   - acquiring this context WITHOUT instantiating templates first-- major error!
+        #   - OPT1: allow contexts to remember and instantiate bound vars
+        #   - OPT2: use type unification (cf function calls)
         container_ctx = seeding.mod_context_map[container_mod_exp]
 
         # updating the existing sub with the sub from this inference:
@@ -651,7 +671,13 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
         # no template arg call required/automatically instantiate:
         instantiation_sub, found_tid = instantiated_scheme.instantiate()
         ret_sub = ret_sub.compose(instantiation_sub)
-        return ret_sub, ret_sub.rewrite_type(found_tid)
+        found_tid = ret_sub.rewrite_type(found_tid)
+
+        # get a copy of the substitution that does not map bound vars for outside the scheme:
+        #   - the hope is that all further inference applies to the instantiated free vars
+        ret_sub = ret_sub.get_scheme_body_sub_without_bound_vars(instantiated_scheme)
+
+        return ret_sub, found_tid
     else:
         # template args provided: must be matched against the definition.
 
@@ -702,8 +728,8 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
                     assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
                     formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
                     assert isinstance(formal_val_def_obj, definition.ValueRecord)
-                    instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
-                    ret_sub = ret_sub.compose(instantiate_sub)
+                    polymorphic_instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
+                    ret_sub = ret_sub.compose(polymorphic_instantiate_sub)
 
                     # unifying value args:
                     this_val_arg_sub = unifier.unify(
@@ -730,14 +756,36 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
             msg_suffix = f"Mismatched template args:\n{mismatch_text}"
             raise excepts.TyperCompilationError(msg_suffix)
 
+        #
         # instantiating the scheme using type args:
         # - unifies bound and actual type args (monomorphization)
-        instantiate_sub, found_tid = instantiated_scheme.instantiate(args=actual_type_arg_tid_list)
-        # NOTE: rather than compose `instantiate_sub`, we should apply it here to all downward contexts,
-        #       thereby preventing overwriting BoundVars in definition scope.
-        #       - how does this handle instantiating a module within itself?
+        #
 
-        ret_sub = ret_sub.compose(instantiate_sub)
+        # NOTE: `polymorphic_instantiate_sub` includes mappings from BoundVars.
+        #       `monomorphic_instantiate_sub` includes mappings from FreeVars that instantiate/sub the BoundVars.
+
+        polymorphic_instantiate_sub, found_tid = instantiated_scheme.instantiate()
+        monomorphic_instantiate_sub = substitution.empty
+
+        # if args provided, unifying actuals with fresh free-vars above.
+        # NOTE: before, when actual args were provided, we would unify the actual args with the BoundVar directly.
+        # THIS IS INCORRECT: when a template is instantiated twice with different args, all Bound instances are
+        # replaced by one template arg.
+        # Instead, we want to make a copy (as above) before subbing.
+        if actual_type_arg_tid_list:
+            # unifying the instantiated free-var
+            assert len(actual_type_arg_tid_list) == len(instantiated_scheme.bound_vars)
+            for passed_arg, formal_arg_var in zip(actual_type_arg_tid_list, instantiated_scheme.bound_vars):
+                placeholder_arg_var = polymorphic_instantiate_sub.rewrite_type(formal_arg_var)
+                unify_sub = unifier.unify(passed_arg, placeholder_arg_var)
+                monomorphic_instantiate_sub = monomorphic_instantiate_sub.compose(unify_sub)
+
+        ret_sub = ret_sub.compose(monomorphic_instantiate_sub)
+        found_tid = ret_sub.rewrite_type(found_tid)
+
+        # get a copy of the substitution that does not map bound vars for outside the scheme:
+        #   - the hope is that all further inference applies to the instantiated free vars
+        ret_sub = ret_sub.get_scheme_body_sub_without_bound_vars(instantiated_scheme)
 
         # returning the resulting substitution and TID:
-        return ret_sub, ret_sub.rewrite_type(found_tid)
+        return ret_sub, found_tid

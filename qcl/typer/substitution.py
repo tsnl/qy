@@ -3,6 +3,8 @@ A substitution is a mapping from named type variables to types.
 `Substitution` instances are immutable and composable.
 """
 
+import typing as t
+
 from qcl import type
 
 from . import scheme
@@ -21,9 +23,7 @@ class Substitution(object):
         else:
             self.sub_map = sub_map
 
-    def rewrite_scheme(self, s: "scheme.Scheme") -> "scheme.Scheme":
-        assert isinstance(s, scheme.Scheme)
-
+    def get_scheme_body_sub_without_bound_vars(self, s: "scheme.Scheme"):
         if s.bound_vars:
             sub_without_bound_vars_map = {}
             for k, v in self.sub_map.items():
@@ -33,8 +33,12 @@ class Substitution(object):
         else:
             sub_without_bound_vars = self
 
-        new_body = sub_without_bound_vars.rewrite_type(s.body_tid)
+        return sub_without_bound_vars
 
+    def rewrite_scheme(self, s: "scheme.Scheme") -> "scheme.Scheme":
+        assert isinstance(s, scheme.Scheme)
+        sub_without_bound_vars = self.get_scheme_body_sub_without_bound_vars(s)
+        new_body = sub_without_bound_vars.rewrite_type(s.body_tid)
         return s.sub_body(new_body)
 
     def rewrite_type(self, tid: type.identity.TID, rw_in_progress_tid_set=None) -> type.identity.TID:

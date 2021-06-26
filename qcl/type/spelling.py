@@ -53,21 +53,24 @@ def of(tid: identity.TID):
         else:
             return f"({lhs_spelling}) -> {rhs_spelling}"
 
-    elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Enum):
+    elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Enum, kind.TK.Module):
         prefix_keyword_map = {
             kind.TK.Struct: "Struct",
             kind.TK.Enum: "Enum",
-            kind.TK.Union: "Union"
+            kind.TK.Union: "Union",
+            kind.TK.Module: "Module"
         }
 
         elem_count = elem.count(tid)
         prefix_keyword = prefix_keyword_map[type_kind]
         field_text_iterator = (
-            of(elem.tid_of_field_ix(tid, i))
+            f"{elem.field_name_at_ix(tid, i)} "
+            f"{'=' if elem.is_type_field_at_field_ix(tid, i) else '::'} "
+            f"{of(elem.tid_of_field_ix(tid, i))}"
             for i in range(elem_count)
         )
 
-        return f"{prefix_keyword} {{ {', '.join(field_text_iterator)} }}"
+        return f"{prefix_keyword} {{ {'; '.join(field_text_iterator)} }}"
 
     elif type_kind in (kind.TK.BoundVar, kind.TK.FreeVar):
         return f"{tid}:{var_names[tid]}"
