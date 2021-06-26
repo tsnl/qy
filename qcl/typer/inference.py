@@ -231,14 +231,24 @@ def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem)
 
 
 def help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, def_tid, sub):
-    # pre-seeded: unify defined TID with existing TID
-    sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
-    sub = sub.compose(sub_lhs)
+    # NOTE: since this ID is pre-seeded, we do not need to instantiate the scheme, rather unify body directly.
+    assert not lhs_def_obj.scheme.bound_vars
+    sub = sub.get_scheme_body_sub_without_bound_vars(lhs_def_obj.scheme)
 
-    unify_sub = unifier.unify(lhs_tid, def_tid)
+    unify_sub = unifier.unify(lhs_def_obj.scheme.body_tid, def_tid)
     sub = sub.compose(unify_sub)
 
     sub.rewrite_contexts_everywhere(ctx)
+
+    # OLD: wrong, since it unifies formal definitions (containing bound vars) with an instantiation.
+    # pre-seeded: unify defined TID with existing TID
+    # sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
+    # sub = sub.compose(sub_lhs)
+    #
+    # unify_sub = unifier.unify(lhs_tid, def_tid)
+    # sub = sub.compose(unify_sub)
+    #
+    # sub.rewrite_contexts_everywhere(ctx)
 
 
 # def help_def_id_type_in_context(ctx, elem, id_name, def_tid, sub):
@@ -300,7 +310,7 @@ def infer_exp_tid(
             )
 
         # returning:
-        ret_sub, def_tid = found_def_obj.scheme.instantiate()
+        ret_sub, def_tid = found_def_obj.scheme.shallow_instantiate()
         return ret_sub, def_tid
 
     elif isinstance(exp, ast.node.IdExpInModule):
@@ -545,7 +555,7 @@ def infer_type_spec_tid(
         found_def_obj = ctx.lookup(ts.name)
         # TODO: validate that the found definition is in the right universe.
         if found_def_obj is not None:
-            sub, def_tid = found_def_obj.scheme.instantiate()
+            sub, def_tid = found_def_obj.scheme.shallow_instantiate()
             return sub, def_tid
         else:
             raise excepts.TyperCompilationError(f"Symbol {ts.name} used but not defined.")
@@ -615,12 +625,11 @@ def raise_cast_error(src_tid, dst_tid, more=None):
 
 
 def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe):
-    # FIXME: this must use substitution, unification, and 'elements' of a module rather than querying contexts
-    #   - otherwise, looking up contexts yields IDs that may be substituted in terms of 'BoundVar' instances that cannot
-    #     be substituted out without also substituting the module of definition.
-    #   - instead, cf. function calls.
+    # NOTE: IdInModuleNodes are nested and share formal variable mappings THAT CANNOT LEAVE THIS SUB-SYSTEM.
+    #   - this means that the substitution returns formal -> actual mappings UNLESS it has no child, in which case
+    #     it is the last IdInModuleNode in the process.
 
-    ret_sub = substitution.empty
+    sub = substitution.empty
 
     # looking up `found_def_obj` referring to [a:]b in this exp:
     if data.opt_container is None:
@@ -631,24 +640,29 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
         if found_def_obj is None:
             msg_suffix = f"symbol {file_mod_name} not found"
             raise excepts.TyperCompilationError(msg_suffix)
+
+        # validating the found definition: must be a module since it has children.
         elif not isinstance(found_def_obj, definition.ModRecord):
             msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
             raise excepts.TyperCompilationError(msg_suffix)
+
+        # by design, no node of this type can have no child.
+        # this block is mostly setup for states encountered below.
+        assert data.has_child
+
     else:
         assert data.opt_container is not None
+
+        # we 'drill-down' through container-expressions until reaching the base-case above.
+        # NOTE: this function uniquely returns a substitution with template formal args when it can guarantee it returns
+        #       to itself, i.e. `data.has_child` is true.
 
         # getting a mod-exp for the container:
         container_sub, container_tid = help_type_id_in_module_node(ctx, data.opt_container, definition.Universe.Module)
         container_mod_exp = seeding.mod_tid_exp_map[container_tid]
+        sub = sub.compose(container_sub)
 
-        # FIXME: THIS IS A PROBLEM WITH TEMPLATE INSTANTIATIONS
-        #   - acquiring this context WITHOUT instantiating templates first-- major error!
-        #   - OPT1: allow contexts to remember and instantiate bound vars
-        #   - OPT2: use type unification (cf function calls)
         container_ctx = seeding.mod_context_map[container_mod_exp]
-
-        # updating the existing sub with the sub from this inference:
-        ret_sub = ret_sub.compose(container_sub)
 
         # looking up the element in the container:
         found_def_obj = container_ctx.lookup(data.elem_name, shallow=True)
@@ -669,15 +683,12 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
     instantiated_scheme = found_def_obj.scheme
     if not data.elem_args:
         # no template arg call required/automatically instantiate:
-        instantiation_sub, found_tid = instantiated_scheme.instantiate()
-        ret_sub = ret_sub.compose(instantiation_sub)
-        found_tid = ret_sub.rewrite_type(found_tid)
+        #   - note: we try using 'shallow' so that contextual args are reused
+        instantiation_sub, found_tid = instantiated_scheme.deep_instantiate()
 
-        # get a copy of the substitution that does not map bound vars for outside the scheme:
-        #   - the hope is that all further inference applies to the instantiated free vars
-        ret_sub = ret_sub.get_scheme_body_sub_without_bound_vars(instantiated_scheme)
-
-        return ret_sub, found_tid
+        # rewriting the type to the fullest extend possible:
+        sub = sub.compose(instantiation_sub)
+        found_tid = sub.rewrite_type(found_tid)
     else:
         # template args provided: must be matched against the definition.
 
@@ -723,20 +734,20 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
                 else:
                     actual_arg_exp = actual_arg_node
                     actual_arg_sub, actual_value_arg_tid = infer_exp_tid(ctx, actual_arg_exp)
-                    ret_sub = ret_sub.compose(actual_arg_sub)
+                    sub = sub.compose(actual_arg_sub)
 
                     assert names.infer_def_universe_of(formal_name) == definition.Universe.Value
                     formal_val_def_obj = instantiated_mod_ctx.lookup(formal_name, shallow=True)
                     assert isinstance(formal_val_def_obj, definition.ValueRecord)
-                    polymorphic_instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.instantiate()
-                    ret_sub = ret_sub.compose(polymorphic_instantiate_sub)
+                    instantiate_sub, formal_value_arg_tid = formal_val_def_obj.scheme.shallow_instantiate()
+                    sub = sub.compose(instantiate_sub)
 
                     # unifying value args:
                     this_val_arg_sub = unifier.unify(
-                        ret_sub.rewrite_type(formal_value_arg_tid),
-                        ret_sub.rewrite_type(actual_value_arg_tid)
+                        sub.rewrite_type(formal_value_arg_tid),
+                        sub.rewrite_type(actual_value_arg_tid)
                     )
-                    ret_sub = ret_sub.compose(this_val_arg_sub)
+                    sub = sub.compose(this_val_arg_sub)
             else:
                 assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
                 if name_universe != definition.Universe.Type:
@@ -747,7 +758,7 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
 
                     actual_arg_ts = actual_arg_node
                     actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
-                    ret_sub = ret_sub.compose(actual_arg_sub)
+                    sub = sub.compose(actual_arg_sub)
 
                     actual_type_arg_tid_list.append(actual_type_arg_tid)
 
@@ -764,8 +775,7 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
         # NOTE: `polymorphic_instantiate_sub` includes mappings from BoundVars.
         #       `monomorphic_instantiate_sub` includes mappings from FreeVars that instantiate/sub the BoundVars.
 
-        polymorphic_instantiate_sub, found_tid = instantiated_scheme.instantiate()
-        monomorphic_instantiate_sub = substitution.empty
+        instantiate_sub, found_tid = instantiated_scheme.deep_instantiate()
 
         # if args provided, unifying actuals with fresh free-vars above.
         # NOTE: before, when actual args were provided, we would unify the actual args with the BoundVar directly.
@@ -776,16 +786,20 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
             # unifying the instantiated free-var
             assert len(actual_type_arg_tid_list) == len(instantiated_scheme.bound_vars)
             for passed_arg, formal_arg_var in zip(actual_type_arg_tid_list, instantiated_scheme.bound_vars):
-                placeholder_arg_var = polymorphic_instantiate_sub.rewrite_type(formal_arg_var)
+                placeholder_arg_var = instantiate_sub.rewrite_type(formal_arg_var)
                 unify_sub = unifier.unify(passed_arg, placeholder_arg_var)
-                monomorphic_instantiate_sub = monomorphic_instantiate_sub.compose(unify_sub)
+                instantiate_sub = instantiate_sub.compose(unify_sub)
 
-        ret_sub = ret_sub.compose(monomorphic_instantiate_sub)
-        found_tid = ret_sub.rewrite_type(found_tid)
+        sub = sub.compose(instantiate_sub)
+        found_tid = sub.rewrite_type(found_tid)
 
-        # get a copy of the substitution that does not map bound vars for outside the scheme:
-        #   - the hope is that all further inference applies to the instantiated free vars
-        ret_sub = ret_sub.get_scheme_body_sub_without_bound_vars(instantiated_scheme)
+    # if no child is present, ensure we remove any formal arg mappings to avoid further substitution before return:
+    #   - even if no args, may still inherit template args from outer sub-module context
+    if not data.has_child:
+        sub = sub.get_scheme_body_sub_without_bound_vars(
+            instantiated_scheme,
+            replace_deeply=True
+        )
 
-        # returning the resulting substitution and TID:
-        return ret_sub, found_tid
+    # returning the resulting substitution and TID:
+    return sub, found_tid
