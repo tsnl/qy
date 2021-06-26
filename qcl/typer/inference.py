@@ -194,8 +194,9 @@ def infer_binding_elem_types(
         sub.rewrite_contexts_everywhere(ctx)
 
         # appending to the `ElemInfo` list to construct fields:
-        elem_info = type.elem.ElemInfo(elem.id_name, rhs_tid, is_type_field)
-        elem_info_list.append(elem_info)
+        if elem_info_list is not None:
+            elem_info = type.elem.ElemInfo(elem.id_name, rhs_tid, is_type_field)
+            elem_info_list.append(elem_info)
 
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
@@ -471,7 +472,7 @@ def infer_exp_tid(
 
     elif isinstance(exp, ast.node.LambdaExp):
         # each lambda gets its own scope (for formal args)
-        lambda_ctx = ctx.push_context(f"lambda-{exp.loc}")
+        lambda_ctx = ctx.push_context(f"lambda-{exp.loc}", exp.loc)
 
         # inferring the 'arg_tid':
         # NOTE: arg kind depends on arg count:
@@ -523,7 +524,7 @@ def infer_exp_tid(
             #   - this ensures that initialization orders are correct
             for elem in exp.table.ordered_value_imp_bind_elems:
                 if isinstance(elem, ast.node.BaseBindElem):
-                    infer_binding_elem_types(chain_ctx, elem)
+                    infer_binding_elem_types(chain_ctx, elem, None)
                 else:
                     assert isinstance(elem, ast.node.BaseImperativeElem)
                     infer_imp_elem_types(chain_ctx, elem)
@@ -683,12 +684,14 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
     instantiated_scheme = found_def_obj.scheme
     if not data.elem_args:
         # no template arg call required/automatically instantiate:
-        #   - note: we try using 'shallow' so that contextual args are reused
-        instantiation_sub, found_tid = instantiated_scheme.deep_instantiate()
+        #   - note: we try using 'shallow' so that contextual args are mapped uniquely in children
+
+        # FIXME: somehow, executing THIS--v statement changes the scheme in the global definition, even though I am
+        #        unsure of how.
+        instantiation_sub, found_tid = instantiated_scheme.shallow_instantiate()
 
         # rewriting the type to the fullest extend possible:
         sub = sub.compose(instantiation_sub)
-        found_tid = sub.rewrite_type(found_tid)
     else:
         # template args provided: must be matched against the definition.
 
@@ -791,7 +794,10 @@ def help_type_id_in_module_node(ctx, data: "ast.node.IdNodeInModuleHelper", expe
                 instantiate_sub = instantiate_sub.compose(unify_sub)
 
         sub = sub.compose(instantiate_sub)
-        found_tid = sub.rewrite_type(found_tid)
+
+    # updating the 'found_tid' with all substitutions so far:
+    #   - ideally, this step involves rewriting BoundVar instances with FreeVar ones.
+    found_tid = sub.rewrite_type(found_tid)
 
     # if no child is present, ensure we remove any formal arg mappings to avoid further substitution before return:
     #   - even if no args, may still inherit template args from outer sub-module context

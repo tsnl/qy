@@ -149,12 +149,13 @@ class Substitution(object):
         :param ctx: the context manager to update IN-PLACE.
         """
 
-        ctx.map_everyone(self.help_rewrite_context_defs)
+        if self is not empty:
+            ctx.map_everyone(self.help_rewrite_single_context_defs)
 
     def rewrite_contexts_downward(self, ctx: "context.Context"):
-        ctx.map_descendants(self.help_rewrite_context_defs)
+        ctx.map_descendants(self.help_rewrite_single_context_defs)
 
-    def help_rewrite_context_defs(self, frame: "context.Context"):
+    def help_rewrite_single_context_defs(self, frame: "context.Context"):
         for def_name, def_obj in frame.symbol_table.items():
             def_obj.scheme = self.rewrite_scheme(def_obj.scheme)
             assert isinstance(def_obj.scheme, scheme.Scheme)

@@ -76,7 +76,7 @@ class Context(object):
         else:
             assert def_record is not None
             self.symbol_table[def_name] = def_record
-            def_record.scheme.finalize_def_context(self)
+            def_record.scheme.init_def_context(self)
             return True
 
     def lookup(self, def_name, shallow=False):

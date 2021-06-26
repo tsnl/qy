@@ -32,7 +32,8 @@ class ElemInfo:
         assert isinstance(self.name, str)
         assert isinstance(self.tid, identity.TID)
         assert isinstance(self.is_type_field, bool)
-        return hash((self.name, self.tid, self.is_type_field))
+        hashable_tuple = (self.name, self.tid, self.is_type_field)
+        return hash(hashable_tuple)
 
 
 def help_init_any(

@@ -54,12 +54,17 @@ class Scheme(object):
         return new_scheme
 
     def shallow_instantiate(self):
-        return self.help_instantiate(self.bound_var_map, is_deep_not_shallow=False)
+        sub, ret_tid = self.help_instantiate(self.bound_var_map, is_deep_not_shallow=False)
+        return sub, ret_tid
 
     def deep_instantiate(self):
-        return self.help_instantiate(self.all_bound_var_map, is_deep_not_shallow=True)
+        # return self.help_instantiate(self.all_bound_var_map, is_deep_not_shallow=True)
+        sub, ret_tid = self.help_instantiate(self.bound_var_map, is_deep_not_shallow=True)
+        return sub, ret_tid
 
-    def help_instantiate(self, bound_var_map, is_deep_not_shallow=False) -> t.Tuple[substitution.Substitution, type.identity.TID]:
+    def help_instantiate(
+            self, bound_var_map, is_deep_not_shallow=False
+    ) -> t.Tuple[substitution.Substitution, type.identity.TID]:
         """
         substitutes bound vars with fresh free-vars.
         :return: a substitution (including bound var mappings) and the instantiated body
@@ -98,7 +103,7 @@ class Scheme(object):
         else:
             return substitution.empty, self.body_tid
 
-    def finalize_def_context(self, def_context):
+    def init_def_context(self, def_context):
         assert def_context is not None
         self.def_context = def_context
         self.all_bound_var_map = self.bound_var_map | self.def_context.global_type_template_arg_map

@@ -7,6 +7,7 @@ We guarantee a structural type system using `functools.cache` + a nominal wrappe
 import functools
 
 from typing import *
+import copy
 
 from . import identity
 from . import kind
@@ -100,25 +101,31 @@ def get_tuple_type(elem_tid_tuple: Tuple[identity.TID]) -> identity.TID:
 
 @functools.cache
 def get_struct_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+    assert isinstance(field_elem_info_tuple, tuple)
+
     tid = identity.mint()
     kind.init(tid, kind.TK.Struct)
-    elem.init_struct(tid, field_elem_info_tuple)
+    elem.init_struct(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
 
 
 @functools.cache
 def get_union_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+    assert isinstance(field_elem_info_tuple, tuple)
+
     tid = identity.mint()
     kind.init(tid, kind.TK.Union)
-    elem.init_union(tid, field_elem_info_tuple)
+    elem.init_union(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
 
 
 @functools.cache
 def get_enum_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+    assert isinstance(field_elem_info_tuple, tuple)
+
     tid = identity.mint()
     kind.init(tid, kind.TK.Enum)
-    elem.init_enum(tid, field_elem_info_tuple)
+    elem.init_enum(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
 
 
@@ -127,9 +134,11 @@ def get_enum_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
 #
 
 def new_module_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+    assert isinstance(field_elem_info_tuple, tuple)
+
     tid = identity.mint()
     kind.init(tid, kind.TK.Module)
-    elem.init_module(tid, field_elem_info_tuple)
+    elem.init_module(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
 
 

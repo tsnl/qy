@@ -51,6 +51,10 @@ WIP:
         - we must try to aggressively optimize non-`CFn` pointers down wherever relevant.
         - lambdas and currying are vital, so no harm in embracing the closure case as default.
 
+...
+
+see `inference.py` line 682: just the weirdest Heisenbug
+
 ---
 
 Jun ??
