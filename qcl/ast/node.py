@@ -730,21 +730,35 @@ class IdNodeInModuleHelper(object):
     opt_container: Optional["IdNodeInModuleHelper"]
     elem_args: List[Union[BaseExp, BaseTypeSpec]]
     elem_name: str
+    opt_child: Optional["IdNodeInModuleHelper"]
 
     def __init__(self, loc, opt_container, elem_name, elem_args=None):
         super().__init__()
         self.loc = loc
         self.opt_container = opt_container
         self.elem_name = elem_name
+        self.opt_child = None
+
         if elem_args is not None:
             self.elem_args = elem_args
         else:
             self.elem_args = []
 
-    def __str__(self):
-        elem_args_str = ','.join(map(str, self.elem_args))
         if self.opt_container is not None:
-            return f"{self.opt_container}:{self.elem_name}({elem_args_str})"
+            self.opt_container.opt_child = self
+
+    @property
+    def has_child(self):
+        return self.opt_child is not None
+
+    def __str__(self):
+        if self.elem_args:
+            elem_args_str = f"[{','.join(map(str, self.elem_args))}]"
+        else:
+            elem_args_str = ""
+
+        if self.opt_container is not None:
+            return f"{self.opt_container}:{self.elem_name}{elem_args_str}"
         else:
             return f"{self.elem_name}{elem_args_str}"
 

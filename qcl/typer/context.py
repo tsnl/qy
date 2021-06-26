@@ -4,7 +4,7 @@ Each `Context` object is part of a larger tree data-structure that efficiently
 handles shadowing definitions and substitution mappings.
 """
 
-from typing import *
+import typing as t
 
 from qcl import type
 from qcl import feedback as fb
@@ -13,22 +13,25 @@ from . import definition
 
 
 class Context(object):
-    opt_parent_context: Optional["Context"]
+    opt_parent_context: t.Optional["Context"]
     root_context: "Context"
-    child_context_list: List["Context"]
-    symbol_table: Dict[str, definition.BaseRecord]
+    child_context_list: t.List["Context"]
+    symbol_table: t.Dict[str, definition.BaseRecord]
 
     def __init__(
-            self, purpose: str,
-            opt_parent_context: Optional["Context"],
-            symbol_table: Dict[str, definition.BaseRecord] = None
+            self, purpose: str, loc: fb.ILoc,
+            opt_parent_context: t.Optional["Context"],
+            symbol_table: t.Dict[str, definition.BaseRecord] = None,
+            local_type_template_arg_map: t.Optional[t.Dict[str, type.identity.TID]] = None
     ):
         super().__init__()
 
+        # metadata and relationships:
         self.purpose = purpose
-
+        self.loc = loc
         self.child_context_list = []
 
+        # initializing the parent context:
         self.opt_parent_context = opt_parent_context
         if self.opt_parent_context is None:
             self.root_context = self
@@ -36,20 +39,44 @@ class Context(object):
             self.root_context = self.opt_parent_context.root_context
             self.opt_parent_context.child_context_list.append(self)
 
+        # initializing the symbol table:
         if symbol_table is None:
             self.symbol_table = {}
         else:
             self.symbol_table = symbol_table
 
-    def push_context(self, purpose: str, opt_symbol_table=None):
-        return Context(purpose, self, opt_symbol_table)
+        # computing a map of all bound type variables in scope:
+        if local_type_template_arg_map is not None:
+            self.local_type_template_arg_map = local_type_template_arg_map
 
-    def try_define(self, def_name: str, def_obj: definition.BaseRecord) -> bool:
+            if self.opt_parent_context is not None:
+                gm = (self.opt_parent_context.global_type_template_arg_map | self.local_type_template_arg_map)
+                self.global_type_template_arg_map = gm
+            else:
+                self.global_type_template_arg_map = self.local_type_template_arg_map
+        else:
+            self.local_type_template_arg_map = {}
+
+            if self.opt_parent_context is not None:
+                self.global_type_template_arg_map = self.opt_parent_context.global_type_template_arg_map
+            else:
+                self.global_type_template_arg_map = self.local_type_template_arg_map
+
+        # defining each local type template argument in this context using the BoundVar types supplied:
+        for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_map.items():
+            def_record = definition.TypeRecord(self.loc, fresh_bound_var)
+            assert self.try_define(type_template_arg_name, def_record)
+
+    def push_context(self, purpose: str, loc: fb.ILoc, opt_symbol_table=None, opt_type_arg_map=None):
+        return Context(purpose, loc, self, opt_symbol_table, opt_type_arg_map)
+
+    def try_define(self, def_name: str, def_record: definition.BaseRecord) -> bool:
         if def_name in self.symbol_table:
             return False
         else:
-            assert def_obj is not None
-            self.symbol_table[def_name] = def_obj
+            assert def_record is not None
+            self.symbol_table[def_name] = def_record
+            def_record.scheme.init_def_context(self)
             return True
 
     def lookup(self, def_name, shallow=False):
@@ -80,7 +107,7 @@ class Context(object):
         for child_context in self.child_context_list:
             child_context.print(indent_count=indent_count+2)
 
-    def map_everyone(self, fn: Callable[["Context"], None]):
+    def map_everyone(self, fn: t.Callable[["Context"], None]):
         self.root_context.map_descendants(fn)
 
     def map_descendants(self, fn):
@@ -89,7 +116,7 @@ class Context(object):
         for child_context in self.child_context_list:
             child_context.map_descendants(fn)
 
-    def map_ancestors(self, fn: Callable[["Context"], None]):
+    def map_ancestors(self, fn: t.Callable[["Context"], None]):
         context = self
         while context is not None:
             fn(context)
@@ -104,6 +131,7 @@ def make_default_root():
 
     return Context(
         purpose="default-root-context",
+        loc=fb.BuiltinLoc("root_context_loc"),
         opt_parent_context=None,
         symbol_table=dict(
             **{

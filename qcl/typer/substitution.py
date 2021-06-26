@@ -23,11 +23,19 @@ class Substitution(object):
         else:
             self.sub_map = sub_map
 
-    def get_scheme_body_sub_without_bound_vars(self, s: "scheme.Scheme"):
-        if s.bound_vars:
+    def get_scheme_body_sub_without_bound_vars(self, s: "scheme.Scheme", replace_deeply=False):
+        if self is empty:
+            return self
+
+        if s.all_bound_var_map:
             sub_without_bound_vars_map = {}
+            if replace_deeply:
+                all_bound_var_set = set(s.all_bound_var_map.values())
+            else:
+                all_bound_var_set = set(s.bound_var_map.values())
+
             for k, v in self.sub_map.items():
-                if k not in s.bound_vars:
+                if k not in all_bound_var_set:
                     sub_without_bound_vars_map[k] = v
             sub_without_bound_vars = Substitution(sub_without_bound_vars_map)
         else:
@@ -141,12 +149,13 @@ class Substitution(object):
         :param ctx: the context manager to update IN-PLACE.
         """
 
-        ctx.map_everyone(self.help_rewrite_context_defs)
+        if self is not empty:
+            ctx.map_everyone(self.help_rewrite_single_context_defs)
 
     def rewrite_contexts_downward(self, ctx: "context.Context"):
-        ctx.map_descendants(self.help_rewrite_context_defs)
+        ctx.map_descendants(self.help_rewrite_single_context_defs)
 
-    def help_rewrite_context_defs(self, frame: "context.Context"):
+    def help_rewrite_single_context_defs(self, frame: "context.Context"):
         for def_name, def_obj in frame.symbol_table.items():
             def_obj.scheme = self.rewrite_scheme(def_obj.scheme)
             assert isinstance(def_obj.scheme, scheme.Scheme)
@@ -170,7 +179,7 @@ class Substitution(object):
             return Substitution(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self):
-        return '{' + ','.join((
+        return '{' + ', '.join((
             f"{type.spelling.of(key)} -> {type.spelling.of(value)}"
             for (key, value) in self.sub_map.items()
         )) + '}'
