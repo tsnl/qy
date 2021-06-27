@@ -40,8 +40,6 @@ mod basic_lin_alg [T] {
         x :: T;
         y :: T;
     };
-};
-mod lin_alg {
     Vec2i = basic_lin_alg[Int32]:Vec2;
     Vec2f = basic_lin_alg[Float32]:Vec2;
 };
