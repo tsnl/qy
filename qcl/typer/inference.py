@@ -84,10 +84,11 @@ def infer_file_mod_exp_tid(file_mod_exp: ast.node.FileModExp) -> type.identity.T
             out_sub = out_sub.compose(import_sub)
 
             # adding the new elem_info_list:
-            new_elem_info = type.elem.ElemInfo(import_mod_name, imported_mod_tid)
+            new_elem_info = type.elem.ElemInfo(import_mod_name, imported_mod_tid, False)
             elem_info_list.append(new_elem_info)
 
         # adding elem_info for each sub-mod:
+        elem_info_list = []
         for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
             sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(sub_mod_exp)
 
@@ -95,14 +96,22 @@ def infer_file_mod_exp_tid(file_mod_exp: ast.node.FileModExp) -> type.identity.T
             # NOTE: all previous elements are now invalidated.
             out_sub = out_sub.compose(sub_mod_substitution)
 
-            new_elem_info = type.elem.ElemInfo(sub_mod_name, sub_mod_tid)
+            new_elem_info = type.elem.ElemInfo(sub_mod_name, sub_mod_tid, False)
             elem_info_list.append(new_elem_info)
 
-        # before creation, all but the last elem_info needs to be updated with `out_sub`:
-        for i in range(len(elem_info_list) - 1):
-            old_tid = elem_info_list[i].tid
-            new_tid = out_sub.rewrite_type(old_tid)
-            elem_info_list[i].tid = new_tid
+        # re-applying the latest substitution to all elements but the last:
+        old_elem_info_list = elem_info_list
+        elem_info_list = []
+        for i in range(len(old_elem_info_list) - 1):
+            old_elem_info = old_elem_info_list[i]
+            rw_tid = out_sub.rewrite_type(old_elem_info.tid)
+            elem_info_list.append(
+                type.elem.ElemInfo(
+                    old_elem_info.name,
+                    rw_tid,
+                    old_elem_info.is_type_field
+                )
+            )
 
         # creating a new module type:
         new_mod_tid = type.new_module_type(tuple(elem_info_list))
@@ -151,7 +160,7 @@ def infer_sub_mod_exp_tid(
 
 def infer_binding_elem_types(
         ctx: context.Context, elem: ast.node.BaseBindElem,
-        elem_info_list: List[type.elem.ElemInfo]
+        elem_info_list: Optional[List[type.elem.ElemInfo]] = None
 ) -> None:
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
@@ -516,7 +525,7 @@ def infer_exp_tid(
 
     # typing chain expressions:
     elif isinstance(exp, ast.node.ChainExp):
-        chain_ctx = ctx.push_context("chain-ctx")
+        chain_ctx = ctx.push_context("chain-ctx", exp.loc)
         sub = substitution.empty
 
         if exp.table.elements:
@@ -524,7 +533,7 @@ def infer_exp_tid(
             #   - this ensures that initialization orders are correct
             for elem in exp.table.ordered_value_imp_bind_elems:
                 if isinstance(elem, ast.node.BaseBindElem):
-                    infer_binding_elem_types(chain_ctx, elem, None)
+                    infer_binding_elem_types(chain_ctx, elem)
                 else:
                     assert isinstance(elem, ast.node.BaseImperativeElem)
                     infer_imp_elem_types(chain_ctx, elem)
@@ -602,7 +611,7 @@ def infer_type_spec_tid(
                 msg_suffix = f"cannot type the same ID multiple times in an ADT."
                 raise excepts.TyperCompilationError(msg_suffix)
 
-            elem_info = type.elem.ElemInfo(field_name, field_tid)
+            elem_info = type.elem.ElemInfo(field_name, field_tid, False)
             field_elem_info_list.append(elem_info)
 
         field_elem_info_tuple = tuple(field_elem_info_list)

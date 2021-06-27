@@ -7,6 +7,7 @@ This system obtains type that make up other type, i.e. type 'elements'.
 
 from typing import *
 import dataclasses
+import collections
 import copy
 
 from . import identity
@@ -16,24 +17,36 @@ from . import kind
 components: Dict[identity.TID, "ProjComponent"] = {}
 
 
-@dataclasses.dataclass
-class ProjComponent(object):
-    elem_info_tuple: Tuple["ElemInfo"]
-    field_name_index_lut: Optional[Dict[str, int]] = None
+# @dataclasses.dataclass
+# class ProjComponent(object):
+#     elem_info_tuple: Tuple["ElemInfo"]
+#     field_name_index_lut: Optional[Dict[str, int]] = None
 
 
-@dataclasses.dataclass
-class ElemInfo:
-    name: Optional[str]
-    tid: identity.TID
-    is_type_field: bool = False
+ProjComponent = collections.namedtuple(
+    "ProjComponent",
+    ["elem_info_tuple", "field_name_index_lut"]
+)
 
-    def __hash__(self):
-        assert isinstance(self.name, str)
-        assert isinstance(self.tid, identity.TID)
-        assert isinstance(self.is_type_field, bool)
-        hashable_tuple = (self.name, self.tid, self.is_type_field)
-        return hash(hashable_tuple)
+
+# @dataclasses.dataclass
+# class ElemInfo:
+#     name: Optional[str]
+#     tid: identity.TID
+#     is_type_field: bool = False
+#
+#     def __hash__(self):
+#         assert isinstance(self.name, str)
+#         assert isinstance(self.tid, identity.TID)
+#         assert isinstance(self.is_type_field, bool)
+#         hashable_tuple = (self.name, self.tid, self.is_type_field)
+#         return hash(hashable_tuple)
+
+
+ElemInfo = collections.namedtuple(
+    "ElemInfo",
+    ["name", "tid", "is_type_field"]
+)
 
 
 def help_init_any(
@@ -49,11 +62,10 @@ def help_init_any(
             assert not elem_info.is_type_field
 
     # creating the component with defaults:
-    new_component = ProjComponent(elem_info_tuple)
+    new_component = ProjComponent(elem_info_tuple, {})
     components[tid] = new_component
 
     # assembling the [name] -> index look-up-table:
-    new_component.field_name_index_lut = {}
     for elem_info_index, elem_info in enumerate(elem_info_tuple):
         if elem_info.name is not None:
             new_component.field_name_index_lut[elem_info.name] = elem_info_index
@@ -68,35 +80,35 @@ def help_init_any(
 def init_ptr(ptr_tid: identity.TID, ptd_tid: identity.TID):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=(ElemInfo("ptd", ptd_tid),)
+        elem_info_tuple=(ElemInfo("ptd", ptd_tid, False),)
     )
 
 
 def init_array(ptr_tid: identity.TID, elem_tid: identity.TID):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=(ElemInfo(None, elem_tid),)
+        elem_info_tuple=(ElemInfo(None, elem_tid, True),)
     )
 
 
 def init_slice(ptr_tid: identity.TID, elem_tid: identity.TID):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=(ElemInfo(None, elem_tid),)
+        elem_info_tuple=(ElemInfo(None, elem_tid, True),)
     )
 
 
 def init_func(tid: identity.TID, arg_tid: identity.TID, ret_tid: identity.TID):
     return help_init_any(
         tid,
-        elem_info_tuple=(ElemInfo(None, arg_tid), ElemInfo(None, ret_tid))
+        elem_info_tuple=(ElemInfo(None, arg_tid, True), ElemInfo(None, ret_tid, True))
     )
 
 
 def init_tuple(ptr_tid: identity.TID, elem_tid_iterable: Iterable[identity.TID]):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=tuple((ElemInfo(None, elem_tid) for elem_tid in elem_tid_iterable))
+        elem_info_tuple=tuple((ElemInfo(None, elem_tid, False) for elem_tid in elem_tid_iterable))
     )
 
 

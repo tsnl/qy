@@ -119,10 +119,14 @@ class Substitution(object):
             if t_kind == type.kind.TK.Tuple:
                 return type.get_tuple_type(tuple(replacement_elem_tid_list))
             else:
-                replacement_elem_info_list = list(type.elem.copy_elem_info_tuple(tid))
-                for new_elem_info, replacement_field_tid in zip(replacement_elem_info_list, replacement_elem_tid_list):
-                    new_elem_info.tid = replacement_field_tid
-                replacement_elem_info_tuple = tuple(replacement_elem_info_list)
+                replacement_elem_info_tuple = tuple((
+                    type.elem.ElemInfo(
+                        type.elem.field_name_at_ix(tid, field_index),
+                        replacement_field_tid,
+                        type.elem.is_type_field_at_field_ix(tid, field_index)
+                    )
+                    for field_index, replacement_field_tid in enumerate(replacement_elem_tid_list)
+                ))
 
                 replacement_ctor_map = {
                     type.kind.TK.Struct: type.get_struct_type,
