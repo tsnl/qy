@@ -26,28 +26,17 @@ map identifier names based on the `ast` to types, expressed using `type`.
     - uses `context` objects to map value and type ID names to `scheme`s.
         - each `scheme` is a polymorphic mapping to other type IDs
 
-(everything below WIP)
+Once we have a typed AST, we use an interpreter to evaluate constants.
 
-The following modules help us represent transformed forms of the typed AST.
-
-- `hlir` = high-level IR
-    - goal: polymorphic IR suitable for static evaluation, const branch elimination before template generation
-    - represents code in an executable/interpretable format
-    - capable of executing polymorphic code
-    - written in Cython
-- `mlir` = mid-level IR
-    - goal: template-expanded form suitable for SMT analysis, optimization
-    - written in pure Python: does not need to be interpreted
-    
-The following modules help us generate `hlir`, then `llvm-ir` modules.
-- `hlir_compiler` = turns a typed AST into HLIR
-    - we can check side-effects-specifier validity inductively here.
-    - we can check initialization order, mutability here.
-    - if code is valid, we can emit high-level IR. Otherwise, due to above errors, compilation may fail.
-- `hlir_static_eval` = evaluates expressions in HLIR to expand templates
-    - this is where all compile-time evaluation occurs
-    - only errors when exceptions raised during static evaluation, which we cannot guarantee against.
-- `mlir_compiler` = turns an HLIR module into an MLIR module
-    - mainly involves (1) expanding templates, and (2) dead-code elimination
-- `mlir_analysis` = checks an MLIR module using the `z3` library.
-- `llir_compiler` = turns an MLIR module into an LLVM IR module using the `llvm` library.
+- `interpretation` handles evaluation of constants and lowering of the AST to a register-VM IR
+    - this is achieved by emitting byte-code for a low-level register VM
+    - the typed AST is compiled into IR, during which we detect...
+        - mutability errors
+        - invalid initialization orders
+        - infinite types/invalid mutability specifiers
+        - or anything else that may prevent us from lowering the typed AST to an ASM-like format
+    - this IR can also be executed at compile-time
+        - this VM can handle templated values
+          - more accurately, it isn't really typed at all
+          - **arrays map to slices.** This is sufficient to elide any and all value arguments.
+        - NOTE: we need to dynamically load any external libraries
