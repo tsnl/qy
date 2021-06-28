@@ -35,11 +35,15 @@
 #    };
 #};
 
-mod basic_lin_alg [T] {
+mod linAlg [T] {
     Vec2 = Struct {
         x :: T;
         y :: T;
     };
-    Vec2i = basic_lin_alg[Int32]:Vec2;
-    Vec2f = basic_lin_alg[Float32]:Vec2;
+    Vec2i = linAlg[Int32]:Vec2;
+    Vec2f = linAlg[Float32]:Vec2;
+};
+mod hello {
+    Vec2i = linAlg:Vec2i;
+    Vec2f = linAlg:Vec2f;
 };
