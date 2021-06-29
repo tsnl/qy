@@ -1,4 +1,4 @@
-mod test5 {
+df test5 {
     hello = (x, y) -> TOT {
         w = x;
         (x, y, w)

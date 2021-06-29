@@ -1,4 +1,4 @@
-mod test2 {
+df test2 {
     Vec3f = Struct { x :: Float32; y :: Float32; z :: Float32; };
     Vec4f = Struct { x :: Float32; y :: Float32; z :: Float32; w :: Float32; };
 

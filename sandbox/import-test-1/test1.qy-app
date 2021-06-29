@@ -2,6 +2,6 @@ imports {
     t2 from "test2.qy";
 };
 
-mod about1 {
+def about1 {
     count1 = t2:about2:count2;
 };

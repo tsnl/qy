@@ -36,24 +36,37 @@ Thus, this JIT could be the key to making this language usable:
     
 ## The Virtual Machine
 
-Our model of execution is a virtual machine with 16 x 8-byte (64 bit) registers, a well-defined
-byte-code format, and a mutable code segment. All work in this module uses a virtual machine as a shared context object.
+Our model of execution is a virtual machine with several 8-byte (64 bit) registers, a well-defined
+byte-code format, and a mutable code segment. 
+All work in this module uses a virtual machine as a shared context object.
 In other words, it contains (encapsulates) all resources used for interpretation.
 
 ### Registers
 
-- R0...R15 are 16 general purpose 64-bit registers. No X0/W0 union business.
-- RSP is the stack pointer register
-- RAX is the function return register
-- depending on the data-type, the register contains either the datum or a pointer to it.
-- our function calling convention is similar to C:
-     - first 16 args go in R0...R15
-     - subsequent args are pushed to the stack (cf. push instructions)
-     - NOTE: VM maintains `RBP` and `RSP` registers
-     - return value always stored in `RAX` register
-- NOTE: all registers are clobber-able
-     - thus, every 'call' instruction eats args and clobbers all registers
-     - to save values, use the stack
+Each VM possesses 32 integer registers and 32 floating point registers.
+We name these registers `x0...x31` and `f0...f31`.
+
+Each register serves a specific purpose.
+For simplicity, we use the RISC-V register naming scheme and calling convention, with these restrictions:
+- no support for 128-bit, double-register structures.
+- no support for `gp` (global pointer) and `tp` (thread pointer), instead used as call-clobbered registers.
+
+These restrictions may be relaxed over time.
+
+A summary of these registers:
+- integer registers (`x0`...`x31`)
+  - `x0` => `ra`: return address
+  - `x1` => `sp`: stack pointer
+  - `x2-x11` => `t0-t9`: temporary registers, i.e. caller-saved/call-clobbered
+  - `x12` => `s0/fp`: frame pointer (a callee-saved/call-preserving register)
+  - `x13-x23` => `s1-s11`: callee-saved/call-preserved registers
+  - `x24-x25` => `a0-a1`: caller-saved/call-clobbered arguments, store return values
+  - `x26-x31` => `a2-a7`: caller-saved/call-clobbered arguments
+- floating point registers (`f0`...`f31`)
+  - `f0-f11` => `ft0-ft11`: caller-saved/call-clobbered temporaries
+  - `f12-f23` => `fs0-fs11`: callee-saved/call-preserving registers
+  - `f0-f1` => `fa0-fa1`: caller-saved/call-clobbered arguments, store return values
+  - `f2-f11` => `fa2-fa7`: caller-saved/call-clobbered arguments
 
 ### Functions & Basic Blocks
 
@@ -73,10 +86,25 @@ value, is turned into mutating values that we must track dynamically and externa
 **TODO:** rely on **reflection** to dynamically maintain information about defined variables, their location in source
 code, and their type (so we can use the right arguments for, say, `lea` instructions)
 
+#### PHI instructions
+
+PHI instructions are borrowed from LLVM (which in turn borrows them from SSA theory).
+
+The result of a PHI branch is always stored in the `ra` or `fa0` register. 
+Thus, each 'if' expression is like a function. 
+
 ### Poking
 
 While functions can be loaded and executed, the VM may still need to be configured before executing code, or may need to 
 be queried for state during debug or emission.
 
-This is achieved using the `poke` API, which involves manipulating bits of the VM state from outside the VM.
+This is achieved using the `poke` family of functions which allow manipulating the VM's state from outside the VM.
+
+### No bit-masking
+
+The VM does not support any bit-masking, allowing the user to load and store only 64-bit words.
+
+All bit-masking can be performed on the host CPU based on the data-type of the value at run-time.
+This is a hacky way of evaluating 64-bit arithmetic modulo some constant that is a power of 2, which is theoretically 
+sound way of viewing integer overflow.
 

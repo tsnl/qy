@@ -20,26 +20,15 @@ typedef struct PHIIncomingEdge PHIIncomingEdge;
 //
 
 enum RegisterID {
-    R0 = 0,
-    R1 = 1,
-    R2 = 2,
-    R3 = 3,
-    R4 = 4,
-    R5 = 5,
-    R6 = 6,
-    R7 = 7,
-    R8 = 8,
-    R9 = 9,
-    R10 = 10,
-    R11 = 11,
-    R12 = 12,
-    R13 = 13,
-    R14 = 14,
-    R15 = 15,
-    RBP,
-    RSP,
-    RAX,
-    META_REGISTER_COUNT
+    RA= 0, SP= 1,
+    T0= 2, T1= 3, T2= 4, T3= 5, T4= 6, T5= 7, T6= 8, T7= 9, T8=10, T9=11,
+    S0=12, S1=13, S2=14, S3=15, S4=16, S5=17, S6=18, S7=19, S8=20, S9=21, S10=22, S11=23,
+    A0=24, A1=25, A2=26, A3=27, A4=28, A5=29, A6=30, A7=31,
+    FP=S0,
+
+    FT0=32, FT1=33, FT2=34, FT3=35, FT4=36, FT5=37, FT6=38, FT7=39, FT8=40, FT9=41, FT10=42, FT11=43,
+    FS0=44, FS1=45, FS2=46, FS3=47, FS4=48, FS5=49, FS6=50, FS7=51, FS8=52, FS9=53, FS10=54, FS11=55,
+    FA0=56, FA1=57, FA2=58, FA3=59, FA4=60, FA5=61, FA6=62, FA7=63
 };
 enum BinArithOp {
     BAO_POW,
@@ -56,8 +45,8 @@ enum RegType {
     RT_F32, RT_F64
 };
 enum Allocator {
-    ALLOCATOR_STACK,
-    ALLOCATOR_HEAP
+    ALLOCATOR_STACK = 0,
+    ALLOCATOR_HEAP = 1
 };
 
 //
@@ -101,7 +90,7 @@ BasicBlockInstrID vm_build_load(
     RegType reg_type,
     RegisterID ptr_reg_id, RegisterID dst_reg_id
 );
-BasicBlockInstrID vm_store(
+BasicBlockInstrID vm_build_store(
     VM* vm, BasicBlockID bb_id,
     RegType reg_type,
     RegisterID ptr_reg_id, RegisterID src_reg_id
@@ -130,12 +119,7 @@ BasicBlockInstrID vm_build_br(
 BasicBlockInstrID vm_build_phi(
     VM* vm, BasicBlockID bb_id,
     RegisterID dst_reg_id,
-    std::vector<PHIIncomingEdge> branches
-);
-BasicBlockInstrID vm_build_memcpy(
-    VM* vm, BasicBlockID bb_id,
-    RegisterID dst_ptr_reg_id, RegisterID src_ptr_reg_id,
-    RegisterID size_in_bytes_reg_id
+    std::vector<BasicBlockID> const& incoming_blocks
 );
 BasicBlockInstrID vm_build_ret(
     VM* vm, BasicBlockID bb_id,
@@ -157,6 +141,13 @@ BasicBlockInstrID vm_build_lea(
     RegisterID dst_reg_id
 );
 
+// memcpy: used to copy data from one pointer to another
+BasicBlockInstrID vm_build_memcpy(
+    VM* vm, BasicBlockID bb_id,
+    RegisterID dst_ptr_reg_id, RegisterID src_ptr_reg_id,
+    RegisterID size_in_bytes_reg_id
+);
+
 // push/pop: used to manipulate contents of the stack using registers
 // - a proxy for 'alloca', then 'load'/'store'
 // - unlike real machines, 'push' increments the stack pointer rather than decrement it
@@ -171,6 +162,7 @@ BasicBlockInstrID vm_build_pop(
     RegType reg_type,
     RegisterID dst_reg_id
 );
+
 
 //
 // poke: interpreter manipulation to configure stuff:
@@ -195,7 +187,6 @@ void vm_poke_store(VM* vm, RegType reg_type, RegisterID ptr_reg_id, RegisterID s
 void vm_poke_push(VM* vm, RegType reg_type, RegisterID src_reg_id);
 Register vm_poke_pop(VM* vm, RegType reg_type);
 void vm_poke_call(VM* vm, RegisterID func_reg_id);
-
 
 //
 //
@@ -222,8 +213,4 @@ union Register {
     uint8_t* ptr;
     FunctionID func_id;
     BasicBlockID bb_id;
-};
-struct PHIIncomingEdge {
-    BasicBlockID src_bb_id;
-    RegisterID src_reg_id;
 };

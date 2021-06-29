@@ -1,20 +1,20 @@
-#mod alphabet_soup [T, u] {
+#df alphabet_soup [T, u] {
 #    a = "hello";
 #    # x = T(0);
 #    x = u;
 #    z = 2;
 #};
 #
-#mod modernism {
+#df modernism {
 #    a = 0x42;
 #    another_x = alphabet_soup[String, 42Q]:u;
 #};
 #
-#mod postmodernism {
+#df postmodernism {
 #    a_re_examined = modernism:a;
 #};
 #
-#mod effing {
+#df effing {
 #    # f is for function
 #
 #    f1 = (x) -> {p = x; p};
@@ -26,7 +26,7 @@
 #    w = f1(f2(z));
 #};
 #
-#mod recursion {
+#df recursion {
 #    g :: (Float32) -> Float32;
 #
 #    g = (x) -> {
@@ -35,7 +35,7 @@
 #    };
 #};
 
-mod linAlg [T] {
+df linAlg [T] {
     Vec2 = Struct {
         x :: T;
         y :: T;
@@ -43,7 +43,7 @@ mod linAlg [T] {
     Vec2i = linAlg[Int32]:Vec2;
     Vec2f = linAlg[Float32]:Vec2;
 };
-mod hello {
+df hello {
     Vec2i = linAlg:Vec2i;
     Vec2f = linAlg:Vec2f;
 };

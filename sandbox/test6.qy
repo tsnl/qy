@@ -1,4 +1,4 @@
-mod test6 {
+df test6 {
     Vector3f = Struct {
         x :: F32;
         y :: F32;

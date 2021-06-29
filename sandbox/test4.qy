@@ -1,4 +1,4 @@
-mod test4 {
+df test4 {
     Vec2f = Struct {
         x :: F32;
         y :: F32;

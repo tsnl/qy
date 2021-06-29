@@ -1,4 +1,4 @@
-mod test3 {
+df test3 {
     fake_predecessor = (x) -> TOT {x};
 
     fake_multiply = (i, j) -> TOT {j};
