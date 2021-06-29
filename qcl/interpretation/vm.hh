@@ -9,7 +9,15 @@
 typedef struct VM VM;
 typedef uint64_t FunctionID;
 typedef uint64_t BasicBlockID;
+typedef uint64_t BasicBlockInstrID;
 typedef union Register Register;
+typedef struct PHIIncomingEdge PHIIncomingEdge;
+
+//
+//
+// Enum Definitions:
+//
+//
 
 enum RegisterID {
     R0 = 0,
@@ -51,10 +59,6 @@ enum Allocator {
     ALLOCATOR_STACK,
     ALLOCATOR_HEAP
 };
-struct PHIIncomingBlock {
-    BasicBlockID src_bb_id;
-    RegisterID src_reg_id;
-};
 
 //
 //
@@ -80,61 +84,60 @@ void vm_set_func_entry_point_bb(VM* vm, FunctionID func_id, BasicBlockID bb);
 // type 1: basic instructions
 //
 
-void vm_build_bao(
+BasicBlockInstrID vm_build_bao(
     VM* vm, BasicBlockID bb_id,
     BinArithOp bin_arith_op, RegType reg_type,
     RegisterID lhs_reg_id, RegisterID rhs_reg_id,
-    RegisterID dst_reg_id,
-    char const* opt_comment
+    RegisterID dst_reg_id
 );
-void vm_build_cmp(
+BasicBlockInstrID vm_build_cmp(
     VM* vm, BasicBlockID bb_id,
     CmpOp cmp_op, RegType reg_type,
     RegisterID lhs_reg_id, RegisterID rhs_reg_id,
-    RegisterID dst_reg_id,
-    char const* opt_comment
+    RegisterID dst_reg_id
 );
-void vm_build_load(
+BasicBlockInstrID vm_build_load(
     VM* vm, BasicBlockID bb_id,
     RegType reg_type,
-    RegisterID ptr_reg_id, RegisterID dst_reg_id,
-    char const* opt_comment
+    RegisterID ptr_reg_id, RegisterID dst_reg_id
 );
-void vm_build_call(
+BasicBlockInstrID vm_store(
     VM* vm, BasicBlockID bb_id,
-    RegisterID func_reg_id,
-    std::vector<RegisterID> const& args_reg_ids,
-    char const* opt_comment
+    RegType reg_type,
+    RegisterID ptr_reg_id, RegisterID src_reg_id
 );
-void vm_build_allocate(
+BasicBlockInstrID vm_build_call(
+    VM* vm, BasicBlockID bb_id,
+    RegisterID func_reg_id
+);
+BasicBlockInstrID vm_build_allocate(
     VM* vm, BasicBlockID bb_id,
     Allocator allocator,
     RegisterID size_reg_id,
-    RegisterID dst_reg_id,
-    char const* opt_comment
+    RegisterID dst_reg_id
 );
-void vm_build_set_reg(
+BasicBlockInstrID vm_build_set_reg(
     VM* vm, BasicBlockID bb_id,
     RegisterID reg_id,
     Register value
 );
-void vm_build_br(
+BasicBlockInstrID vm_build_br(
     VM* vm, BasicBlockID bb_id,
     RegisterID condition_reg_id,
     BasicBlockID bb_if_true,
     BasicBlockID bb_if_false
 );
-void vm_build_phi(
+BasicBlockInstrID vm_build_phi(
     VM* vm, BasicBlockID bb_id,
     RegisterID dst_reg_id,
-    std::vector<PHIIncomingBlock> branches
+    std::vector<PHIIncomingEdge> branches
 );
-void vm_build_memcpy(
+BasicBlockInstrID vm_build_memcpy(
     VM* vm, BasicBlockID bb_id,
     RegisterID dst_ptr_reg_id, RegisterID src_ptr_reg_id,
     RegisterID size_in_bytes_reg_id
 );
-void vm_build_ret(
+BasicBlockInstrID vm_build_ret(
     VM* vm, BasicBlockID bb_id,
     RegisterID copy_to_rax_reg_id
 );
@@ -145,7 +148,7 @@ void vm_build_ret(
 
 // lea = load effective address
 // equivalent to `load` from {ptr = base + slope * ordinate}
-void vm_build_lea(
+BasicBlockInstrID vm_build_lea(
     VM* vm, BasicBlockID bb_id,
     RegType reg_type,
     RegisterID base_address_reg_id,
@@ -158,12 +161,12 @@ void vm_build_lea(
 // - a proxy for 'alloca', then 'load'/'store'
 // - unlike real machines, 'push' increments the stack pointer rather than decrement it
 // - mutates the `stack-pointer` register
-void vm_build_push(
+BasicBlockInstrID vm_build_push(
     VM* vm, BasicBlockID bb_id,
     RegType reg_type,
     RegisterID src_reg_id
 );
-void vm_build_pop(
+BasicBlockInstrID vm_build_pop(
     VM* vm, BasicBlockID bb_id,
     RegType reg_type,
     RegisterID dst_reg_id
@@ -171,29 +174,35 @@ void vm_build_pop(
 
 //
 // poke: interpreter manipulation to configure stuff:
+// named 'poke' because it involves manipulating the VM state without code, by 'poking' at it from outside rather than
+// from within.
 //
 
 void vm_poke_set_reg(VM* vm, RegisterID reg_id, Register value);
-Register vm_get_reg(VM* vm, RegisterID reg_id);
-Register vm_load(
+Register vm_poke_get_reg(VM* vm, RegisterID reg_id);
+Register vm_poke_load(
     VM* vm,
     RegType reg_type,
     RegisterID ptr_reg_id, RegisterID dst_reg_id
 );
-Register vm_lea(
+Register vm_poke_lea(
     VM* vm,
     RegType reg_type,
     RegisterID base_address_reg_id, RegisterID slope_reg_id, RegisterID ordinate_reg_id,
     RegisterID dst_reg_id
 );
-void vm_call(
-    VM* vm,
-    RegisterID func_reg_id,
-    std::vector<RegisterID> const& args_reg_ids
-);
+void vm_poke_store(VM* vm, RegType reg_type, RegisterID ptr_reg_id, RegisterID src_reg_id);
+void vm_poke_push(VM* vm, RegType reg_type, RegisterID src_reg_id);
+Register vm_poke_pop(VM* vm, RegType reg_type);
+void vm_poke_call(VM* vm, RegisterID func_reg_id);
+
 
 //
+//
+//
 // Inline type definitions:
+//
+//
 //
 
 union Register {
@@ -213,4 +222,8 @@ union Register {
     uint8_t* ptr;
     FunctionID func_id;
     BasicBlockID bb_id;
+};
+struct PHIIncomingEdge {
+    BasicBlockID src_bb_id;
+    RegisterID src_reg_id;
 };

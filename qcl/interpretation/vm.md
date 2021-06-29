@@ -72,3 +72,11 @@ value, is turned into mutating values that we must track dynamically and externa
 
 **TODO:** rely on **reflection** to dynamically maintain information about defined variables, their location in source
 code, and their type (so we can use the right arguments for, say, `lea` instructions)
+
+### Poking
+
+While functions can be loaded and executed, the VM may still need to be configured before executing code, or may need to 
+be queried for state during debug or emission.
+
+This is achieved using the `poke` API, which involves manipulating bits of the VM state from outside the VM.
+
