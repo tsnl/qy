@@ -48,7 +48,6 @@ void free(LinearAllocator* allocator, uint8_t* ptr) {
 // Function & Basic Block implementations
 //
 
-
 struct BasicBlock {
     // todo: implement me
 };

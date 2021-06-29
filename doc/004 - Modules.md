@@ -36,7 +36,6 @@ Once we have a typed AST, we use an interpreter to evaluate constants.
         - infinite types/invalid mutability specifiers
         - or anything else that may prevent us from lowering the typed AST to an ASM-like format
     - this IR can also be executed at compile-time
-        - this VM can handle templated values
-          - more accurately, it isn't really typed at all
-          - **arrays map to slices.** This is sufficient to elide any and all value arguments.
-        - NOTE: we need to dynamically load any external libraries
+        - use lazy compilation to bake templates as required using constants evaluated so far.
+        - after evaluating every template value argument, the cache is complete for the program and finite.
+    

@@ -17,7 +17,7 @@ The following steps only need to be performed once, while setting up.
 1.  Run either `build-grammar.bat` on Windows or `build-grammar.sh` on Linux/macOS to generate the grammar.
     - ensure you have the `java` runtime installed.
 2.  Run `python3.9 -m pip install -r requirements.txt` to install all Python dependencies
-3.  Run `setup.py build_ext --inplace` to build Cython extensions.
+3.  Run `setup.sh` or `setup.bat` depending on your OS to build Cython extensions.
     - static evaluation uses these extension modules.
     
 ### Part 2: Running the compiler
