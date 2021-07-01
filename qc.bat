@@ -1,6 +1,5 @@
 @ECHO OFF
 
-
 REM TODO: check if this actually works!
 REM set version = %%"python3 --version"
 REM if "%version:~7,10%" != "3.9"

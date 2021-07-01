@@ -1,7 +1,6 @@
 import os
 import os.path as path
 import argparse
-import traceback
 
 from qcl import ast
 from qcl import excepts
@@ -23,21 +22,21 @@ def main():
     if in_c_mode:
         # build frontend: run dependency dispatch by recursively parsing and dispatching:
         try:
-            file_module_exp_list = frontend.load_project(project, args_obj.c_mode_entry_point)
+            frontend.load_project(project, args_obj.c_mode_entry_point)
         except (excepts.DependencyDispatchCompilationError, excepts.ParserCompilationError) as e:
             # TODO: fold exception data into feedback, print, and exit elegantly.
             raise e from e
         else:
             # DEBUG:
-            print(f"LOADED {len(file_module_exp_list)} modules:")
+            print(f"LOADED {len(project.file_module_exp_list)} modules:")
             print(f"* CWD: {project.abs_working_dir_path}")
-            for file_module_exp in file_module_exp_list:
+            for file_module_exp in project.file_module_exp_list:
                 assert isinstance(file_module_exp, ast.node.FileModExp)
                 print(f"- {file_module_exp.source.file_path_rel_cwd}")
 
         # run typer on the frontend:
         try:
-            typer.type_project(project, file_module_exp_list)
+            typer.type_project(project)
         except excepts.TyperCompilationError as e:
             # TODO: fold exception data into feedback, print, and exit elegantly.
             raise e from e

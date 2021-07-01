@@ -1,0 +1,4 @@
+build/
+vm.*.pyd
+vm.*.so
+vm.cpp

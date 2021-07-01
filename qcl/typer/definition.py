@@ -32,7 +32,7 @@ class TypeRecord(BaseRecord):
 
 
 class ModRecord(BaseRecord):
-    def __init__(self, loc: feedback.ILoc, mod_scheme: scheme.Scheme, mod_exp: ast.node.BaseModExp):
+    def __init__(self, loc: feedback.ILoc, mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp"):
         super().__init__(loc, mod_scheme, Universe.Module)
         self.mod_exp = mod_exp
 

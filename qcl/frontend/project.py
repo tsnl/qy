@@ -11,6 +11,7 @@ class Project(object):
         self.all_sm_map = {}
         self.abs_content_dir_path = None
         self.entry_point_source_module = None
+        self.file_module_exp_list = None
 
     def register_source_module(self, rel_path, is_entry_point=False):
         source_module = self.help_register_source_module(rel_path)
@@ -38,3 +39,7 @@ class Project(object):
             source_module = file.FileModuleSource(self, source_module_path)
             self.all_sm_map[source_module_path] = source_module
             return source_module
+
+    def set_file_module_exp_list(self, file_module_exp_list):
+        assert self.file_module_exp_list is None
+        self.file_module_exp_list = file_module_exp_list

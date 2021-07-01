@@ -9,9 +9,11 @@ import abc
 from collections import defaultdict
 from typing import *
 
+from qcl import excepts
 from qcl import frontend
 from qcl import feedback
 from qcl import type
+from qcl import typer
 
 
 class BaseNode(object, metaclass=abc.ABCMeta):
@@ -23,16 +25,42 @@ class BaseNode(object, metaclass=abc.ABCMeta):
         self.loc = loc
 
 
+class TypedBaseNode(BaseNode):
+    x_tid: Optional["type.identity.TID"]
+    x_ctx: Optional["typer.context.Context"]
+
+    def __init__(self, loc: "feedback.ILoc"):
+        super().__init__(loc)
+        self.x_tid = None
+        self.x_ctx = None
+
+    @property
+    def tid(self) -> Optional["type.identity.TID"]:
+        return self.x_tid
+
+    @property
+    def ctx(self) -> Optional["typer.context.Context"]:
+        return self.x_ctx
+
+    @property
+    def type_info_finalized(self):
+        is_finalized = self.x_tid is not None
+        if is_finalized:
+            assert self.x_ctx is not None
+        return is_finalized
+
+    def finalize_type_info(self, tid: type.identity.TID, ctx: typer.context.Context):
+        assert not self.type_info_finalized
+        self.x_tid = tid
+        self.x_ctx = ctx
+
+
 #
 # Expressions used to evaluate values, types, and classes.
 #
 
-class BaseExp(BaseNode, metaclass=abc.ABCMeta):
-    x_typeof_tid: Optional[type.identity.TID]
-
-    def __init__(self, loc: "feedback.ILoc"):
-        super().__init__(loc)
-        self.x_typeof_tid = None
+class BaseExp(TypedBaseNode, metaclass=abc.ABCMeta):
+    pass
 
 
 class UnitExp(BaseExp):
@@ -235,7 +263,7 @@ class IfExp(BaseExp):
 # Tabular Expressions:
 #
 
-class BaseModExp(BaseNode):
+class BaseModExp(TypedBaseNode):
     module_id_counter = 0
 
     def __init__(self, loc, template_arg_names: List[str]):
@@ -341,14 +369,8 @@ class TupleExp(BaseExp):
 #
 #
 
-class BaseTypeSpec(BaseNode):
-    is_mutable: bool
-
-    def __init__(self, loc):
-        super().__init__(loc)
-
-        # if `is_mutable` is true, the denoted type is of the form `mut T`
-        self.is_mutable = False
+class BaseTypeSpec(TypedBaseNode):
+    pass
 
 
 class SelfTypeSpec(BaseTypeSpec):
@@ -569,24 +591,22 @@ class Table(object):
         # - if multiple symbols bound in the same table
         # - if any bindings conflict with template params
 
-        # TODO: replace with real error handling
-
         ok = True
 
         # ensuring each element type is accepted:
         for element in self.elements:
             if isinstance(element, BaseBindElem):
                 if not self.accepts_binding_elems:
-                    print(f"ERROR: Binding element not permitted in table: {element.loc}")
-                    return False
+                    msg_suffix = f"binding element not permitted table at {element.loc}"
+                    raise excepts.ParserCompilationError(msg_suffix)
             elif isinstance(element, BaseTypingElem):
                 if not self.accepts_typing_elems:
-                    print(f"ERROR: Typing element not permitted in table: {element.loc}")
-                    return False
+                    msg_suffix = f"typing element not permitted in table: {element.loc}"
+                    raise excepts.ParserCompilationError(msg_suffix)
             elif isinstance(element, BaseImperativeElem):
                 if not self.accepts_imperative_elems:
-                    print(f"ERROR: Imperative element not permitted in table: {element.loc}")
-                    return False
+                    msg_suffix = f"imperative element not permitted in table: {element.loc}"
+                    raise excepts.ParserCompilationError(msg_suffix)
 
         return ok
 

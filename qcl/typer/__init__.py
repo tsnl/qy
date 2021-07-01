@@ -23,7 +23,8 @@ from . import seeding
 from . import inference
 
 
-def type_project(project, all_file_module_list):
+def type_project(project):
+    all_file_module_list = project.file_module_exp_list
 
     # typing occurs in two phases:
     # - seeding: we generate the types of all file modules in terms of free-vars so imports will resolve

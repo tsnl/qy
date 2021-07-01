@@ -25,15 +25,15 @@ from . import definition
 from . import names
 
 
-mod_context_map: t.Dict[ast.node.BaseModExp, context.Context] = {}
-mod_exp_tid_map: t.Dict[ast.node.BaseModExp, type.identity.TID] = {}
-mod_tid_exp_map: t.Dict[type.identity.TID, ast.node.BaseModExp] = {}
+mod_context_map: t.Dict["ast.node.BaseModExp", "context.Context"] = {}
+mod_exp_tid_map: t.Dict["ast.node.BaseModExp", "type.identity.TID"] = {}
+mod_tid_exp_map: t.Dict["type.identity.TID", "ast.node.BaseModExp"] = {}
 
 
 def seed_project_types(
         root_context: context.Context,
         project: frontend.Project,
-        all_file_module_list: t.List[ast.node.FileModExp]
+        all_file_module_list: t.List["ast.node.FileModExp"]
 ):
     """
     this pass creates `FreeVar` types for each module (called 'seeds') and associates AST nodes with other properties.
@@ -54,7 +54,7 @@ def seed_project_types(
         seed_file_mod_exp(root_context, file_module_exp)
 
 
-def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: ast.node.FileModExp):
+def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: "ast.node.FileModExp"):
     # getting the seed for this file-mod-exp:
     file_mod_tid = mod_exp_tid_map[file_mod_exp]
 
@@ -96,7 +96,7 @@ def seed_import(ctx: context.Context, loc, import_name: str, import_source: fron
         raise excepts.TyperCompilationError(msg_suffix)
 
 
-def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: ast.node.SubModExp):
+def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.node.SubModExp"):
     # creating and storing a 'seed' for this sub-mod-exp:
     sub_mod_tid = type.new_free_var(f"seed.sub_mod.{sub_mod_name}")
     mod_exp_tid_map[sub_mod_exp] = sub_mod_tid
@@ -159,7 +159,7 @@ def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, temp
 
 def seed_template_type_arg(
         sub_mod_ctx: context.Context, loc: feedback.ILoc,
-        template_type_arg_name: str, bound_var_tid: type.identity.TID
+        template_type_arg_name: str, bound_var_tid: "type.identity.TID"
 ):
     def_obj = definition.TypeRecord(loc, bound_var_tid)
     def_ok = sub_mod_ctx.try_define(template_type_arg_name, def_obj)
@@ -170,7 +170,7 @@ def seed_template_type_arg(
         raise excepts.TyperCompilationError(msg_suffix)
 
 
-def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: ast.node.BaseBindElem):
+def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: "ast.node.BaseBindElem"):
     # creating a 'seed':
     def_name = bind1_elem.id_name
     defined_tid = type.new_free_var(f"seed.bind.{def_name}")

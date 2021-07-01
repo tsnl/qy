@@ -28,13 +28,13 @@ class FileModTypeInferenceInfo(object):
     sub: substitution.Substitution
 
 
-file_mod_inferences: Dict[ast.node.FileModExp, FileModTypeInferenceInfo] = {}
-sub_mod_inferences: Dict[ast.node.SubModExp, SubModTypeInferenceInfo]
+file_mod_inferences: Dict["ast.node.FileModExp", FileModTypeInferenceInfo] = {}
+sub_mod_inferences: Dict["ast.node.SubModExp", SubModTypeInferenceInfo]
 
 
 def infer_project_types(
         project: frontend.Project,
-        all_file_module_list: List[ast.node.FileModExp]
+        all_file_module_list: List["ast.node.FileModExp"]
 ):
     """
     this pass uses `unify` to generate substitutions that, once all applied, eliminate all free type variables from the
@@ -49,7 +49,7 @@ def infer_project_types(
         file_mod_tid = infer_file_mod_exp_tid(file_module_exp)
 
 
-def infer_file_mod_exp_tid(file_mod_exp: ast.node.FileModExp) -> type.identity.TID:
+def infer_file_mod_exp_tid(file_mod_exp: "ast.node.FileModExp") -> type.identity.TID:
     # we use `seeding.mod_tid[...]` to resolve module imports out-of-order
     cached_mod_inference = file_mod_inferences.get(file_mod_exp, None)
     if cached_mod_inference is not None:
@@ -125,15 +125,16 @@ def infer_file_mod_exp_tid(file_mod_exp: ast.node.FileModExp) -> type.identity.T
         seeding.mod_tid_exp_map[new_mod_tid] = file_mod_exp
 
         out_sub.rewrite_contexts_everywhere(file_mod_ctx)
+        file_mod_exp.finalize_type_info(new_mod_tid, file_mod_ctx)
         return new_mod_tid
 
 
 def infer_sub_mod_exp_tid(
-        sub_mod_exp: ast.node.SubModExp
+        sub_mod_exp: "ast.node.SubModExp"
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     # acquiring the seeded context, updating our caches:
     seeded_sub_mod_exp_tid = seeding.mod_exp_tid_map[sub_mod_exp]
-    seeded_sub_mod_exp_ctx = seeding.mod_context_map[sub_mod_exp]
+    sub_mod_ctx = seeding.mod_context_map[sub_mod_exp]
 
     out_sub = substitution.empty
 
@@ -141,26 +142,26 @@ def infer_sub_mod_exp_tid(
 
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
-        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem, elem_info_list)
+        infer_binding_elem_types(sub_mod_ctx, elem, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_type_bind_elems:
-        infer_binding_elem_types(seeded_sub_mod_exp_ctx, elem, elem_info_list)
+        infer_binding_elem_types(sub_mod_ctx, elem, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_typing_elems:
-        infer_typing_elem_types(seeded_sub_mod_exp_ctx, elem)
+        infer_typing_elem_types(sub_mod_ctx, elem)
 
     sub_mod_exp_tid = type.new_module_type(tuple(elem_info_list))
     out_sub = out_sub.compose(substitution.Substitution({seeded_sub_mod_exp_tid: sub_mod_exp_tid}))
 
     # re-seeding the new sub_mod's TID:
     seeding.mod_tid_exp_map[sub_mod_exp_tid] = sub_mod_exp
-
+    sub_mod_exp.finalize_type_info(sub_mod_exp_tid, sub_mod_ctx)
     return out_sub, sub_mod_exp_tid
 
 
 def infer_binding_elem_types(
-        ctx: context.Context, elem: ast.node.BaseBindElem,
-        elem_info_list: Optional[List[type.elem.ElemInfo]] = None
+        ctx: "context.Context", elem: "ast.node.BaseBindElem",
+        elem_info_list: Optional[List["type.elem.ElemInfo"]] = None
 ) -> None:
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
@@ -211,7 +212,7 @@ def infer_binding_elem_types(
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
-def infer_imp_elem_types(ctx: context.Context, elem: ast.node.BaseImperativeElem) -> None:
+def infer_imp_elem_types(ctx: "context.Context", elem: "ast.node.BaseImperativeElem") -> None:
     if isinstance(elem, ast.node.ForceEvalElem):
         sub, exp_tid = infer_exp_tid(ctx, elem.discarded_exp)
         sub.rewrite_contexts_everywhere(ctx)
@@ -220,7 +221,7 @@ def infer_imp_elem_types(ctx: context.Context, elem: ast.node.BaseImperativeElem
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
-def infer_typing_elem_types(ctx: context.Context, elem: ast.node.BaseTypingElem) -> None:
+def infer_typing_elem_types(ctx: "context.Context", elem: "ast.node.BaseTypingElem") -> None:
     if isinstance(elem, ast.node.Type1VElem):
         sub, rhs_tid = infer_type_spec_tid(ctx, elem.type_spec)
 
@@ -299,7 +300,15 @@ def help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, def_tid, sub):
 
 
 def infer_exp_tid(
-        ctx: context.Context, exp: ast.node.BaseExp
+        ctx: "context.Context", exp: "ast.node.BaseExp"
+) -> Tuple[substitution.Substitution, type.identity.TID]:
+    sub, tid = help_infer_exp_tid(ctx, exp)
+    exp.finalize_type_info(tid, ctx)
+    return sub, tid
+
+
+def help_infer_exp_tid(
+        ctx: "context.Context", exp: "ast.node.BaseExp"
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     #
     # context-dependent branches: ID, ModAddressID
@@ -559,7 +568,15 @@ def infer_exp_tid(
 
 
 def infer_type_spec_tid(
-        ctx: context.Context, ts: ast.node.BaseTypeSpec
+        ctx: "context.Context", ts: "ast.node.BaseTypeSpec"
+):
+    sub, tid = help_infer_type_spec_tid(ctx, ts)
+    ts.finalize_type_info(tid, ctx)
+    return sub, tid
+
+
+def help_infer_type_spec_tid(
+        ctx: "context.Context", ts: "ast.node.BaseTypeSpec"
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     if isinstance(ts, ast.node.IdTypeSpec):
         found_def_obj = ctx.lookup(ts.name)
