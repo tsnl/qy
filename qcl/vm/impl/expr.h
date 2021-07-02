@@ -4,7 +4,7 @@
 
 #include "core.h"
 #include "table.h"
-#include "types.h"
+#include "rtti.h"
 #include "defs.h"
 
 typedef union ExprData ExprData;
@@ -22,7 +22,7 @@ ExprID expr_tab_new_simplest(Table* table, ExprKind kind);
 ExprID expr_tab_new_int_literal(Table* table, uint64_t value, int width_in_bytes, bool is_signed);
 ExprID expr_tab_new_float_literal(Table* table, double value, int width_in_bytes);
 ExprID expr_tab_new_collection(Table* table, ExprKind kind, ExprID* items, size_t item_count);
-ExprID expr_tab_new_sizeof(Table* table, TypeID tid);
+ExprID expr_tab_new_sizeof(Table* table, RtTypeID tid);
 ExprID expr_tab_new_ite(Table* table, ExprID cond_expr_id, ExprID then_expr_id, ExprID else_expr_id);
 ExprID expr_tab_new_call(Table* table, ExprID func_expr_id, ExprID arg_expr_id);
 ExprID expr_tab_new_bao(Table* table, ExprKind kind, ExprID lhs_arg_expr_id, ExprID rhs_arg_expr_id);

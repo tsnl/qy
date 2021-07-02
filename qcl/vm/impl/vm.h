@@ -12,10 +12,10 @@ typedef struct StringExtract StringExtract;
 typedef struct CompoundExtract CompoundExtract;
 
 typedef uint64_t DefID;
-typedef uint64_t TypeID;
+typedef uint64_t RtTypeID;
 typedef uint64_t FuncID;
 typedef uint64_t ExprID;
-typedef uint64_t TypeID;
+typedef uint64_t RtTypeID;
 typedef uint64_t ValueID;
 typedef uint64_t IntStr;
 
@@ -45,7 +45,7 @@ ExprID vm_mk_literal_float_expr(VM* vm, double f);
 ExprID vm_mk_literal_string_expr(VM* vm, uint64_t length, char const* bytes);
 ExprID vm_mk_literal_array_expr(VM* vm, uint64_t length, ExprID const* element_expr_id_array);
 ExprID vm_mk_literal_tuple_expr(VM* vm, uint64_t length, ExprID const* element_expr_id_array);
-ExprID vm_mk_sizeof_expr(VM* vm, TypeID type_expr);
+ExprID vm_mk_sizeof_expr(VM* vm, RtTypeID type_expr);
 // complex (1):
 ExprID vm_mk_if_expr(VM* vm, ExprID cond_expr_id, ExprID then_expr_id, ExprID else_expr_id);
 ExprID vm_mk_call_expr(VM* vm, ExprID fn_expr_id, ExprID arg_expr_id, bool allow_non_tot);
@@ -75,7 +75,7 @@ CompoundExtract vm_extract_array(ValueID value_id);
 CompoundExtract vm_extract_tuple(ValueID value_id);
 CompoundExtract vm_extract_struct(ValueID value_id);
 // todo: how to extract unions?
-TypeID vm_extract_tid(ValueID value_id);
+RtTypeID vm_extract_tid(ValueID value_id);
 
 //
 //

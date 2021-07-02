@@ -1,5 +1,16 @@
 {
     "files.associations": {
-        "xlocale": "c"
+        "xlocale": "c",
+        "iterator": "c",
+        "memory": "c",
+        "streambuf": "c",
+        "system_error": "c",
+        "xfacet": "c",
+        "xiosbase": "c",
+        "xlocnum": "c",
+        "xtree": "c",
+        "xutility": "c",
+        "tuple": "c",
+        "utility": "c"
     }
 }

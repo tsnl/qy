@@ -1,1 +1,0 @@
-TODO: rewrite Python `type` module in C++ such that `vm` may rely on it.

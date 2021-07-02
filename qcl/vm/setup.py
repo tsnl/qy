@@ -11,7 +11,8 @@ def main():
                     ["./pyvm.pyx",
                      "./impl/vm.c",
                      "./impl/table.c",
-                     "./impl/expr.c"]
+                     "./impl/expr.c",
+                     "./impl/rtti.c"]
                 )
             ],
         ),

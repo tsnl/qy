@@ -61,7 +61,7 @@ union ExprData {
     } collection;   // array, tuple
 
     struct {
-        TypeID tid;
+        RtTypeID tid;
     } sizeof_;
 
     struct {
@@ -246,7 +246,7 @@ ExprID expr_tab_new_collection(Table* table, ExprKind kind, ExprID* items, size_
     return eid;
 }
 
-ExprID expr_tab_new_sizeof(Table* table, TypeID tid) {
+ExprID expr_tab_new_sizeof(Table* table, RtTypeID tid) {
     ExprID eid = help_append_expr(table, EXPR_SIZEOF);
     Expr* e = tab_gp(table, eid);
     e->data.sizeof_.tid = tid;
