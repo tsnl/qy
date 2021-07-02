@@ -5,7 +5,7 @@ After we've typed the AST, we still need to verify that the input program is val
 If this were an interpreted language, then each source file could be viewed as a partial definition of a single constant
 module expression, i.e. a struct-like object with value and type fields.
 
-In fact, this is the goal of this module:
+In fact, this is the goal of ~~this~~ the `vm` module:
 the VM offers a Python-level of efficiency for static evaluation,
 mainly because it uses high-level abstractions that can easily be queried for validation.
 

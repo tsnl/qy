@@ -1,0 +1,5 @@
+../ptc_checks/build/
+pyvm.*.pyd
+pyvm.*.so
+pyvm.cpp
+pyvm.c

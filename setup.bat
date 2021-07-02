@@ -1,3 +1,3 @@
-@CD qcl\ptc_checks\
+@CD qcl\vm\
 @python3.9 setup.py build_ext --inplace --plat-name=win-amd64
 @CD ..\..\
