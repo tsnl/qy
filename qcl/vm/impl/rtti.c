@@ -253,23 +253,113 @@ RtTypeID help_new_ptr_rttid(RttiManager* rm, ValueKind vk, RtTypeID ptd_rttid, b
 //
 
 size_t get_size_of_rttid(RttiManager* rm, RtTypeID tid) {
-
+    size_t* size_p = tab_gp(rm->size_table, tid);
+    return *size_p;
 }
 ValueKind get_kind_of_rttid(RttiManager* rm, RtTypeID tid) {
-
+    uint8_t* v_p = tab_gp(rm->kind_table, tid);
+    return (ValueKind)*v_p;
 }
-RtTypeID get_ptd_of_rttid(RttiManager* rm, RtTypeID tid) {
-
+RtTypeID get_ptd_of_ptr_rttid(RttiManager* rm, RtTypeID tid) {
+    TypeInfo* ti_p = tab_gp(rm->info_table, tid);
+    return ti_p->ptr.ptd_rttid;
 }
-RtTypeID get_elem_tid_of_rttid(RttiManager* rm, RtTypeID container_tid, size_t elem_index) {
-
+bool get_mut_of_ptr_rttid(RttiManager* rm, RtTypeID tid) {
+    TypeInfo* ti_p = tab_gp(rm->info_table, tid);
+    return ti_p->ptr.is_mut;
 }
-bool is_rttid_mut(RttiManager* rm, RtTypeID tid) {
-
+size_t get_elem_count_of_adt_rttid(RttiManager* rm, RtTypeID container_tid) {
+    ValueKind container_vk = get_kind_of_rttid(rm, container_tid);
+    assert(
+        container_vk == VAL_TUPLE ||
+        container_vk == VAL_UNION
+    );
+    TypeInfo* ti_p = tab_gp(rm->info_table, container_tid);
+    return ti_p->adt.elem_count;
+}
+RtTypeID get_elem_tid_of_adt_rttid(RttiManager* rm, RtTypeID container_tid, size_t elem_index) {
+    ValueKind container_vk = get_kind_of_rttid(rm, container_tid);
+    assert(
+        container_vk == VAL_TUPLE ||
+        container_vk == VAL_UNION
+    );
+    TypeInfo* ti_p = tab_gp(rm->info_table, container_tid);
+    assert(elem_index < ti_p->adt.elem_count && "RTTI: get elem TID out of bounds");
+    return ti_p->adt.elem_rttids[elem_index];
 }
 RtTypeID get_arg_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid) {
-
+    assert(get_kind_of_rttid(rm, fn_tid) == VAL_FN);
+    TypeInfo* ti_p = tab_gp(rm->info_table, fn_tid);
+    return ti_p->fn.arg_rttid;
 }
 RtTypeID get_ret_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid) {
+    assert(get_kind_of_rttid(rm, fn_tid) == VAL_FN);
+    TypeInfo* ti_p = tab_gp(rm->info_table, fn_tid);
+    return ti_p->fn.ret_rttid;
+}
 
+//
+// comparison:
+//
+
+bool are_types_equal(RttiManager* rm, RtTypeID lhs_tid, RtTypeID rhs_tid) {
+    // level 1: kinds checks
+    ValueKind lhs_vk = get_kind_of_rttid(rm, lhs_tid);
+    ValueKind rhs_vk = get_kind_of_rttid(rm, rhs_tid);
+    if (lhs_vk != rhs_vk) {
+        return false;
+    }
+
+    // level 2: kind-dependent checks:
+    ValueKind vk = lhs_vk;
+    switch (vk) {
+        // for simple types, we maintain unique TIDs:
+        case VAL_UNIT:
+        case VAL_STRING:
+        case VAL_UINT:
+        case VAL_SINT:
+        case VAL_FLOAT: {
+            return lhs_tid == rhs_tid;
+        }
+
+        // for complex types, we do not guarantee unique TIDs, so we need
+        // to recursively compare:
+        case VAL_PTR:
+        case VAL_ARRAY:
+        case VAL_SLICE: {
+            RtTypeID lhs_ptd_rttid = get_ptd_of_ptr_rttid(rm, lhs_tid);
+            RtTypeID rhs_ptd_rttid = get_ptd_of_ptr_rttid(rm, rhs_tid);
+            return are_types_equal(rm, lhs_ptd_rttid, rhs_ptd_rttid);
+        }
+        case VAL_TUPLE:
+        case VAL_UNION: {
+            size_t lhs_elem_count = get_elem_count_of_adt_rttid(rm, lhs_tid);
+            size_t rhs_elem_count = get_elem_count_of_adt_rttid(rm, rhs_tid);
+            if (lhs_elem_count != rhs_elem_count) {
+                return false;
+            }
+            size_t elem_count = lhs_elem_count;
+            for (size_t i_elem = 0; i_elem < elem_count; i_elem++) {
+                RtTypeID lhs_elem_tid = get_elem_tid_of_adt_rttid(rm, lhs_tid, i_elem);
+                RtTypeID rhs_elem_tid = get_elem_tid_of_adt_rttid(rm, rhs_tid, i_elem);
+                if (!are_types_equal(rm, lhs_elem_tid, rhs_elem_tid)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case VAL_FN: {
+            RtTypeID lhs_arg_rttid = get_arg_tid_of_fn_rttid(rm, lhs_tid);
+            RtTypeID lhs_ret_rttid = get_ret_tid_of_fn_rttid(rm, lhs_tid);
+            RtTypeID rhs_arg_rttid = get_arg_tid_of_fn_rttid(rm, rhs_tid);
+            RtTypeID rhs_ret_rttid = get_ret_tid_of_fn_rttid(rm, rhs_tid);
+            return (
+                are_types_equal(rm, lhs_arg_rttid, rhs_arg_rttid) &&
+                are_types_equal(rm, lhs_ret_rttid, rhs_ret_rttid)
+            );
+        }
+        default: {
+            assert(0 && "Unknown ValueKind in `are_types_equal`");
+        }
+    }
 }

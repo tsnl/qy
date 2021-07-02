@@ -28,8 +28,19 @@ RtTypeID new_slice_rttid(RttiManager* rm, RtTypeID elem_tid, bool is_mut);
 
 size_t get_size_of_rttid(RttiManager* rm, RtTypeID tid);
 ValueKind get_kind_of_rttid(RttiManager* rm, RtTypeID tid);
-RtTypeID get_ptd_of_rttid(RttiManager* rm, RtTypeID tid);
-RtTypeID get_elem_tid_of_rttid(RttiManager* rm, RtTypeID container_tid, size_t elem_index);
-bool is_rttid_mut(RttiManager* rm, RtTypeID tid);
+RtTypeID get_ptd_of_ptr_rttid(RttiManager* rm, RtTypeID tid);
+bool get_mut_of_ptr_rttid(RttiManager* rm, RtTypeID tid);
+RtTypeID get_elem_tid_of_adt_rttid(RttiManager* rm, RtTypeID container_tid, size_t elem_index);
+size_t get_elem_count_of_adt_rttid(RttiManager* rm, RtTypeID container_tid);
 RtTypeID get_arg_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid);
 RtTypeID get_ret_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid);
+
+//
+// comparison:
+//
+
+bool are_types_equal(RttiManager* rm, RtTypeID lhs_tid, RtTypeID rhs_tid);
+
+//
+// TODO
+//  - allow ses to be passed to fns.
