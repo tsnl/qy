@@ -584,16 +584,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             self.visit(ctx.elements)
         )
 
-    def visitTaggedUnionTypeSpec(self, ctx):
+    def visitUnionTypeSpec(self, ctx):
         return ast.node.AdtTypeSpec(
-            ast.node.AdtKind.TaggedUnion,
-            self.ctx_loc(ctx),
-            self.visit(ctx.elements)
-        )
-
-    def visitUntaggedUnionTypeSpec(self, ctx):
-        return ast.node.AdtTypeSpec(
-            ast.node.AdtKind.UntaggedUnion,
+            ast.node.AdtKind.Union,
             self.ctx_loc(ctx),
             self.visit(ctx.elements)
         )

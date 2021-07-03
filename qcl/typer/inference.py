@@ -611,8 +611,7 @@ def help_infer_type_spec_tid(
     elif isinstance(ts, ast.node.AdtTypeSpec):
         type_ctor = {
             ast.node.AdtKind.Structure: type.get_struct_type,
-            ast.node.AdtKind.TaggedUnion: type.get_enum_type,
-            ast.node.AdtKind.UntaggedUnion: type.get_union_type
+            ast.node.AdtKind.Union: type.get_union_type
         }[ts.adt_kind]
 
         sub = substitution.empty

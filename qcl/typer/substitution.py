@@ -106,7 +106,7 @@ class Substitution(object):
 
         # compounds: tuple, struct, union, enum, module
         compound_tk_set = {
-            type.kind.TK.Tuple, type.kind.TK.Struct, type.kind.TK.Union, type.kind.TK.Enum,
+            type.kind.TK.Tuple, type.kind.TK.Struct, type.kind.TK.Union,
             type.kind.TK.Module
         }
         if t_kind in compound_tk_set:
@@ -130,7 +130,6 @@ class Substitution(object):
 
                 replacement_ctor_map = {
                     type.kind.TK.Struct: type.get_struct_type,
-                    type.kind.TK.Enum: type.get_enum_type,
                     type.kind.TK.Union: type.get_union_type,
                     type.kind.TK.Module: type.new_module_type
                 }

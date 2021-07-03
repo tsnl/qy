@@ -1,12 +1,24 @@
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+
 typedef enum BinaryArithmeticOperator BinaryArithmeticOperator;
 typedef enum BinaryComparisonOperator BinaryComparisonOperator;
 typedef enum AdtKind AdtKind;
 typedef enum Allocator Allocator;
 typedef enum ValueKind ValueKind;
 
+typedef size_t FuncID;
+typedef size_t DefID;
+typedef size_t ExprID;
+typedef size_t RtTypeID;
+
+#define NULL_DEF_ID ((DefID)0)
+
+
 enum BinaryArithmeticOperator {
+    BAO_POW,
     BAO_MUL, BAO_DIV, BAO_REM,
     BAO_ADD, BAO_SUB
 };

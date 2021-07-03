@@ -14,7 +14,7 @@ def occurs(container_tid: identity.TID, var_id: identity.TID) -> bool:
     else:
         compound_tk_set = {
             kind.TK.Fn, kind.TK.Tuple,
-            kind.TK.Struct, kind.TK.Enum, kind.TK.Union,
+            kind.TK.Struct, kind.TK.Union,
             kind.TK.Module
         }
         if c_kind in compound_tk_set:

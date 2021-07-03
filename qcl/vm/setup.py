@@ -12,7 +12,8 @@ def main():
                      "./impl/vm.c",
                      "./impl/table.c",
                      "./impl/expr.c",
-                     "./impl/rtti.c"]
+                     "./impl/rtti.c",
+                     "./impl/consts.c"]
                 )
             ],
         ),

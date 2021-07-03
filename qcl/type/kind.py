@@ -27,7 +27,6 @@ class TK(enum.Enum):
     Fn = enum.auto()
     Tuple = enum.auto()
     Struct = enum.auto()
-    Enum = enum.auto()
     Union = enum.auto()
     Module = enum.auto()
     FreeVar = enum.auto()

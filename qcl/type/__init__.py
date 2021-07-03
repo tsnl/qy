@@ -119,16 +119,6 @@ def get_union_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
     return tid
 
 
-@functools.cache
-def get_enum_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
-    assert isinstance(field_elem_info_tuple, tuple)
-
-    tid = identity.mint()
-    kind.init(tid, kind.TK.Enum)
-    elem.init_enum(tid, copy.deepcopy(field_elem_info_tuple))
-    return tid
-
-
 #
 # NOTE: module creation is not cached, because we want each module to have a unique type.
 #

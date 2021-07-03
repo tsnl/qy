@@ -216,8 +216,7 @@ primaryTypeSpec
 unaryTypeSpec
     : through=primaryTypeSpec                           #throughUnaryTypeSpec
     | 'Struct' elements=tableWrapper                    #structTypeSpec
-    | 'Enum' elements=tableWrapper                      #taggedUnionTypeSpec
-    | 'Union' elements=tableWrapper                     #untaggedUnionTypeSpec
+    | 'Union' elements=tableWrapper                     #unionTypeSpec
     | (is_mut='mut')? '[' t=typeSpec '*' n=expr ']'     #arrayTypeSpec
     | (is_mut='mut')? '[' t=typeSpec '*' '?' ']'        #sliceTypeSpec
     | (is_mut='mut')? '[' t=typeSpec ']'                #ptrTypeSpec

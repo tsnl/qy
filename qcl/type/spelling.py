@@ -53,10 +53,9 @@ def of(tid: identity.TID):
         else:
             return f"({lhs_spelling}) -> {rhs_spelling}"
 
-    elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Enum, kind.TK.Module):
+    elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Module):
         prefix_keyword_map = {
             kind.TK.Struct: "Struct",
-            kind.TK.Enum: "Enum",
             kind.TK.Union: "Union",
             kind.TK.Module: "Module"
         }

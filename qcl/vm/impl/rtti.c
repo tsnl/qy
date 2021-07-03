@@ -349,6 +349,7 @@ bool are_types_equal(RttiManager* rm, RtTypeID lhs_tid, RtTypeID rhs_tid) {
             return true;
         }
         case VAL_FN: {
+            // todo: compare side-effects-specifier
             RtTypeID lhs_arg_rttid = get_arg_tid_of_fn_rttid(rm, lhs_tid);
             RtTypeID lhs_ret_rttid = get_ret_tid_of_fn_rttid(rm, lhs_tid);
             RtTypeID rhs_arg_rttid = get_arg_tid_of_fn_rttid(rm, rhs_tid);

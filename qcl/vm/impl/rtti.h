@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include "core.h"
 
-typedef size_t RtTypeID;
 typedef struct RttiManager RttiManager;
 
 RttiManager* rtti_mgr_new();

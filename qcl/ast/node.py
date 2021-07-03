@@ -433,8 +433,7 @@ class PtrTypeSpec(BaseTypeSpec):
 
 
 class AdtKind(enum.Enum):
-    TaggedUnion = enum.auto()
-    UntaggedUnion = enum.auto()
+    Union = enum.auto()
     Structure = enum.auto()
 
 
@@ -444,29 +443,11 @@ class AdtTypeSpec(BaseTypeSpec):
         self.adt_kind = adt_kind
 
         self.alias = {
-            AdtKind.TaggedUnion: "enum",
-            AdtKind.UntaggedUnion: "union",
+            AdtKind.Union: "union",
             AdtKind.Structure: "struct"
         }[self.adt_kind]
         self.table = Table(
             self.loc, self.alias, elements,
-            accepts_typing_elements=True,
-            accepts_binding_elements=False,
-            accepts_imperative_elements=False
-        )
-
-
-class InterfaceTypeSpec(BaseTypeSpec):
-    def __init__(self, loc, requires_elements, provides_elements):
-        super().__init__(loc)
-        self.requires_table = Table(
-            self.loc, f"interface-requires", requires_elements,
-            accepts_typing_elements=True,
-            accepts_binding_elements=False,
-            accepts_imperative_elements=False
-        )
-        self.provides_table = Table(
-            self.loc, f"interface-provides", provides_elements,
             accepts_typing_elements=True,
             accepts_binding_elements=False,
             accepts_imperative_elements=False
