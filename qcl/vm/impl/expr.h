@@ -24,8 +24,7 @@ ExprID expr_tab_new_string_literal(TABLE(Expr)* table, char const* bytes, size_t
 ExprID expr_tab_new_collection(TABLE(Expr)* table, ExprKind kind, ExprID const* items, size_t item_count);
 ExprID expr_tab_new_sizeof(TABLE(Expr)* table, RtTypeID tid);
 ExprID expr_tab_new_ite(TABLE(Expr)* table, ExprID cond_expr_id, ExprID then_expr_id, ExprID else_expr_id);
-ExprID expr_tab_new_call1(TABLE(Expr)* table, ExprID func_expr_id, ExprID arg_expr_id);
-ExprID expr_tab_new_call2(
+ExprID expr_tab_new_call(
     TABLE(Expr)* table, ExprID func_expr_id, ExprID arg_expr_id, 
     size_t val_template_count, ExprID* val_args,
     size_t type_template_count, RtTypeID* type_args

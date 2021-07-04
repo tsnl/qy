@@ -13,7 +13,8 @@ def main():
                      "./impl/table.c",
                      "./impl/expr.c",
                      "./impl/rtti.c",
-                     "./impl/consts.c"]
+                     "./impl/consts.c",
+                     "./impl/eval-frame.c"]
                 )
             ],
         ),

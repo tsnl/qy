@@ -44,6 +44,11 @@ ExprID vm_mk_sizeof_expr(VM* vm, RtTypeID type_expr);
 // complex:
 ExprID vm_mk_if_expr(VM* vm, ExprID cond_expr_id, ExprID then_expr_id, ExprID else_expr_id);
 ExprID vm_mk_call1_expr(VM* vm, ExprID fn_expr_id, ExprID arg_expr_id, bool allow_non_tot);
+ExprID vm_mk_call2_expr(
+    VM* vm, ExprID fn_expr_id, ExprID arg_expr_id, bool allow_non_tot,
+    size_t template_val_arg_count, ExprID* mv_template_val_args,
+    size_t template_type_arg_count, RtTypeID* mv_template_type_args
+);
 ExprID vm_mk_bao_expr(VM* vm, BinaryArithmeticOperator bao, ExprID lhs_arg_expr, ExprID rhs_arg_expr);
 ExprID vm_mk_cmp_expr(VM* vm, BinaryComparisonOperator bco, ExprID lhs_arg_expr, ExprID rhs_arg_expr);
 ExprID vm_mk_alloc_1_expr(VM* vm, Allocator allocator, ExprID stored_value);

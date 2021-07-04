@@ -78,9 +78,22 @@ ExprID vm_mk_if_expr(VM* vm, ExprID cond_expr_id, ExprID then_expr_id, ExprID el
     return expr_tab_new_ite(vm->expr_tab, cond_expr_id, then_expr_id, else_expr_id);
 }
 ExprID vm_mk_call1_expr(VM* vm, ExprID fn_expr_id, ExprID arg_expr_id, bool allow_non_tot) {
-    // todo: factor in side-effects specifiers
-    return expr_tab_new_call(vm->expr_tab, fn_expr_id, arg_expr_id);
-    // todo: write `call2`, which accepts actual template arguments.
+    return expr_tab_new_call(
+        vm->expr_tab, fn_expr_id, arg_expr_id,
+        0, NULL,
+        0, NULL
+    );
+}
+ExprID vm_mk_call2_expr(
+    VM* vm, ExprID fn_expr_id, ExprID arg_expr_id, bool allow_non_tot,
+    size_t template_val_arg_count, ExprID* mv_template_val_args,
+    size_t template_type_arg_count, RtTypeID* mv_template_type_args
+) {
+    return expr_tab_new_call(
+        vm->expr_tab, fn_expr_id, arg_expr_id,
+        template_val_arg_count, mv_template_val_args,
+        template_type_arg_count, mv_template_type_args
+    );
 }
 ExprID vm_mk_bao_expr(VM* vm, BinaryArithmeticOperator bao, ExprID lhs_arg_expr, ExprID rhs_arg_expr) {
     ExprKind expr_kind;
@@ -152,4 +165,11 @@ ExprID vm_mk_let_in_expr(VM* vm, DefID def_id, ExprID init_expr, ExprID in_expr)
 // VM evaluation:
 //
 
-// todo: implement this
+Const vm_evaluate_value(ExprID expr_id) {
+    // todo: create a root eval-frame and start evaluating symbols in it.
+    // todo: devise a way to initialize global constants.
+}
+
+RtTypeID vm_evaluate_rttid(ExprID expr_id) {
+
+}

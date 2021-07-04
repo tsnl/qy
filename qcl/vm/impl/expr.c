@@ -104,20 +104,29 @@ ExprID expr_tab_new_ite(Table* table, ExprID cond_expr_id, ExprID then_expr_id, 
     return eid;
 }
 
-ExprID expr_tab_new_call1(Table* table, ExprID func_expr_id, ExprID arg_expr_id) {
+ExprID expr_tab_new_call(
+    TABLE(Expr)* table, ExprID func_expr_id, ExprID arg_expr_id, 
+    size_t val_template_count, ExprID* val_args,
+    size_t type_template_count, RtTypeID* type_args
+) {
     ExprID eid = mint_partial_expr(table, EXPR_CALL);
     Expr* e = expr(table, eid);
     e->data.call.fn_expr_id = func_expr_id;
     e->data.call.arg_expr_id = arg_expr_id;
-    return eid;
-}
-
-ExprID expr_tab_new_call2(Table* table, ExprID func_expr_id, ExprID arg_expr_id) {
-    ExprID eid = mint_partial_expr(table, EXPR_CALL);
-    Expr* e = expr(table, eid);
-    e->data.call.fn_expr_id = func_expr_id;
-    e->data.call.arg_expr_id = arg_expr_id;
-    e->data.call.arg_expr_id = arg_expr_id;
+    
+    // e->data.call.opt_template_args; 
+    if (val_template_count == 0 && type_template_count == 0) {
+        e->data.call.opt_template_args = NULL;
+    } else {
+        ActualTemplateArgs* p = malloc(sizeof(ActualTemplateArgs));
+        {
+            p->type_args = type_args;
+            p->type_count = type_template_count;
+            p->val_args = val_args;
+            p->val_count = val_template_count;
+        }
+        e->data.call.opt_template_args = p;
+    }
     return eid;
 }
 
