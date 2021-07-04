@@ -5,8 +5,8 @@
 
 typedef struct EvalFrame EvalFrame;
 
-EvalFrame* ef_new(EvalFrame* parent_ef, size_t sym_count, DefID* mv_sym_names);
+EvalFrame* ef_new(EvalFrame* parent_ef, int sym_count, DefID* mv_sym_names);
 void ef_del(EvalFrame* ef);
 
-void ef_init_symbol(DefID sym_name, Const constant);
-Const const* ef_try_lookup_symbol(DefID sym_name);
+void ef_init_symbol(EvalFrame* ef, DefID sym_name, Const constant);
+Const const* ef_try_lookup_symbol(EvalFrame* ef, DefID sym_name);

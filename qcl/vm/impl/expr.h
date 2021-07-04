@@ -5,7 +5,7 @@
 #include "core.h"
 #include "table.h"
 #include "rtti.h"
-#include "func.h"
+#include "consts.h"
 
 typedef union ExprData ExprData;
 typedef enum ExprKind ExprKind;
@@ -50,9 +50,9 @@ Expr* expr(TABLE(Expr)* table, ExprID expr_id);
 typedef struct ActualTemplateArgs ActualTemplateArgs;
 struct ActualTemplateArgs {
     size_t val_count;
-    TemplateValArg* val_args;
+    Const* val_args;
     size_t type_count;
-    TemplateTypeArg* type_args;
+    RtTypeID* type_args;
 };
 
 enum ExprKind {

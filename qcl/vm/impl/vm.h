@@ -4,7 +4,6 @@
 #include <stdbool.h>
 
 #include "core.h"
-#include "expr.h"
 #include "consts.h"
 
 typedef struct VM VM;
