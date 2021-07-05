@@ -2,8 +2,8 @@ import abc
 
 
 class CompilationError(BaseException, metaclass=abc.ABCMeta):
-    def __init__(self, message):
-        super().__init__(f"An error occurred during compilation: {message}")
+    def __init__(self, message_suffix):
+        super().__init__(f"An error occurred during compilation: {message_suffix}")
 
 
 class ParserCompilationError(CompilationError):
@@ -11,11 +11,14 @@ class ParserCompilationError(CompilationError):
 
 
 class DependencyDispatchCompilationError(CompilationError):
-    def __init__(self, message_suffix):
-        super().__init__(message_suffix)
+    pass
 
 
 class TyperCompilationError(CompilationError):
+    pass
+
+
+class PtcCheckCompilationError(CompilationError):
     pass
 
 

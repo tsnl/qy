@@ -2,7 +2,7 @@ imports {
     helper from "./helper.astro";
 };
 
-df vec [Scalar] {
+dm vec [Scalar] {
 
     Vector3 = Struct {
         x :: Scalar;
@@ -27,7 +27,7 @@ df vec [Scalar] {
 # Immutable bound elements:
 #
 
-df test1 {
+dm test1 {
     a1 :: Int16;
     a2 :: Int16;
     a3 :: Int16;

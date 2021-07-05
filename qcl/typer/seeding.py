@@ -107,7 +107,7 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
     # - NOTE: all value template args do not need a polymorphic type variable.
     template_type_arg_names, template_val_arg_names = names.sift_type_from_val(sub_mod_exp.template_arg_names)
     sub_mod_scheme = scheme.Scheme(sub_mod_tid, template_type_arg_names)
-    sub_mod_def_obj = definition.ModRecord(sub_mod_exp.loc, sub_mod_scheme, sub_mod_exp)
+    sub_mod_def_obj = definition.ModRecord(sub_mod_name, sub_mod_exp.loc, sub_mod_scheme, sub_mod_exp)
     def_ok = ctx.try_define(sub_mod_name, sub_mod_def_obj)
     if not def_ok:
         msg_suffix = f"sub-module {sub_mod_name} conflicts with another definition in a file-module scope"
@@ -178,9 +178,9 @@ def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: "ast.node.BaseBind
     # creating an appropriate definition object `def_obj`:
     def_universe = names.infer_def_universe_of(def_name)
     if def_universe == definition.Universe.Value:
-        def_obj = definition.ValueRecord(bind1_elem.loc, defined_tid)
+        def_obj = definition.ValueRecord(def_name, bind1_elem.loc, defined_tid, is_globally_visible=True)
     elif def_universe == definition.Universe.Type:
-        def_obj = definition.TypeRecord(bind1_elem.loc, defined_tid)
+        def_obj = definition.TypeRecord(def_name, bind1_elem.loc, defined_tid, is_globally_visible=True)
     else:
         raise NotImplementedError("Unknown universe for Bind1?Elem")
 

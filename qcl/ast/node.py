@@ -7,6 +7,7 @@ import enum
 import abc
 
 from collections import defaultdict
+from qcl.typer import definition
 from typing import *
 
 from qcl import excepts
@@ -153,10 +154,12 @@ class StringExpChunk(BaseExp):
 
 class IdExp(BaseExp):
     name: str
+    found_def_rec: Optional[definition.BaseRecord]
 
     def __init__(self, loc, name):
         super().__init__(loc)
         self.name = name
+        self.found_def_rec = None
 
     def __str__(self):
         return self.name
@@ -383,10 +386,12 @@ class UnitTypeSpec(BaseTypeSpec):
 
 class IdTypeSpec(BaseTypeSpec):
     name: str
+    found_def_rec: Optional[definition.BaseRecord]
 
     def __init__(self, loc: "feedback.ILoc", name: str):
         super().__init__(loc)
         self.name = name
+        self.found_def_rec = None
 
     def __str__(self):
         return self.name

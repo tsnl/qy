@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "qc [...] test8.qy-app",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["-c", "sandbox/test8.qy-app"]
+        },
+        {
+            "name": "qc [...] test9.qy-app",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["-c", "sandbox/test9.qy-app"]
+        }
+    ]
+}

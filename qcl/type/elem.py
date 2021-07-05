@@ -61,7 +61,7 @@ def help_init_any(
         for elem_info in elem_info_tuple:
             assert not elem_info.is_type_field
 
-    # creating the component with defaults:
+    # creating the component with default/empty look-up tables:
     new_component = ProjComponent(elem_info_tuple, {})
     components[tid] = new_component
 
@@ -101,7 +101,8 @@ def init_slice(ptr_tid: identity.TID, elem_tid: identity.TID):
 def init_func(tid: identity.TID, arg_tid: identity.TID, ret_tid: identity.TID):
     return help_init_any(
         tid,
-        elem_info_tuple=(ElemInfo(None, arg_tid, True), ElemInfo(None, ret_tid, True))
+        elem_info_tuple=(ElemInfo("ArgType", arg_tid, True), ElemInfo("RetType", ret_tid, True)),
+        allow_type_fields=True
     )
 
 

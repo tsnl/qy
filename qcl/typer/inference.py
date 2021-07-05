@@ -1,4 +1,5 @@
 import dataclasses
+from functools import cache
 from typing import *
 
 from qcl import frontend
@@ -70,6 +71,7 @@ def infer_file_mod_exp_tid(file_mod_exp: "ast.node.FileModExp") -> type.identity
 
         elem_info_list = []
 
+        # FROM IMPORTS:
         # adding elem_info for each import:
         for import_mod_name, import_mod_source in file_mod_exp.imports_source_map_from_frontend.items():
             # inferring the latest type of the imported module:
@@ -87,8 +89,8 @@ def infer_file_mod_exp_tid(file_mod_exp: "ast.node.FileModExp") -> type.identity
             new_elem_info = type.elem.ElemInfo(import_mod_name, imported_mod_tid, False)
             elem_info_list.append(new_elem_info)
 
+        # FROM SUB-MODS:
         # adding elem_info for each sub-mod:
-        elem_info_list = []
         for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
             sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(sub_mod_exp)
 
@@ -100,6 +102,7 @@ def infer_file_mod_exp_tid(file_mod_exp: "ast.node.FileModExp") -> type.identity
             elem_info_list.append(new_elem_info)
 
         # re-applying the latest substitution to all elements but the last:
+        # - NOTE: this involves replacing the `elem_info_list` list
         old_elem_info_list = elem_info_list
         elem_info_list = []
         for i in range(len(old_elem_info_list) - 1):
@@ -112,6 +115,7 @@ def infer_file_mod_exp_tid(file_mod_exp: "ast.node.FileModExp") -> type.identity
                     old_elem_info.is_type_field
                 )
             )
+        elem_info_list.append(old_elem_info_list[-1])
 
         # creating a new module type:
         new_mod_tid = type.new_module_type(tuple(elem_info_list))
@@ -142,10 +146,10 @@ def infer_sub_mod_exp_tid(
 
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
-        infer_binding_elem_types(sub_mod_ctx, elem, elem_info_list)
+        infer_binding_elem_types(sub_mod_ctx, elem, True, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_type_bind_elems:
-        infer_binding_elem_types(sub_mod_ctx, elem, elem_info_list)
+        infer_binding_elem_types(sub_mod_ctx, elem, True, elem_info_list)
 
     for elem in sub_mod_exp.table.ordered_typing_elems:
         infer_typing_elem_types(sub_mod_ctx, elem)
@@ -161,7 +165,8 @@ def infer_sub_mod_exp_tid(
 
 def infer_binding_elem_types(
         ctx: "context.Context", elem: "ast.node.BaseBindElem",
-        elem_info_list: Optional[List["type.elem.ElemInfo"]] = None
+        is_bound_globally_visible: bool,
+        opt_elem_info_list: Optional[List["type.elem.ElemInfo"]]
 ) -> None:
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
@@ -187,9 +192,9 @@ def infer_binding_elem_types(
 
             # defining the bound symbol using `set_tid`
             if du == definition.Universe.Value:
-                def_rec = definition.ValueRecord(elem.loc, def_tid)
+                def_rec = definition.ValueRecord(elem.name, elem.loc, def_tid, is_globally_visible=is_bound_globally_visible)
             elif du == definition.Universe.Type:
-                def_rec = definition.TypeRecord(elem.loc, def_tid)
+                def_rec = definition.TypeRecord(elem.name, elem.loc, def_tid, is_globally_visible=is_bound_globally_visible)
             else:
                 raise NotImplementedError("Unknown universe in binding")
 
@@ -204,9 +209,9 @@ def infer_binding_elem_types(
         sub.rewrite_contexts_everywhere(ctx)
 
         # appending to the `ElemInfo` list to construct fields:
-        if elem_info_list is not None:
+        if opt_elem_info_list is not None:
             elem_info = type.elem.ElemInfo(elem.id_name, rhs_tid, is_type_field)
-            elem_info_list.append(elem_info)
+            opt_elem_info_list.append(elem_info)
 
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
@@ -251,53 +256,6 @@ def help_def_pre_seeded_id_in_context(ctx, lhs_def_obj, def_tid, sub):
 
     sub.rewrite_contexts_everywhere(ctx)
 
-    # OLD: wrong, since it unifies formal definitions (containing bound vars) with an instantiation.
-    # pre-seeded: unify defined TID with existing TID
-    # sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
-    # sub = sub.compose(sub_lhs)
-    #
-    # unify_sub = unifier.unify(lhs_tid, def_tid)
-    # sub = sub.compose(unify_sub)
-    #
-    # sub.rewrite_contexts_everywhere(ctx)
-
-
-# def help_def_id_type_in_context(ctx, elem, id_name, def_tid, sub):
-#     # TODO: factor this function into two separate code-paths:
-#     #  - one for seeded definitions, i.e. module-level binding and typing
-#     #  - one for un-seeded definitions, i.e. chain-level binding and typing
-#     #       - in this case, we can use definitions and lookups to verify initialization order existence
-#     #         using C-like rules, eliding this from basic checks.
-#
-#     lhs_def_obj = ctx.lookup(id_name, shallow=True)
-#     if lhs_def_obj is not None:
-#         # pre-seeded: unify defined TID with existing TID
-#         sub_lhs, lhs_tid = sub.rewrite_scheme(lhs_def_obj.scheme).instantiate()
-#         sub = sub.compose(sub_lhs)
-#
-#         unify_sub = unifier.unify(lhs_tid, def_tid)
-#         sub = sub.compose(unify_sub)
-#
-#         sub.rewrite_contexts_everywhere(ctx)
-#     else:
-#         # un-seeded: could be bound/typed inside a chain
-#
-#         # defining the bound symbol using `set_tid`
-#         du = names.infer_def_universe_of(id_name)
-#         if du == definition.Universe.Value:
-#             def_rec = definition.ValueRecord(elem.loc, def_tid)
-#         elif du == definition.Universe.Type:
-#             def_rec = definition.TypeRecord(elem.loc, def_tid)
-#         else:
-#             raise NotImplementedError("Unknown universe in binding")
-#
-#         def_ok = ctx.try_define(id_name, def_rec)
-#         if not def_ok:
-#             msg_suffix = f"definition `{id_name}` clashes with another definition in this scope."
-#             raise excepts.TyperCompilationError(msg_suffix)
-#
-#         # no substitutions generated-- we're all done.
-
 
 def infer_exp_tid(
         ctx: "context.Context", exp: "ast.node.BaseExp"
@@ -327,6 +285,9 @@ def help_infer_exp_tid(
             raise excepts.TyperCompilationError(
                 f"Symbol {exp.name} is not defined in the 'Value' universe. Are you missing a `:` suffix?"
             )
+
+        # storing the found definition on the ID:
+        exp.found_def_rec = found_def_obj
 
         # returning:
         ret_sub, def_tid = found_def_obj.scheme.shallow_instantiate()
@@ -503,7 +464,7 @@ def help_infer_exp_tid(
             elem_arg_tid_list = []
             for i, arg_name in enumerate(exp.arg_names):
                 actual_arg_tid = type.new_free_var(f"lambda-formal-arg:{arg_name}")
-                arg_def_obj = definition.ValueRecord(exp.loc, actual_arg_tid)
+                arg_def_obj = definition.ValueRecord(arg_name, exp.loc, actual_arg_tid, is_globally_visible=False)
                 formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
                 if not formal_arg_def_ok:
                     msg_suffix = f"lambda formal arg #{i}: `{arg_name}` clashes with a prior definition in this scope."
@@ -542,14 +503,14 @@ def help_infer_exp_tid(
             #   - this ensures that initialization orders are correct
             for elem in exp.table.ordered_value_imp_bind_elems:
                 if isinstance(elem, ast.node.BaseBindElem):
-                    infer_binding_elem_types(chain_ctx, elem)
+                    infer_binding_elem_types(chain_ctx, elem, is_bound_globally_visible=False, opt_elem_info_list=None)
                 else:
                     assert isinstance(elem, ast.node.BaseImperativeElem)
                     infer_imp_elem_types(chain_ctx, elem)
 
             # then, defining each type binding element:
             for elem in exp.table.ordered_type_bind_elems:
-                infer_binding_elem_types(chain_ctx, elem)
+                infer_binding_elem_types(chain_ctx, elem, is_bound_globally_visible=False, opt_elem_info_list=None)
 
             # then, effecting each 'typing' element:
             for elem in exp.table.ordered_typing_elems:
@@ -579,13 +540,23 @@ def help_infer_type_spec_tid(
         ctx: "context.Context", ts: "ast.node.BaseTypeSpec"
 ) -> Tuple[substitution.Substitution, type.identity.TID]:
     if isinstance(ts, ast.node.IdTypeSpec):
+        # looking up the definition:
         found_def_obj = ctx.lookup(ts.name)
-        # TODO: validate that the found definition is in the right universe.
-        if found_def_obj is not None:
-            sub, def_tid = found_def_obj.scheme.shallow_instantiate()
-            return sub, def_tid
-        else:
-            raise excepts.TyperCompilationError(f"Symbol {ts.name} used but not defined.")
+        
+        # validating found, universe:
+        if found_def_obj is None:
+            msg_suffix = f"TypeID {ts.name} used but not defined."
+            raise excepts.TyperCompilationError(msg_suffix)
+        elif found_def_obj.universe != definition.Universe.Type:
+            msg_suffix = f"TypeID {ts.name} not in valid universe in this context."
+            raise excepts.TyperCompilationError(msg_suffix)
+
+        # storing found def_rec for later:
+        ts.found_def_rec = found_def_obj
+
+        # returning:
+        sub, def_tid = found_def_obj.scheme.shallow_instantiate()
+        return sub, def_tid
 
     elif isinstance(ts, ast.node.FnSignatureTypeSpec):
         lhs_ts = ts.arg_type_spec

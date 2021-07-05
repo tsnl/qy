@@ -1,4 +1,4 @@
-df test5 {
+dm test5 {
     hello = (x, y) -> TOT {
         w = x;
         (x, y, w)

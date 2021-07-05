@@ -63,5 +63,5 @@ ExprID vm_mk_eval_in_expr(VM* vm, ExprID discarded_expr, ExprID in_expr);
 ExprID vm_mk_let_in_expr(VM* vm, DefID def_id, ExprID init_expr, ExprID in_expr);
 
 // evaluation: turns expressions into values or equivalent property
-Const vm_evaluate_value(ExprID expr_id);
-RtTypeID vm_evaluate_rttid(ExprID expr_id);
+Const vm_evaluate_value(VM* vm, ExprID expr_id);
+RtTypeID vm_evaluate_rttid(VM* vm, ExprID expr_id);

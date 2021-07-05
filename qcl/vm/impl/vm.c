@@ -165,7 +165,33 @@ ExprID vm_mk_let_in_expr(VM* vm, DefID def_id, ExprID init_expr, ExprID in_expr)
 // VM evaluation:
 //
 
-Const vm_evaluate_value(ExprID expr_id) {
+Const vm_evaluate_value(VM* vm, ExprID expr_id) {
+    Expr* e = expr(vm->expr_tab, expr_id);
+    switch (e->kind) {
+        case EXPR_UNIT: {
+
+        } break;
+
+        case EXPR_UINT: {
+
+        } break;
+
+        case EXPR_SINT: {
+
+        } break;
+
+        case EXPR_FLOAT: {
+
+        } break;
+
+        case EXPR_STRING: {
+
+        } break;
+
+        default: {
+            assert(0 && "Unknown expression to evaluate");
+        } break;
+    }
     // todo: create a root eval-frame and start evaluating symbols in it.
     // todo: devise a way to initialize global constants.
 }

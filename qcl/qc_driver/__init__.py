@@ -6,6 +6,7 @@ from qcl import ast
 from qcl import excepts
 from qcl import frontend
 from qcl import typer
+from qcl import ptc_checks
 
 
 def main():
@@ -38,14 +39,18 @@ def main():
         try:
             typer.type_project(project)
         except excepts.TyperCompilationError as e:
-            # TODO: fold exception data into feedback, print, and exit elegantly.
+            # TODO: fold exception data into feedback. Print, then exit elegantly.
             raise e from e
         else:
             # DEBUG:
             print(f"INFO: Typer successful.")
 
-        # todo: perform 'basic' checks: side-effect-specs respected, existence of initialization order
-        print("WARNING: skipping basic checks")
+        # run post-type-check checks (PTC checks)
+        try:
+            ptc_checks.run(project)
+        except excepts.PtcCheckCompilationError as e:
+            # TODO: fold exception data into feedback. Print, then exit elegantly.
+            raise e from e
 
         # todo: perform SMT analysis: no de-referencing `nullptr`, pointer escape analysis with `push`
         #   - using Z3 library

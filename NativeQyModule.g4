@@ -27,7 +27,7 @@ exportLine
     ;
 
 moduleDef
-    : 'df' name=VID ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')? body=tableWrapper
+    : 'dm' name=VID ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')? body=tableWrapper
     ;
 
 //

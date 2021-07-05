@@ -64,7 +64,7 @@ class Context(object):
 
         # defining each local type template argument in this context using the BoundVar types supplied:
         for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_map.items():
-            def_record = definition.TypeRecord(self.loc, fresh_bound_var)
+            def_record = definition.TypeRecord(type_template_arg_name, self.loc, fresh_bound_var, is_globally_visible=True)
             assert self.try_define(type_template_arg_name, def_record)
 
     def push_context(self, purpose: str, loc: fb.ILoc, opt_symbol_table=None, opt_type_arg_map=None):
@@ -126,7 +126,7 @@ class Context(object):
 def make_default_root():
     def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeRecord:
         loc = fb.BuiltinLoc(def_name)
-        def_obj = definition.TypeRecord(loc, def_type_id)
+        def_obj = definition.TypeRecord(def_name, loc, def_type_id, is_globally_visible=True)
         return def_obj
 
     return Context(

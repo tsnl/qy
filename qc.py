@@ -1,5 +1,6 @@
 import qcl
+import sys
 
 
 if __name__ == "__main__":
-    exit(qcl.qc_driver.main())
+    sys.exit(qcl.qc_driver.main())
