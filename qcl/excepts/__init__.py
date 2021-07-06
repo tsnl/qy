@@ -28,3 +28,8 @@ class CheckerCompilationError(CompilationError):
 
 class EmitterCompilationError(CompilationError):
     pass
+
+
+class CompilerError(BaseException):
+    def __init__(self, msg: str):
+        super().__init__(f"CompilerError: {msg}")

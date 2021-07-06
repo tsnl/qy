@@ -192,7 +192,7 @@ def infer_binding_elem_types(
 
             # defining the bound symbol using `set_tid`
             if du == definition.Universe.Value:
-                def_rec = definition.ValueRecord(elem.name, elem.loc, def_tid, is_globally_visible=is_bound_globally_visible)
+                def_rec = definition.ValueRecord(id_name, elem.loc, def_tid, is_globally_visible=is_bound_globally_visible)
             elif du == definition.Universe.Type:
                 def_rec = definition.TypeRecord(elem.name, elem.loc, def_tid, is_globally_visible=is_bound_globally_visible)
             else:
