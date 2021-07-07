@@ -1,6 +1,57 @@
+Jul 7, 2021
+
+Scope-based SES checks working (testing pending), using type inference rather than basic checks.
+
+Now that typer is in place, lots of stuff that was skipped must be implemented. 
+
+List of **technical debt:**
+- **parser todo** must be completed
+    - pointers, arrays, slices
+    - make/push
+    - no more 'struct' expressions, rather Cast + tuple
+    - consider: `assert` statements
+    - consider: various kinds of loops, as imperative statements
+        - might be wise to make 'force-eval' statement simply `do`,
+          such that an optional `while` repeater may be provided afterward
+- **typer todo**...
+    - checking mutability also straightforward using the typer
+    - must implement typing for various unary and binary ops
+    - determine whether to use `.ptd` field for pointers
+        - would need to amend `GetElemByName` typer
+- after this, can proceed to **PTC checks**
+    - includes checking for stack pointer memory leaks
+    - includes checking that every allocated variable is freed
+- finally, can use either **SMT analysis** to...
+    - ensure convergence if `TOT` rather than `DV` or stronger
+        - consider recursion
+        - consider loops
+    - ensure slice indices are always valid
+        - slices are dynamically sized, so need to check that
+          indices access within them.
+        - can also ensure signed indices are never negative.
+    - verify `assert` statements
+        - user-provided `assert` statements force the compiler to
+          prove a predicate is always true in order to compile
+          successfully.
+        - this is a 'starring feature', and is easy to add.
+    - note that...
+        - would need to add `assert` statements to the language
+        - can add loops to the language, BUT not required to work on SMT
+            - `for`, `while`, `do {} while ()`, `loop {}`
+            - can still check for infinite recursion
+            - need to **impose a stack size limit**
+        - challenge in verifying loop bounds are OK
+
+- after this, can proceed to interpreted checks
+    - purpose is to generate template arguments while evaluating
+    - can annotate source code  
+- after this, can emit LLVM IR
+
+---
+
 NOTE:
 
-**`.ptd` fields**
+**`.ptd` fields** (ON HOLD)
 - rather than `*ptr`, we can use the `.ptd` field to access a pointer's data.
 - this is the only field a pointer supports.
 

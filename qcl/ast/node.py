@@ -7,6 +7,7 @@ import enum
 import abc
 
 from collections import defaultdict
+from qcl.type import side_effects
 from qcl.typer import definition
 from typing import *
 
@@ -28,16 +29,22 @@ class BaseNode(object, metaclass=abc.ABCMeta):
 
 class TypedBaseNode(BaseNode):
     x_tid: Optional["type.identity.TID"]
+    x_ses: Optional["type.side_effects.SES"]
     x_ctx: Optional["typer.context.Context"]
 
     def __init__(self, loc: "feedback.ILoc"):
         super().__init__(loc)
         self.x_tid = None
+        self.x_ses = None
         self.x_ctx = None
 
     @property
     def tid(self) -> Optional["type.identity.TID"]:
         return self.x_tid
+
+    @property
+    def ses(self) -> Optional["type.side_effects.SES"]:
+        return self.x_ses
 
     @property
     def ctx(self) -> Optional["typer.context.Context"]:
@@ -50,9 +57,10 @@ class TypedBaseNode(BaseNode):
             assert self.x_ctx is not None
         return is_finalized
 
-    def finalize_type_info(self, tid: type.identity.TID, ctx: typer.context.Context):
+    def finalize_type_info(self, tid: type.identity.TID, ses: type.side_effects.SES, ctx: typer.context.Context):
         assert not self.type_info_finalized
         self.x_tid = tid
+        self.x_ses = ses
         self.x_ctx = ctx
 
 
@@ -166,12 +174,21 @@ class IdExp(BaseExp):
 
 
 class LambdaExp(BaseExp):
-    def __init__(self, loc: "feedback.ILoc", arg_names: List[str], body: BaseExp,
-                 opt_ses: Optional[type.side_effects.SES]):
+    def __init__(self, loc: "feedback.ILoc", arg_names: List[str], body: BaseExp):
         super().__init__(loc)
         self.arg_names = arg_names
         self.body = body
-        self.opt_ses = opt_ses
+        self.ret_ses = type.side_effects.SES.Tot
+
+    def finalize_fn_ses(self, ses: "type.side_effects.SES"):
+        assert ses in (
+            type.side_effects.SES.Tot,
+            type.side_effects.SES.Dv,
+            type.side_effects.SES.ST,
+            type.side_effects.SES.Exn,
+            type.side_effects.SES.ML,
+        )
+        self.ret_ses = ses
 
 
 class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
@@ -188,8 +205,6 @@ class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
 
 class UnaryOp(enum.Enum):
     LogicalNot = enum.auto()
-    GetMutableRef = enum.auto()
-    GetImmutableRef = enum.auto()
     DeRef = enum.auto()
     Pos = enum.auto()
     Neg = enum.auto()
@@ -549,7 +564,7 @@ class Table(object):
         elif element is None:
             assert False and "'None' element parsed-- is this an ANTLRVisitor error?"
         else:
-            assert False and "Unknown element type."
+            raise NotImplementedError("Unknown type of `element` instance.")
 
     def parse_binding_elem(self, elem: "BaseBindElem"):
         if isinstance(elem, Bind1VElem):

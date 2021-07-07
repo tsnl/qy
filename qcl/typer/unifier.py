@@ -1,10 +1,22 @@
+from functools import reduce
+from qcl.type import side_effects
+
 from qcl import type
 from qcl import excepts
 
 from . import substitution
 
 
-def unify(t: type.identity.TID, u: type.identity.TID):
+#
+#
+# Type-inference functions:
+#
+#
+
+
+def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
+    # NOTE: `allow_u_mut_ptr` is a hack used to allow `*` to de-reference mutable as well as immutable pointers.
+
     #
     # trivial unification: identical types
     #
@@ -61,6 +73,12 @@ def unify(t: type.identity.TID, u: type.identity.TID):
             #   - may be able to rename SES, but that would violate unique TID per structural type
             #   - perhaps can bundle into basic-check-style post-check
 
+            t_ses = side_effects.of(t)
+            u_ses = side_effects.of(u)
+
+            if not ses_are_equal(t_ses, u_ses):
+                raise_unification_error(t, u, f"cannot unify two function types with incompatible SES")
+
             s1 = unify(type.elem.tid_of_fn_arg(t), type.elem.tid_of_fn_arg(u))
             s2 = unify(s1.rewrite_type(type.elem.tid_of_fn_ret(t)), s1.rewrite_type(type.elem.tid_of_fn_ret(u)))
 
@@ -93,6 +111,16 @@ def unify(t: type.identity.TID, u: type.identity.TID):
             return sub
 
         elif tk_t == tk_u and tk_t in (type.kind.TK.Pointer, type.kind.TK.Array, type.kind.TK.Slice):
+            t_is_mut = type.is_mut.ptr_or_array_or_slice(t)
+            u_is_mut = type.is_mut.ptr_or_array_or_slice(u)
+
+            if allow_u_mut_ptr:
+                if t_is_mut and not u_is_mut:
+                    raise_unification_error(t, u, "cannot unify mutable `t` with immutable `u` pointer in `*ptr` expression")
+            else:
+                if t_is_mut != u_is_mut:
+                    raise_unification_error(t, u, "cannot unify pointers with different mut specifiers")
+
             return unify(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
 
         else:
@@ -112,3 +140,89 @@ def raise_unification_error(t, u, opt_msg=""):
         message += f": {opt_msg}"
 
     raise excepts.TyperCompilationError(message)
+
+
+#
+#
+# SES-inference helpers:
+#
+#
+
+
+def unify_ses(*ses_iterator):
+    return reduce(unify_ses_binary, ses_iterator)
+    
+
+def unify_ses_binary(ses1, ses2):
+    opt_unified_ses = {
+        (type.side_effects.SES.Tot, type.side_effects.SES.Tot): type.side_effects.SES.Tot,
+        (type.side_effects.SES.Tot, type.side_effects.SES.Dv): type.side_effects.SES.Dv,
+        (type.side_effects.SES.Tot, type.side_effects.SES.ST): type.side_effects.SES.ST,
+        (type.side_effects.SES.Tot, type.side_effects.SES.Exn): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Tot, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.Dv, type.side_effects.SES.Tot): type.side_effects.SES.Dv,
+        (type.side_effects.SES.Dv, type.side_effects.SES.Dv): type.side_effects.SES.Dv,
+        (type.side_effects.SES.Dv, type.side_effects.SES.ST): type.side_effects.SES.ST,
+        (type.side_effects.SES.Dv, type.side_effects.SES.Exn): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Dv, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.ST, type.side_effects.SES.Tot): type.side_effects.SES.ST,
+        (type.side_effects.SES.ST, type.side_effects.SES.Dv): type.side_effects.SES.ST,
+        (type.side_effects.SES.ST, type.side_effects.SES.ST): type.side_effects.SES.ST,
+        (type.side_effects.SES.ST, type.side_effects.SES.Exn): type.side_effects.SES.ML,      # notable: push 'up' the lattice
+        (type.side_effects.SES.ST, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.Exn, type.side_effects.SES.Tot): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Exn, type.side_effects.SES.Dv): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Exn, type.side_effects.SES.ST): type.side_effects.SES.ML,      # notable: push 'up' the lattice
+        (type.side_effects.SES.Exn, type.side_effects.SES.Exn): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Exn, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.ML, type.side_effects.SES.Tot): type.side_effects.SES.ML,
+        (type.side_effects.SES.ML, type.side_effects.SES.Dv): type.side_effects.SES.ML,
+        (type.side_effects.SES.ML, type.side_effects.SES.ST): type.side_effects.SES.ML,
+        (type.side_effects.SES.ML, type.side_effects.SES.Exn): type.side_effects.SES.ML,
+        (type.side_effects.SES.ML, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.Elim_AnyNonTot, type.side_effects.SES.Tot): type.side_effects.SES.Elim_AnyNonTot,
+        (type.side_effects.SES.Elim_AnyNonTot, type.side_effects.SES.Dv): type.side_effects.SES.Dv,
+        (type.side_effects.SES.Elim_AnyNonTot, type.side_effects.SES.Exn): type.side_effects.SES.Exn,
+        (type.side_effects.SES.Elim_AnyNonTot, type.side_effects.SES.ST): type.side_effects.SES.ST,
+        (type.side_effects.SES.Elim_AnyNonTot, type.side_effects.SES.ML): type.side_effects.SES.ML,
+
+        (type.side_effects.SES.Tot, type.side_effects.SES.Elim_AnyNonTot): type.side_effects.SES.Elim_AnyNonTot,
+        (type.side_effects.SES.Dv, type.side_effects.SES.Elim_AnyNonTot): type.side_effects.SES.Dv,
+        (type.side_effects.SES.Exn, type.side_effects.SES.Elim_AnyNonTot): type.side_effects.SES.Exn,
+        (type.side_effects.SES.ST, type.side_effects.SES.Elim_AnyNonTot): type.side_effects.SES.ST,
+        (type.side_effects.SES.ML, type.side_effects.SES.Elim_AnyNonTot): type.side_effects.SES.ML
+    }[ses1, ses2]
+    if opt_unified_ses is not None:
+        return opt_unified_ses
+    else:
+        msg_suffix = f"SES unification error: {ses1} U {ses2}"
+        raise excepts.TyperCompilationError(msg_suffix)
+
+
+def compare_ses(top_allowed_ses: "type.side_effects.SES", compared_ses: "type.side_effects.SES"):
+    if top_allowed_ses == type.side_effects.SES.Tot:
+        return compared_ses == type.side_effects.SES.Tot
+    elif top_allowed_ses == type.side_effects.SES.Dv:
+        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv)
+    elif top_allowed_ses == type.side_effects.SES.Exn:
+        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.Exn)
+    elif top_allowed_ses == type.side_effects.SES.ST:
+        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST)
+    elif top_allowed_ses == type.side_effects.SES.ML:
+        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST, type.side_effects.SES.ML)
+    else:
+        raise excepts.CompilationError("Unknown side-effects specifier in `compare_ses`")
+
+
+def ses_are_equal(ses1: "type.side_effects.SES", ses2: "type.side_effects.SES"):
+    SES = type.side_effects.SES
+    
+    if ses1 == SES.Elim_AnyNonTot:
+        return ses2 == SES.Elim_AnyNonTot or ses2 != SES.Tot
+    else:
+        return ses1 == ses2

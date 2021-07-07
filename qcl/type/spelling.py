@@ -3,6 +3,7 @@ from . import elem
 from . import scalar_width_in_bytes
 from . import is_mut
 from . import kind
+from . import side_effects
 
 VarPrintComponent = str
 
@@ -48,10 +49,11 @@ def of(tid: identity.TID):
     elif type_kind == kind.TK.Fn:
         lhs_spelling = of(elem.tid_of_fn_arg(tid))
         rhs_spelling = of(elem.tid_of_fn_ret(tid))
+        ses_spelling = of_ses(side_effects.of(tid))
         if lhs_spelling[0] == '(':
-            return f"{lhs_spelling} -> {rhs_spelling}"
+            return f"{lhs_spelling} -> {ses_spelling} {rhs_spelling}"
         else:
-            return f"({lhs_spelling}) -> {rhs_spelling}"
+            return f"({lhs_spelling}) -> {ses_spelling} {rhs_spelling}"
 
     elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Module):
         prefix_keyword_map = {
@@ -76,3 +78,14 @@ def of(tid: identity.TID):
 
     else:
         raise NotImplementedError(f"`spell` for type of kind {type_kind}")
+
+
+def of_ses(ses: side_effects.SES):
+    return {
+        side_effects.SES.Tot: "TOT",
+        side_effects.SES.Dv: "DV",
+        side_effects.SES.ST: "ST",
+        side_effects.SES.Exn: "Exn",
+        side_effects.SES.ML: "ML",
+        side_effects.SES.Elim_AnyNonTot: "<AnyNonTot>"
+    }.get(ses, "?")

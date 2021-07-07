@@ -168,6 +168,12 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             self.visit(ctx.init_ts)
         )
 
+    def visitForceEvalChainElement(self, ctx):
+        return ast.node.ForceEvalElem(
+            self.ctx_loc(ctx),
+            self.visit(ctx.eval_exp)
+        )
+
     #
     #
     # Expressions:
@@ -421,9 +427,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             'not': ast.node.UnaryOp.LogicalNot,
             '+': ast.node.UnaryOp.Pos,
             '-': ast.node.UnaryOp.Neg,
-            '*': ast.node.UnaryOp.DeRef,
-            '&mut': ast.node.UnaryOp.GetMutableRef,
-            '&': ast.node.UnaryOp.GetImmutableRef
+            '*': ast.node.UnaryOp.DeRef
         }[ctx.getText()]
 
     #
@@ -527,8 +531,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return ast.node.LambdaExp(
             self.ctx_loc(ctx),
             [fn_arg.text for fn_arg in ctx.args],
-            self.visit(ctx.body),
-            self.visit(ctx.ses) if ctx.ses else None
+            self.visit(ctx.body)
         )
 
     #
@@ -544,7 +547,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return ast.node.UnitTypeSpec(self.ctx_loc(ctx))
 
     def visitIdentityParenTypeSpec(self, ctx):
-        return self.visit(ctx.wrapped)
+        x = self.visit(ctx.wrapped)
+        return x
 
     def visitTupleTypeSpec(self, ctx):
         return ast.node.TupleTypeSpec(
@@ -590,6 +594,15 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             self.ctx_loc(ctx),
             self.visit(ctx.elements)
         )
+    
+    def visitArrayTypeSpec(self, ctx):
+        raise NotImplementedError("Parsing array type spec")
+
+    def visitSliceTypeSpec(self, ctx):
+        raise NotImplementedError("Parsing slice type spec")
+
+    def visitPtrTypeSpec(self, ctx):
+        raise NotImplementedError("Parsing ptr type spec")
 
     def visitThroughBinaryTypeSpec(self, ctx):
         return self.visit(ctx.through)
@@ -616,10 +629,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         }[ctx.getText()]
 
     #
-    # TODO:
+    # TODO: finish parser features
     #
 
-    # - visit effectsSpec
     # - visit struct
     # - visit pointer, array, type-spec
     # - visit make expressions

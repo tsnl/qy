@@ -128,6 +128,7 @@ unaryOp
     : 'not'
     | '+'
     | '-'
+    | '*'
     ;
 
 binaryExp
@@ -188,7 +189,7 @@ elseBranchExp
     | if_exp=ifExp
     ;
 lambdaExp
-    : '(' (args+=VID ',')* (args+=VID)? ')' '->' (ses=effectsSpec)? body=expr
+    : '(' (args+=VID ',')* (args+=VID)? ')' '->' body=expr
     ;
 allocateExp
     : hint=allocatorHint (initializer=parenWrappedExp)
