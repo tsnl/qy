@@ -318,7 +318,8 @@ def help_infer_exp_tid(
         return ret_sub, def_tid, call_ses
 
     elif isinstance(exp, ast.node.IdExpInModule):
-        return help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
+        ctx, tid, ses = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
+        return ctx, tid, ses
 
     #
     # context-independent branches:
@@ -675,7 +676,9 @@ def help_infer_type_spec_tid(
         return sub, adt_tid
 
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        return help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
+        ctx, tid, ses = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
+        assert ses == type.side_effects.SES.Tot
+        return ctx, tid
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 
@@ -725,7 +728,7 @@ def help_type_id_in_module_node(
         #       to itself, i.e. `data.has_child` is true.
 
         # getting a mod-exp for the container:
-        container_sub, container_tid = help_type_id_in_module_node(ctx, data.opt_container, definition.Universe.Module)
+        container_sub, container_tid, container_ses = help_type_id_in_module_node(ctx, data.opt_container, definition.Universe.Module)
         container_mod_exp = seeding.mod_tid_exp_map[container_tid]
         sub = sub.compose(container_sub)
 
