@@ -7,7 +7,7 @@ import enum
 import abc
 
 from collections import defaultdict
-from qcl.type import side_effects
+from qcl.type import elem, side_effects
 from qcl.typer import definition
 from typing import *
 
@@ -444,12 +444,38 @@ class FnSignatureTypeSpec(BaseTypeSpec):
         self.opt_ses = opt_ses
 
 
-class PtrTypeSpec(BaseTypeSpec):
-    pointee_type_spec: BaseTypeSpec
+class BaseMemWindowTypeSpec(BaseTypeSpec, metaclass=abc.ABCMeta):
+    is_mut: bool
 
-    def __init__(self, loc, pointee_type_spec):
+    def __init__(self, loc: "feedback.ILoc", is_mut: bool):
         super().__init__(loc)
-        self.pointee_type_spec = pointee_type_spec
+        self.is_mut = is_mut
+
+
+class PtrTypeSpec(BaseMemWindowTypeSpec):
+    ptd_ts: BaseTypeSpec
+
+    def __init__(self, loc, is_mut, pointee_type_spec):
+        super().__init__(loc, is_mut)
+        self.ptd_ts = pointee_type_spec
+
+
+class ArrayTypeSpec(BaseMemWindowTypeSpec):
+    elem_ts: BaseTypeSpec
+    array_count: BaseExp
+
+    def __init__(self, loc: "feedback.ILoc", is_mut: bool, elem_type_spec: BaseTypeSpec, array_count: BaseExp):
+        super().__init__(loc, is_mut)
+        self.elem_ts = elem_type_spec
+        self.array_count = array_count
+
+
+class SliceTypeSpec(BaseMemWindowTypeSpec):
+    elem_ts: BaseTypeSpec
+
+    def __init__(self, loc: "feedback.ILoc", is_mut: bool, elem_type_spec: BaseTypeSpec):
+        super().__init__(loc, is_mut)
+        self.elem_ts = elem_type_spec
 
 
 class AdtKind(enum.Enum):

@@ -32,19 +32,19 @@ def of(tid: identity.TID):
 
     elif type_kind == kind.TK.Pointer:
         if is_mut.ptr(tid):
-            return f"[{of(elem.tid_of_ptd(tid))}]"
-        else:
             return f"mut[{of(elem.tid_of_ptd(tid))}]"
+        else:
+            return f"[{of(elem.tid_of_ptd(tid))}]"
     elif type_kind == kind.TK.Array:
         if is_mut.ptr(tid):
-            return f"[{of(elem.tid_of_ptd(tid))}, N{tid}]"
+            return f"mut[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
         else:
-            return f"mut[{of(elem.tid_of_ptd(tid))}, N{tid}]"
+            return f"[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
     elif type_kind == kind.TK.Slice:
         if is_mut.ptr(tid):
-            return f"[{of(elem.tid_of_ptd(tid))}, ?]"
-        else:
             return f"mut[{of(elem.tid_of_ptd(tid))}, ?]"
+        else:
+            return f"[{of(elem.tid_of_ptd(tid))}, ?]"
 
     elif type_kind == kind.TK.Fn:
         lhs_spelling = of(elem.tid_of_fn_arg(tid))

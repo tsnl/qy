@@ -318,8 +318,8 @@ def help_infer_exp_tid(
         return ret_sub, def_tid, call_ses
 
     elif isinstance(exp, ast.node.IdExpInModule):
-        ctx, tid, ses = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
-        return ctx, tid, ses
+        sub, tid, ses = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
+        return sub, tid, ses
 
     #
     # context-independent branches:
@@ -676,9 +676,14 @@ def help_infer_type_spec_tid(
         return sub, adt_tid
 
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        ctx, tid, ses = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
+        sub, tid, ses = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
         assert ses == type.side_effects.SES.Tot
-        return ctx, tid
+        return sub, tid
+
+    elif isinstance(ts, ast.node.PtrTypeSpec):
+        ptd_sub, ptd_tid = infer_type_spec_tid(ctx, ts.ptd_ts)
+        ptr_tid = type.get_ptr_type(ptd_tid, ts.is_mut)
+        return ptd_sub, ptr_tid
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 
@@ -694,7 +699,7 @@ def raise_cast_error(src_tid, dst_tid, more=None):
 
 def help_type_id_in_module_node(
     ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe
-) -> Tuple[context.Context, type.identity.TID, type.side_effects.SES]:
+) -> Tuple[substitution.Substitution, type.identity.TID, type.side_effects.SES]:
     # NOTE: IdInModuleNodes are nested and share formal variable mappings THAT CANNOT LEAVE THIS SUB-SYSTEM.
     #   - this means that the substitution returns formal -> actual mappings UNLESS it has no child, in which case
     #     it is the last IdInModuleNode in the process.

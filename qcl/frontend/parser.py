@@ -596,13 +596,26 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         )
     
     def visitArrayTypeSpec(self, ctx):
-        raise NotImplementedError("Parsing array type spec")
+        return ast.node.ArrayTypeSpec(
+            self.ctx_loc(ctx),
+            (ctx.is_mut is not None),
+            self.visit(ctx.t),
+            self.visit(ctx.n)
+        )
 
     def visitSliceTypeSpec(self, ctx):
-        raise NotImplementedError("Parsing slice type spec")
+        return ast.node.SliceTypeSpec(
+            self.ctx_loc(ctx),
+            (ctx.is_mut is not None),
+            self.visit(ctx.t)
+        )
 
     def visitPtrTypeSpec(self, ctx):
-        raise NotImplementedError("Parsing ptr type spec")
+        return ast.node.PtrTypeSpec(
+            self.ctx_loc(ctx),
+            (ctx.is_mut is not None),
+            self.visit(ctx.t)
+        )
 
     def visitThroughBinaryTypeSpec(self, ctx):
         return self.visit(ctx.through)
