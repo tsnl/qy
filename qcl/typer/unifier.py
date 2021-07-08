@@ -116,10 +116,12 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
 
             if allow_u_mut_ptr:
                 if t_is_mut and not u_is_mut:
-                    raise_unification_error(t, u, "cannot unify mutable `t` with immutable `u` pointer in `*ptr` expression")
+                    msg_suffix = "cannot unify mutable `t` with immutable `u` pointer in `*ptr` expression"
+                    raise_unification_error(t, u, msg_suffix)
             else:
                 if t_is_mut != u_is_mut:
-                    raise_unification_error(t, u, "cannot unify pointers with different mut specifiers")
+                    msg_suffix = "cannot unify pointers with different mut specifiers"
+                    raise_unification_error(t, u, msg_suffix)
 
             return unify(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
 

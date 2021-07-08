@@ -49,7 +49,7 @@ def parse_fresh_module_tree(source_module: FileModuleSource):
 
 class ErrorListener(antlr.ANTLRErrorListener):
     def syntaxError(self, recognizer, offending_symbol, line, column, message, e):
-        raise excepts.ParserCompilationError(f"Syntax error: {message}")
+        raise excepts.ParserCompilationError(f"Syntax error @ {line}:{1+column}: {message}")
 
     def reportAmbiguity(self, recognizer, dfa, start_index, stop_index, exact, ambig_alts, configs):
         if not exact:
@@ -427,7 +427,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             'not': ast.node.UnaryOp.LogicalNot,
             '+': ast.node.UnaryOp.Pos,
             '-': ast.node.UnaryOp.Neg,
-            '*': ast.node.UnaryOp.DeRef
+            '@': ast.node.UnaryOp.DeRefImmutable,
+            '@!': ast.node.UnaryOp.DeRefMutable
         }[ctx.getText()]
 
     #
@@ -508,6 +509,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             return self.visit(ctx.if_exp)
         elif ctx.fn_exp:
             return self.visit(ctx.fn_exp)
+        elif ctx.allocate_exp:
+            return self.visit(ctx.allocate_exp)
         else:
             assert False and "Unknown bulkyExp type."
 
@@ -533,6 +536,44 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             [fn_arg.text for fn_arg in ctx.args],
             self.visit(ctx.body)
         )
+
+    def visitAllocateExp(self, ctx):
+        allocator = self.visit(ctx.hint)
+        is_mut = ctx.is_mut is not None
+        opt_initializer_exp = self.visit(ctx.initializer) if ctx.initializer is not None else None
+        opt_collection_ts = self.visit(ctx.collection_ts) if ctx.collection_ts is not None else None
+        opt_size_exp = self.visit(ctx.size) if ctx.size is not None else None
+
+        if opt_collection_ts is not None:
+            # allocating an array or a slice
+            if opt_size_exp is not None:
+                return ast.node.AllocateArrayExp(
+                    allocator, is_mut,
+                    self.ctx_loc(ctx),
+                    opt_collection_ts,
+                    opt_size_exp, opt_initializer_exp,
+                )
+            else:
+                return ast.node.AllocateSliceExp(
+                    allocator, is_mut,
+                    self.ctx_loc(ctx),
+                    opt_collection_ts,
+                    opt_initializer_exp
+                )
+        else:
+            # allocating a pointer
+            assert opt_initializer_exp is not None
+            return ast.node.AllocatePtrExp(
+                allocator, is_mut,
+                self.ctx_loc(ctx),
+                opt_initializer_exp
+            )
+
+    def visitAllocatorHint(self, ctx):
+        return {
+            'make': ast.node.Allocator.Heap,
+            'push': ast.node.Allocator.Stack
+        }[ctx.getText()]
 
     #
     #

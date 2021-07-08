@@ -39,7 +39,7 @@ tableElement
     : lhs_id=VID '::' ts=typeSpec        #typeValIdElement
     | lhs_id=VID '=' init_exp=expr       #bindValIdElement
     | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
-    | eval_exp=expr                      #forceEvalChainElement
+    | 'do' eval_exp=expr                 #forceEvalChainElement
     ;
 tableWrapper
     : '{' (elements+=tableElement ';')* '}'
@@ -128,7 +128,8 @@ unaryOp
     : 'not'
     | '+'
     | '-'
-    | '*'
+    | '@'
+    | '@!'
     ;
 
 binaryExp
@@ -192,8 +193,8 @@ lambdaExp
     : '(' (args+=VID ',')* (args+=VID)? ')' '->' body=expr
     ;
 allocateExp
-    : hint=allocatorHint (initializer=parenWrappedExp)
-    | hint=allocatorHint '[' collection_ts=typeSpec '*' (size=expr|'?') ']' (initializer=parenWrappedExp)?
+    : hint=allocatorHint (is_mut='!')? (initializer=parenWrappedExp)
+    | hint=allocatorHint (is_mut='!')? '[' collection_ts=typeSpec '*' (size=expr|'?') ']' (initializer=parenWrappedExp)?
     ;
 allocatorHint: 'make' | 'push' ;
 
@@ -218,9 +219,9 @@ unaryTypeSpec
     : through=primaryTypeSpec                           #throughUnaryTypeSpec
     | 'Struct' elements=tableWrapper                    #structTypeSpec
     | 'Union' elements=tableWrapper                     #unionTypeSpec
-    | (is_mut='mut')? '[' t=typeSpec '*' n=expr ']'     #arrayTypeSpec
-    | (is_mut='mut')? '[' t=typeSpec '*' '?' ']'        #sliceTypeSpec
-    | (is_mut='mut')? '[' t=typeSpec ']'                #ptrTypeSpec
+    | (is_mut='!')? '[' t=typeSpec '*' n=expr ']'       #arrayTypeSpec
+    | (is_mut='!')? '[' t=typeSpec '*' '?' ']'          #sliceTypeSpec
+    | (is_mut='!')? '[' t=typeSpec ']'                  #ptrTypeSpec
     ;
 binaryTypeSpec
     : through=unaryTypeSpec                                         #throughBinaryTypeSpec

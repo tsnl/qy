@@ -135,22 +135,22 @@ def make_default_root():
         opt_parent_context=None,
         symbol_table=dict(
             **{
-                "String": new_builtin_type_def("String", type.get_str_type()),
+                "Str": new_builtin_type_def("String", type.get_str_type()),
             },
             **{
-                f"Int{n_bits}": new_builtin_type_def(
+                f"I{n_bits}": new_builtin_type_def(
                     f"SignedInt<{n_bits}>", type.get_int_type(n_bits // 8, is_unsigned=False)
                 )
                 for n_bits in (8, 16, 32, 64, 128)
             },
             **{
-                f"UInt{n_bits}": new_builtin_type_def(
+                f"U{n_bits}": new_builtin_type_def(
                     f"UnsignedInt<{n_bits}>", type.get_int_type(n_bits//8, is_unsigned=True)
                 )
                 for n_bits in (8, 16, 32, 64, 128)
             },
             **{
-                f"Float{n_bits}": new_builtin_type_def(
+                f"F{n_bits}": new_builtin_type_def(
                     f"Float<{n_bits}>", type.get_float_type(n_bits//8)
                 )
                 for n_bits in (16, 32, 64)

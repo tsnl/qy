@@ -1,17 +1,21 @@
-# dm howdy {
-#     x = (a) -> {
-#         a := 42;
-#     };
-#     y = (b) -> ML {
-#         # x(b)
-#     };
-#     y :: (Float32) -> ML Float32;
-# };
+dm howdy {
+    x = (a) -> ST {
+        do a := 42f;
+        @!a
+    };
+    y = (b) -> ML {
+        x!(b)
+    };
+    y :: (![F32]) -> ML F32;
+};
 
 dm henlo {
-    q :: ([Int32]) -> Int32;
-
     q = (ip) -> {
-        *ip
+        @!ip
+    };
+
+    w = () -> ML {
+        x = make!(420l);
+        q(x)
     };
 };

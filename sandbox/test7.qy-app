@@ -18,8 +18,8 @@ dm impl [T, n] {
 
     help_apply_piecewise_bin_op = (v1, v2, bin_op_fn) -> {
         results = push [T * n];
-        for i = push(0); *i < n; i := *i + 1 {
-            results[i] := bin_op_fn(*v1[i], *v2[i]);
+        for i = push(0); @i < n; i := @i + 1 {
+            results[i] := bin_op_fn(@v1[i], @v2[i]);
         };
         Vector(results)
     };

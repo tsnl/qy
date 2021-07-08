@@ -100,7 +100,7 @@ def get_tuple_type(elem_tid_tuple: Tuple[identity.TID]) -> identity.TID:
 
 
 @functools.cache
-def get_struct_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+def get_struct_type(field_elem_info_tuple) -> identity.TID:
     assert isinstance(field_elem_info_tuple, tuple)
 
     tid = identity.mint()
@@ -110,7 +110,7 @@ def get_struct_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID
 
 
 @functools.cache
-def get_union_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+def get_union_type(field_elem_info_tuple) -> identity.TID:
     assert isinstance(field_elem_info_tuple, tuple)
 
     tid = identity.mint()
@@ -123,7 +123,7 @@ def get_union_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
 # NOTE: module creation is not cached, because we want each module to have a unique type.
 #
 
-def new_module_type(field_elem_info_tuple: Tuple[elem.ElemInfo]) -> identity.TID:
+def new_module_type(field_elem_info_tuple) -> identity.TID:
     assert isinstance(field_elem_info_tuple, tuple)
 
     tid = identity.mint()

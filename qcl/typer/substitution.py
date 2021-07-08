@@ -19,6 +19,7 @@ class Substitution(object):
     def __init__(self, sub_map=None):
         super().__init__()
         if sub_map is None:
+            # only used to instantiate singleton `empty` instance
             self.sub_map = {}
         else:
             self.sub_map = sub_map

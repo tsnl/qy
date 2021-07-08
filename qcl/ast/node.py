@@ -205,7 +205,8 @@ class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
 
 class UnaryOp(enum.Enum):
     LogicalNot = enum.auto()
-    DeRef = enum.auto()
+    DeRefImmutable = enum.auto()
+    DeRefMutable = enum.auto()
     Pos = enum.auto()
     Neg = enum.auto()
 
@@ -498,6 +499,56 @@ class AdtTypeSpec(BaseTypeSpec):
             accepts_binding_elements=False,
             accepts_imperative_elements=False
         )
+
+
+#
+# AllocateExp
+#
+
+
+class Allocator(enum.Enum):
+    Stack = enum.auto()
+    Heap = enum.auto()
+
+
+class BaseAllocateExp(BaseExp, metaclass=abc.ABCMeta):
+    def __init__(self, allocator: Allocator, is_mut: bool, loc: feedback.ILoc):
+        super().__init__(loc)
+        self.allocator = allocator
+        self.is_mut = is_mut
+
+
+class AllocatePtrExp(BaseAllocateExp):
+    def __init__(self, allocator: Allocator, is_mut: bool, loc, initializer_exp):
+        super().__init__(allocator, is_mut, loc)
+        self.initializer_exp = initializer_exp
+
+
+class AllocateArrayExp(BaseAllocateExp):
+    def __init__(
+            self,
+            allocator: Allocator, is_mut: bool,
+            loc: feedback.ILoc,
+            collection_ts: "BaseTypeSpec",
+            array_size_exp: BaseExp, opt_initializer_exp: Optional[BaseExp]
+    ):
+        super().__init__(allocator, is_mut, loc)
+        self.array_size_exp = array_size_exp
+        self.opt_initializer_exp = opt_initializer_exp
+        self.collection_ts = collection_ts
+
+
+class AllocateSliceExp(BaseAllocateExp):
+    def __init__(
+            self,
+            allocator: Allocator, is_mut: bool,
+            loc: feedback.ILoc,
+            collection_ts: "BaseTypeSpec",
+            opt_initializer_exp: BaseExp
+    ):
+        super().__init__(allocator, is_mut, loc)
+        self.opt_initializer_exp = opt_initializer_exp
+        self.collection_ts = collection_ts
 
 
 #

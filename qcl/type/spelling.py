@@ -24,25 +24,25 @@ def of(tid: identity.TID):
         return "String"
 
     elif type_kind == kind.TK.SignedInt:
-        return f"Int{8 * scalar_width_in_bytes.of(tid)}"
+        return f"I{8 * scalar_width_in_bytes.of(tid)}"
     elif type_kind == kind.TK.UnsignedInt:
-        return f"UInt{8 * scalar_width_in_bytes.of(tid)}"
+        return f"U{8 * scalar_width_in_bytes.of(tid)}"
     elif type_kind == kind.TK.Float:
-        return f"Float{8 * scalar_width_in_bytes.of(tid)}"
+        return f"F{8 * scalar_width_in_bytes.of(tid)}"
 
     elif type_kind == kind.TK.Pointer:
         if is_mut.ptr(tid):
-            return f"mut[{of(elem.tid_of_ptd(tid))}]"
+            return f"![{of(elem.tid_of_ptd(tid))}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}]"
     elif type_kind == kind.TK.Array:
         if is_mut.ptr(tid):
-            return f"mut[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
+            return f"![{of(elem.tid_of_ptd(tid))}, N_{tid}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
     elif type_kind == kind.TK.Slice:
         if is_mut.ptr(tid):
-            return f"mut[{of(elem.tid_of_ptd(tid))}, ?]"
+            return f"![{of(elem.tid_of_ptd(tid))}, ?]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, ?]"
 

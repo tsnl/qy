@@ -26,8 +26,8 @@ from . import names
 
 
 mod_context_map: t.Dict["ast.node.BaseModExp", "context.Context"] = {}
-mod_exp_tid_map: t.Dict["ast.node.BaseModExp", "type.identity.TID"] = {}
-mod_tid_exp_map: t.Dict["type.identity.TID", "ast.node.BaseModExp"] = {}
+mod_exp_tid_map: t.Dict["ast.node.BaseModExp", type.identity.TID] = {}
+mod_tid_exp_map: t.Dict[type.identity.TID, "ast.node.BaseModExp"] = {}
 
 
 def seed_project_types(
@@ -89,7 +89,7 @@ def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: "ast.node.FileMod
 def seed_import(ctx: context.Context, loc, import_name: str, import_source: frontend.FileModuleSource):
     imported_mod_exp = import_source.ast_file_mod_exp_from_frontend
     imported_tid = mod_exp_tid_map[imported_mod_exp]
-    def_obj = definition.ModRecord(loc, scheme.Scheme(imported_tid), imported_mod_exp)
+    def_obj = definition.ModRecord(import_name, loc, scheme.Scheme(imported_tid), imported_mod_exp)
     def_ok = ctx.try_define(import_name, def_obj)
     if not def_ok:
         msg_suffix = f"import name {import_name} clashes with existing definition in this file-module"
@@ -148,7 +148,7 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
 
 def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, template_val_arg_name: str):
     value_tid = type.new_free_var(f"seed.template_val_arg.{template_val_arg_name}")
-    def_obj = definition.ValueRecord(loc, value_tid)
+    def_obj = definition.ValueRecord(template_val_arg_name, loc, value_tid, is_globally_visible=True)
     def_ok = sub_mod_ctx.try_define(template_val_arg_name, def_obj)
     if not def_ok:
         msg_suffix = (
@@ -159,9 +159,9 @@ def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, temp
 
 def seed_template_type_arg(
         sub_mod_ctx: context.Context, loc: feedback.ILoc,
-        template_type_arg_name: str, bound_var_tid: "type.identity.TID"
+        template_type_arg_name: str, bound_var_tid: type.identity.TID
 ):
-    def_obj = definition.TypeRecord(loc, bound_var_tid)
+    def_obj = definition.TypeRecord(template_type_arg_name, loc, bound_var_tid, is_globally_visible=True)
     def_ok = sub_mod_ctx.try_define(template_type_arg_name, def_obj)
     if not def_ok:
         msg_suffix = (
