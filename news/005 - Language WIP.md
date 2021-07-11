@@ -43,6 +43,7 @@ Finally, the `!` character has been introduced to connote 'mutability' or 'diver
 More work on inference required:
 
 - TODO: for pointer expressions, determine set of RelMemLoc the pointer can point to.
+    - NOTE: broader than this: also checks if returned/set pointers are valid.
     - this allows us to decide if assignment is `TOT` or `ST`
     - implement with ANOTHER returned value from `infer_exp`
         - what about a function that returns a pointer?
@@ -50,6 +51,18 @@ More work on inference required:
             - however, returning stack-local pointer is an error
         - maybe encode optional RML on function, but relative to caller?
         - maybe use a symbolic approach, with RML variables?
+    - must also handle memory windows in general
+    - must also handle 'return' as well as `:=` + checking that assigned pointer is valie
+    - IDEA: track 2 properties: "may be local" and "may be non-local (...)"
+        - may be non-local also stores a `lifetime`
+        - non-local => may be non-local and NOT may be local, 
+            - similarly, local => may be local and NOT may be non-local
+        - in `:=`, if val "may be local", then cannot return or assign to a pPointer
+        - in `:=`, if dst ptr NOT "may be non-local", can safely set `TOT` SES for assignment
+        - these properties are straightforward enough to infer from `make`, `push`, and `exp[...]`
+        - upon function call, must set `may be non-local` to FALSE if LIFETIME matches SCOPE LIFETIME
+            - tracking 2 properties helps us deal with a function that calls itself with a pushed pointer
+            - the arg pointer is marked as 'non-local', even if the lifetime specifier is the same
 
 - TODO: figure out why sub-mod types are wrong, and seeded file mod never changes.
     - after typing, accumulate `ElemInfo` list immutably rather than assembling/subbing on-the-fly
