@@ -203,7 +203,7 @@ allocatorHint: 'make' | 'push' ;
 //
 
 typeSpec
-    : through=binaryTypeSpec
+    : through=bulkyTypeSpec
     ;
 parenTypeSpec
     : '(' ')'                                               #unitTypeSpec
@@ -225,7 +225,11 @@ unaryTypeSpec
     ;
 binaryTypeSpec
     : through=unaryTypeSpec                                         #throughBinaryTypeSpec
-    | lt=parenTypeSpec '->' ses=effectsSpec? rt=binaryTypeSpec      #fnSgnTypeSpec
+    | lt=unaryTypeSpec '->' ses=effectsSpec? rt=binaryTypeSpec      #fnSgnTypeSpec
+    ;
+bulkyTypeSpec
+    : through=binaryTypeSpec                       #throughBulkyTypeSpec
+    | 'ClosureBan' '{' nested=binaryTypeSpec '}'   #noClosureTypeSpec
     ;
 
 //

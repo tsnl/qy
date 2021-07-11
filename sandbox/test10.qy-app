@@ -1,0 +1,7 @@
+dm currying_in_c {
+    f :: ClosureBan { F32 -> ![F32] -> ST () };
+
+    f = (value) -> (ptr) -> ST {
+        do (ptr := 42f);
+    };
+};

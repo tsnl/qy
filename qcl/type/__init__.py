@@ -17,6 +17,7 @@ from . import is_mut
 from . import spelling
 from . import side_effects
 from . import free
+from . import memory
 
 
 @functools.cache
@@ -82,11 +83,15 @@ def get_slice_type(ptd_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
 @functools.cache
 def get_fn_type(
         arg_tid: identity.TID, ret_tid: identity.TID,
-        ses: side_effects.SES
+        ses: side_effects.SES,
+        closure_spec: memory.ClosureSpec
 ) -> identity.TID:
+    assert ses is not None
+    assert closure_spec is not None
     tid = identity.mint()
     kind.init(tid, kind.TK.Fn)
     elem.init_func(tid, arg_tid, ret_tid)
+    memory.init_func(tid, closure_spec)
     side_effects.init(tid, ses)
     return tid
 

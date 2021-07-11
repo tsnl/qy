@@ -7,7 +7,6 @@ import enum
 import abc
 
 from collections import defaultdict
-from qcl.type import elem, side_effects
 from qcl.typer import definition
 from typing import *
 
@@ -34,9 +33,11 @@ class TypedBaseNode(BaseNode):
 
     def __init__(self, loc: "feedback.ILoc"):
         super().__init__(loc)
-        self.x_tid = None
-        self.x_ses = None
-        self.x_ctx = None
+        self.x_tid = None       # type-ID: the value of this expression is always of this type
+        self.x_ses = None       # side-effects-specifier: what capabilities does this expression need?
+        self.x_cs = None        # closure-spec: what memory does this expression need?
+        self.x_ctx = None       # context: semantics of where expression is used
+        self.x_rml = None       # rel memory loc: for mem-window types, handles where memory is stored.
 
     @property
     def tid(self) -> Optional["type.identity.TID"]:
@@ -51,16 +52,27 @@ class TypedBaseNode(BaseNode):
         return self.x_ctx
 
     @property
+    def cs(self) -> Optional["type.memory.ClosureSpec"]:
+        return self.x_cs
+
+    @property
     def type_info_finalized(self):
         is_finalized = self.x_tid is not None
         if is_finalized:
             assert self.x_ctx is not None
         return is_finalized
 
-    def finalize_type_info(self, tid: type.identity.TID, ses: type.side_effects.SES, ctx: typer.context.Context):
+    def finalize_type_info(
+            self,
+            tid: type.identity.TID,
+            ses: type.side_effects.SES,
+            cs: type.memory.ClosureSpec,
+            ctx: typer.context.Context
+    ):
         assert not self.type_info_finalized
         self.x_tid = tid
         self.x_ses = ses
+        self.x_cs = cs
         self.x_ctx = ctx
 
 
@@ -179,6 +191,7 @@ class LambdaExp(BaseExp):
         self.arg_names = arg_names
         self.body = body
         self.ret_ses = type.side_effects.SES.Tot
+        self.non_local_name_map = {}
 
     def finalize_fn_ses(self, ses: "type.side_effects.SES"):
         assert ses in (
@@ -189,6 +202,13 @@ class LambdaExp(BaseExp):
             type.side_effects.SES.ML,
         )
         self.ret_ses = ses
+
+    def add_non_local(self, non_local_id_name, non_local_id_def_rec):
+        existing_non_local = self.non_local_name_map.get(non_local_id_name, None)
+        if existing_non_local is None:
+            self.non_local_name_map[non_local_id_name] = non_local_id_def_rec
+        else:
+            assert existing_non_local is non_local_id_def_rec
 
 
 class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
@@ -437,12 +457,16 @@ class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
     opt_ses: Optional[type.side_effects.SES]
+    closure_spec: type.memory.ClosureSpec
 
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)
         self.arg_type_spec = arg_type_spec
         self.return_type_spec = return_type_spec
         self.opt_ses = opt_ses
+
+        # by default, the closure spec is `Yes`, since our language uses fat pointers internally.
+        self.closure_spec = type.memory.ClosureSpec.Yes
 
 
 class BaseMemWindowTypeSpec(BaseTypeSpec, metaclass=abc.ABCMeta):

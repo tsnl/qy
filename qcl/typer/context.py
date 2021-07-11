@@ -8,6 +8,7 @@ import typing as t
 
 from qcl import type
 from qcl import feedback as fb
+from qcl import ast
 
 from . import definition
 
@@ -17,12 +18,14 @@ class Context(object):
     root_context: "Context"
     child_context_list: t.List["Context"]
     symbol_table: t.Dict[str, definition.BaseRecord]
+    opt_func: t.Optional["ast.node.LambdaExp"]
 
     def __init__(
             self, purpose: str, loc: fb.ILoc,
             opt_parent_context: t.Optional["Context"],
             symbol_table: t.Dict[str, definition.BaseRecord] = None,
-            local_type_template_arg_map: t.Optional[t.Dict[str, type.identity.TID]] = None
+            local_type_template_arg_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
+            opt_func: t.Optional["ast.node.LambdaExp"] = None
     ):
         super().__init__()
 
@@ -31,13 +34,17 @@ class Context(object):
         self.loc = loc
         self.child_context_list = []
 
-        # initializing the parent context:
+        # initializing the parent context, inheriting relevant props:
         self.opt_parent_context = opt_parent_context
         if self.opt_parent_context is None:
             self.root_context = self
+            self.opt_func = opt_func
         else:
             self.root_context = self.opt_parent_context.root_context
             self.opt_parent_context.child_context_list.append(self)
+
+            # if `opt_func` is not provided (is None), we use the parent context's 'opt_func', which may be `None`
+            self.opt_func = opt_func if opt_func is not None else self.opt_parent_context.opt_func
 
         # initializing the symbol table:
         if symbol_table is None:
@@ -64,11 +71,11 @@ class Context(object):
 
         # defining each local type template argument in this context using the BoundVar types supplied:
         for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_map.items():
-            def_record = definition.TypeRecord(type_template_arg_name, self.loc, fresh_bound_var, is_globally_visible=True)
+            def_record = definition.TypeRecord(type_template_arg_name, self.loc, fresh_bound_var, self.opt_func)
             assert self.try_define(type_template_arg_name, def_record)
 
-    def push_context(self, purpose: str, loc: fb.ILoc, opt_symbol_table=None, opt_type_arg_map=None):
-        return Context(purpose, loc, self, opt_symbol_table, opt_type_arg_map)
+    def push_context(self, purpose: str, loc: fb.ILoc, opt_symbol_table=None, opt_type_arg_map=None, opt_func=None):
+        return Context(purpose, loc, self, opt_symbol_table, opt_type_arg_map, opt_func=opt_func)
 
     def try_define(self, def_name: str, def_record: definition.BaseRecord) -> bool:
         if def_name in self.symbol_table:
@@ -126,7 +133,7 @@ class Context(object):
 def make_default_root():
     def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeRecord:
         loc = fb.BuiltinLoc(def_name)
-        def_obj = definition.TypeRecord(def_name, loc, def_type_id, is_globally_visible=True)
+        def_obj = definition.TypeRecord(def_name, loc, def_type_id, opt_func=None)
         return def_obj
 
     return Context(

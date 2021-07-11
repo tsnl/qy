@@ -1,21 +1,24 @@
 dm howdy {
-    x = (a) -> ST {
-        do a := 42f;
-        @!a
+    x = (v) -> (p) -> ST {
+        do p := 42f;
+        @!p
     };
     y = (b) -> ML {
-        x!(b)
+        x(0f)!(b)
     };
-    y :: (![F32]) -> ML F32;
+    x :: ClosureBan { F32 -> ![F32] -> ST F32 };
+    y :: ClosureBan { ![F32] -> ML F32 };
 };
 
-dm henlo {
-    q = (ip) -> {
-        @!ip
-    };
-
-    w = () -> ML {
-        x = make!(420l);
-        q(x)
-    };
-};
+# dm henlo {
+#     q = (ip) -> {
+#         @!ip
+#     };
+#
+#     w = () -> ML {
+#         x = make!(420l);
+#         q(x)
+#     };
+#
+#     q :: (![I64]) -> I64;
+# };

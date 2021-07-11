@@ -1,3 +1,74 @@
+Jul 11, 2021
+
+Been working on detecting non-local ID use and implications.
+- each `LambdaExp` now stores a map of all non-local IDs, courtesy `typer.inference`
+    - we can implement closures by giving every function an extra arg, turning each func ptr into a fat ptr
+    - extra arg represents 'context'
+- each function type is associated with a `ClosureSpec`, to enforce `ClosureBan`
+    - formerly known as `NoClosure {...}`
+    - this specifies whether the caller must support calling fat pointers, NOT whether the function itself needs one.
+        - e.g. a curried function whose inner function uses the outer function's local variable
+            - even though the outer function does not need a closure pointer,
+            - it returns a fat pointer that does
+    - if a function type-spec is wrapped in `ClosureBan {...}`, it means no function in the curried chain can use/have
+      a closure pointer.
+    - only functions with `ClosureBan` can be called from C, or general FFIs
+    - SURPRISE: currying still works, albeit without closures?
+        - note that the inner function does not use `value`, the only local defined in the outer func
+        - so, the inner function satisfies the `ClosureBan`
+        - kind of useless, but nothing stopping the user from expanding the outer function (e.g. logging)
+        - this is possible because we verify whether every function actually needs a closure pointer        
+
+        ```
+        dm currying_in_c {
+            f :: ClosureBan { (F32) -> (![F32]) -> () };
+        
+            f = (value) -> (ptr) -> {
+                ptr := 42f;
+            };
+        };
+        ```
+      
+Another breakthrough came in the `unify_existing_def` function of `typer.inference`: 
+- after unifying, we can compare TIDs to see which has more info
+- we update the context with the richer TID
+- this could cause issues, but is an extension of context rewriting
+
+Finally, the `!` character has been introduced to connote 'mutability' or 'divergence'.
+- use it before arguments of a function to specify non-total function call
+- use it in `new` expressions (`make!` and `push!`) to allocate a mutable (rather than immutable) pointer
+- `@p` de-references the pointer `p`-- `@!p` does the same, but expects `p` to be a mutable pointer.
+    - exactly the same operation, just different types of arguments.
+
+More work on inference required:
+
+- TODO: for pointer expressions, determine set of RelMemLoc the pointer can point to.
+    - this allows us to decide if assignment is `TOT` or `ST`
+    - implement with ANOTHER returned value from `infer_exp`
+        - what about a function that returns a pointer?
+            - a function passed a stack pointer may return a stack pointer
+            - however, returning stack-local pointer is an error
+        - maybe encode optional RML on function, but relative to caller?
+        - maybe use a symbolic approach, with RML variables?
+
+- TODO: figure out why sub-mod types are wrong, and seeded file mod never changes.
+    - after typing, accumulate `ElemInfo` list immutably rather than assembling/subbing on-the-fly
+
+- TODO: typing 'size' specifiers in slice, array `new` expressions.
+    - they could change the `SES` (side-effects-specifier) or `CS` (closure specifier)
+
+Plan after this:
+- get `if` expressions working: last native piece before we can write real programs, if only using recursion.
+- work on topological sort of global initializers
+- work on template instantiation
+- work on adding extern functions
+- work on emitting LLVM IR
+- work on SMT analysis, `assert` and `free` statements.
+
+NOTE: also need to test, test, test.
+
+---
+
 Jul 7, 2021
 
 Scope-based SES checks working (testing pending), using type inference rather than basic checks.

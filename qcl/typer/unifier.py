@@ -1,5 +1,5 @@
-from functools import reduce
-from qcl.type import side_effects
+import functools
+import typing as t
 
 from qcl import type
 from qcl import excepts
@@ -73,8 +73,10 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
             #   - may be able to rename SES, but that would violate unique TID per structural type
             #   - perhaps can bundle into basic-check-style post-check
 
-            t_ses = side_effects.of(t)
-            u_ses = side_effects.of(u)
+            # TODO: unify `Cs = ClosureSpec`
+
+            t_ses = type.side_effects.of(t)
+            u_ses = type.side_effects.of(u)
 
             if not ses_are_equal(t_ses, u_ses):
                 raise_unification_error(t, u, f"cannot unify two function types with incompatible SES")
@@ -150,9 +152,11 @@ def raise_unification_error(t, u, opt_msg=""):
 #
 #
 
+SES = type.side_effects.SES
+
 
 def unify_ses(*ses_iterator):
-    return reduce(unify_ses_binary, ses_iterator)
+    return functools.reduce(unify_ses_binary, ses_iterator)
     
 
 def unify_ses_binary(ses1, ses2):
@@ -209,22 +213,64 @@ def unify_ses_binary(ses1, ses2):
 def compare_ses(top_allowed_ses: "type.side_effects.SES", compared_ses: "type.side_effects.SES"):
     if top_allowed_ses == type.side_effects.SES.Tot:
         return compared_ses == type.side_effects.SES.Tot
-    elif top_allowed_ses == type.side_effects.SES.Dv:
-        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv)
-    elif top_allowed_ses == type.side_effects.SES.Exn:
-        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.Exn)
-    elif top_allowed_ses == type.side_effects.SES.ST:
-        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST)
-    elif top_allowed_ses == type.side_effects.SES.ML:
-        return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST, type.side_effects.SES.ML)
     else:
-        raise excepts.CompilationError("Unknown side-effects specifier in `compare_ses`")
+        if compared_ses == type.side_effects.SES.Elim_AnyNonTot:
+            return True
+        elif top_allowed_ses == type.side_effects.SES.Dv:
+            return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv)
+        elif top_allowed_ses == type.side_effects.SES.Exn:
+            return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.Exn)
+        elif top_allowed_ses == type.side_effects.SES.ST:
+            return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST)
+        elif top_allowed_ses == type.side_effects.SES.ML:
+            return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST, type.side_effects.SES.ML)
+        else:
+            raise excepts.CompilationError("Unknown side-effects specifier in `compare_ses`")
 
 
 def ses_are_equal(ses1: "type.side_effects.SES", ses2: "type.side_effects.SES"):
-    SES = type.side_effects.SES
-    
     if ses1 == SES.Elim_AnyNonTot:
         return ses2 == SES.Elim_AnyNonTot or ses2 != SES.Tot
     else:
         return ses1 == ses2
+
+
+#
+# ClosureSpec inference:
+#
+
+ClosureSpec = type.memory.ClosureSpec
+
+
+def unify_closure_spec(cs1: ClosureSpec, cs2: ClosureSpec) -> ClosureSpec:
+    if ClosureSpec.Yes in (cs1, cs2) and ClosureSpec.No in (cs1, cs2):
+        msg_suffix = f"cannot unify opposing closure specifiers: a `ClosureBan` function uses non-local IDs"
+        raise excepts.TyperCompilationError(msg_suffix)
+    elif ClosureSpec.Yes in (cs1, cs2):
+        return ClosureSpec.Yes
+    elif ClosureSpec.No in (cs1, cs2):
+        return ClosureSpec.No
+    else:
+        assert cs1 == cs2 == ClosureSpec.Maybe
+        return ClosureSpec.Maybe
+
+
+#
+# RelMemoryLoc inference:
+#
+
+
+RML = type.memory.RelMemLoc
+
+
+def unify_rml(rml1: t.Optional[RML], rml2: t.Optional[RML]) -> t.Optional[RML]:
+    if rml1 is None and rml2 is None:
+        return None
+    elif rml1 is None or rml2 is None:
+        raise excepts.TyperCompilationError("Invalid RelMemLoc: trying to unify mem-window and non-mem-window RML")
+    else:
+        if RML.HeapOrStackNonLocal in (rml1, rml2):
+            return RML.HeapOrStackNonLocal
+        else:
+            assert rml1 == rml2 == RML.StackLocal
+            return RML.StackLocal

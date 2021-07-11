@@ -4,6 +4,7 @@ from . import scalar_width_in_bytes
 from . import is_mut
 from . import kind
 from . import side_effects
+from . import memory
 
 VarPrintComponent = str
 
@@ -50,10 +51,17 @@ def of(tid: identity.TID):
         lhs_spelling = of(elem.tid_of_fn_arg(tid))
         rhs_spelling = of(elem.tid_of_fn_ret(tid))
         ses_spelling = of_ses(side_effects.of(tid))
-        if lhs_spelling[0] == '(':
-            return f"{lhs_spelling} -> {ses_spelling} {rhs_spelling}"
-        else:
-            return f"({lhs_spelling}) -> {ses_spelling} {rhs_spelling}"
+
+        # if lhs_spelling[0] != '(':
+        #     lhs_spelling = f"({lhs_spelling})"
+
+        opt_prefix, opt_suffix = {
+            memory.ClosureSpec.Yes: ("", ""),
+            memory.ClosureSpec.No: ("ClosureBan { ", " }"),
+            memory.ClosureSpec.Maybe: ("EmptyClosure { ", " }")
+        }[memory.closure_spec(tid)]
+
+        return f"{opt_prefix}{lhs_spelling} -> {ses_spelling} {rhs_spelling}{opt_suffix}"
 
     elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Module):
         prefix_keyword_map = {

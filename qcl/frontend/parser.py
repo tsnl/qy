@@ -669,6 +669,21 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             self.visit(ctx.ses) if ctx.ses is not None else None
         )
 
+    def visitThroughBulkyTypeSpec(self, ctx):
+        return self.visit(ctx.through)
+
+    def visitNoClosureTypeSpec(self, ctx):
+        nested = self.visit(ctx.nested)
+
+        if not isinstance(nested, ast.node.FnSignatureTypeSpec):
+            msg_suffix = "`NoClosure {(...)}` can only be applied to function signatures."
+            raise excepts.ParserCompilationError(msg_suffix)
+        else:
+            # updating the closure spec to deny any closure pointer:
+            nested.closure_spec = type.memory.ClosureSpec.No
+
+        return nested
+
     #
     # effects-spec:
     #
