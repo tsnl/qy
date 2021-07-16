@@ -1,4 +1,3 @@
-import abc
 import os.path as path
 
 from qcl import antlr
@@ -187,6 +186,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     def visitIdExp(self, ctx):
         return ast.node.IdExp(self.ctx_loc(ctx), ctx.tk.text)
 
+    def visitThroughPrimaryExp(self, ctx):
+        return self.visit(ctx.through)
+
     def visitIdExpInModule(self, ctx):
         container_exp = self.visit(ctx.prefix)
         suffix_name = ctx.suffix.text
@@ -341,6 +343,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return self.visit(ctx.it)
 
     def visitTupleExp(self, ctx):
+        return self.visit(ctx.it)
+
+    def visitAssignExpAsParenWrappedExp(self, ctx):
         return self.visit(ctx.it)
 
     def visitCastExp(self, ctx):
@@ -680,7 +685,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             raise excepts.ParserCompilationError(msg_suffix)
         else:
             # updating the closure spec to deny any closure pointer:
-            nested.closure_spec = type.memory.ClosureSpec.No
+            nested.closure_spec = qcl.typer.memory.CS.No
 
         return nested
 

@@ -1,9 +1,9 @@
 dm test3 {
-    fake_predecessor = (x) -> TOT {x};
+    fake_predecessor := (x) -> TOT {x};
 
-    fake_multiply = (i, j) -> TOT {j};
+    fake_multiply := (i, j) -> TOT {j};
 
-    factorial = (x) -> TOT {
+    factorial := (x) -> TOT {
     #    if (x == 0) {
         fake_multiply (x, fake_predecessor(x))
     #    } else {
@@ -11,5 +11,5 @@ dm test3 {
     #    }
     };
 
-    w = fake_multiply(0, 1f);
+    w := fake_multiply(0, 1f);
 };

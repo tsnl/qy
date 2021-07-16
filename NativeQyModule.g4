@@ -37,8 +37,8 @@ moduleDef
 
 tableElement
     : lhs_id=VID '::' ts=typeSpec        #typeValIdElement
-    | lhs_id=VID '=' init_exp=expr       #bindValIdElement
-    | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
+    | lhs_id=VID ':=' init_exp=expr      #bindValIdElement
+    | lhs_id=TID ':=' init_ts=typeSpec   #bindTypeIdElement
     | 'do' eval_exp=expr                 #forceEvalChainElement
     ;
 tableWrapper
@@ -73,6 +73,7 @@ parenWrappedExp
     : '(' ')'                #unitExp
     | '(' wrapped=expr ')'   #identityParenExp
     | it=tuplePrimaryExp     #tupleExp
+    | it=assignExp           #assignExpAsParenWrappedExp
     ;
 wrappedExp
     : it=parenWrappedExp    #throughWrappedExp
@@ -88,9 +89,15 @@ chainPrimaryExp
 castPrimaryExp
     : ts=primaryTypeSpec data=parenWrappedExp
     ;
+assignExp
+    : '(' dst=binaryExp '<-' src=assignExp ')'
+    ;
 
+idExp
+    : tk=VID
+    ;
 primaryExp
-    : tk=VID                                #idExp
+    : through=idExp                         #throughPrimaryExp
     | prefix=moduleAddressPrefix suffix=VID #idExpInModule
     | through=intPrimaryExp                 #throughIntPrimaryExp
     | tk=DEC_FLOAT                          #decFloatExp
@@ -159,8 +166,8 @@ cmpBinaryExp
     ;
 eqBinaryExp
     : through=cmpBinaryExp
-    | lt=eqBinaryExp op='==' rt=cmpBinaryExp
-    | lt=eqBinaryExp op='!=' rt=cmpBinaryExp
+    | lt=eqBinaryExp op='=' rt=cmpBinaryExp
+    | lt=eqBinaryExp op='<>' rt=cmpBinaryExp
     ;
 logicalAndBinaryExp
     : through=eqBinaryExp
@@ -171,13 +178,8 @@ logicalOrBinaryExp
     | lt=logicalOrBinaryExp op='|' rt=logicalAndBinaryExp
     ;
 
-assignExp
-    : through=binaryExp
-    | dst=assignExp ':=' src=binaryExp
-    ;
-
 bulkyExp
-    : through=assignExp
+    : through=binaryExp
     | if_exp=ifExp
     | fn_exp=lambdaExp
     | allocate_exp=allocateExp

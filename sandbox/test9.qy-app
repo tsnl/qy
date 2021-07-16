@@ -1,12 +1,12 @@
 dm howdy {
-    x = (v) -> (p) -> ST {
+    x := (v) -> (p) -> ST {
         # v--- violates the closure ban
         # do p := v;
 
-        do p := 42f;
+        do p <- 42f;
         @!p
     };
-    y = (b) -> ML {
+    y := (b) -> ML {
         x(0f)!(b)
     };
     x :: ClosureBan { F32 -> ![F32] -> ST F32 };

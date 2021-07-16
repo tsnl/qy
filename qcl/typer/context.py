@@ -5,6 +5,7 @@ handles shadowing definitions and substitution mappings.
 """
 
 import typing as t
+from collections import namedtuple
 
 from qcl import type
 from qcl import feedback as fb
@@ -27,6 +28,10 @@ class Context(object):
             local_type_template_arg_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
             opt_func: t.Optional["ast.node.LambdaExp"] = None
     ):
+        #
+        # Initialization:
+        #
+
         super().__init__()
 
         # metadata and relationships:
@@ -51,6 +56,23 @@ class Context(object):
             self.symbol_table = {}
         else:
             self.symbol_table = symbol_table
+
+        # initializing a lifetime for this context:
+        self.lifetime = type.mem_loc.mint(self)
+
+        # initializing the 'lifetimes map' used to store context-by-context info about pointer types:
+        # - whenever the mapped set changes, we eagerly compute `LifetimesDigest`
+        # - for global initialization, no `push` allowed, so much simpler
+        self.lifetimes_map = {}
+
+        # TODO: GOAL:
+        #   - associate each pointer expression (not type) with a set of possible content lifetimes
+        #       - so we can check content locality of an assign-dst expression
+        #   - store nested content lifetimes
+
+        #
+        # Derived/computed properties:
+        #
 
         # computing a map of all bound type variables in scope:
         if local_type_template_arg_map is not None:
@@ -107,7 +129,7 @@ class Context(object):
             if def_obj.universe in (definition.Universe.Value, definition.Universe.Module):
                 sep = "::"
             else:
-                sep = "="
+                sep = ":="
 
             print(f"{indent_text}  - {name} {sep} {def_obj.scheme.spell()}")
 
@@ -128,6 +150,16 @@ class Context(object):
         while context is not None:
             fn(context)
             context = context.opt_parent_context
+
+    # def unify_lifetime_set_for_mem_window_tid(self, mem_window_tid, lifetime_set):
+    #     pass
+    #
+    # def mem_window_lifetime_set(self, mem_window_tid):
+    #     digest, lifetime_set = self.lifetimes_map.get(mem_window_tid, (None, None))
+    #     return lifetime_set
+    #
+    # def mem_window_contents_may_be_local(self):
+    #     pass
 
 
 def make_default_root():
@@ -164,3 +196,9 @@ def make_default_root():
             }
         )
     )
+
+
+LifetimesDigest = namedtuple("LifetimesDigest", [
+    "may_be_local",
+    "may_be_non_local"
+])

@@ -26,6 +26,7 @@ class SES(enum.Enum):
     Exn = enum.auto()
     ML = enum.auto()
     Elim_AnyNonTot = enum.auto()
+    Elim_Tot_LaterTotOrST = enum.auto()
 
 
 side_effects: Dict[identity.TID, SES] = {}

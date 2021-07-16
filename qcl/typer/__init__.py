@@ -21,6 +21,7 @@ from . import substitution
 from . import scheme
 from . import seeding
 from . import inference
+from . import memory
 
 
 def type_project(project):

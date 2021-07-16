@@ -3,8 +3,6 @@ A substitution is a mapping from named type variables to types.
 `Substitution` instances are immutable and composable.
 """
 
-import typing as t
-
 from qcl import type
 
 from . import scheme
@@ -99,7 +97,7 @@ class Substitution(object):
                 type.kind.TK.Array: type.get_array_type,
                 type.kind.TK.Slice: type.get_slice_type
             }
-            mem_view_is_mut = type.is_mut.ptr_or_array_or_slice(tid)
+            mem_view_is_mut = type.mem_window.is_mut(tid)
             return replacement_ctor_map[t_kind](
                 self.rewrite_type(type.elem.tid_of_ptd(tid)),
                 mem_view_is_mut
@@ -142,7 +140,7 @@ class Substitution(object):
                 self.rewrite_type(type.elem.tid_of_fn_arg(tid)),
                 self.rewrite_type(type.elem.tid_of_fn_ret(tid)),
                 type.side_effects.of(tid),
-                type.memory.closure_spec(tid)
+                qcl.typer.memory.of(tid)
             )
 
         # unknown:

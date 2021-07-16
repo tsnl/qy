@@ -6,7 +6,6 @@ This system obtains type that make up other type, i.e. type 'elements'.
 """
 
 from typing import *
-import dataclasses
 import collections
 import copy
 

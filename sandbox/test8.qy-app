@@ -36,14 +36,14 @@
 #};
 
 dm linAlg [T] {
-    Vec2 = Struct {
+    Vec2 := Struct {
         x :: T;
         y :: T;
     };
-    Vec2i = linAlg[Int32]:Vec2;
-    Vec2f = linAlg[Float32]:Vec2;
+    Vec2i := linAlg[I32]:Vec2;
+    Vec2f := linAlg[F32]:Vec2;
 };
 dm hello {
-    Vec2i = linAlg:Vec2i;
-    Vec2f = linAlg:Vec2f;
+    Vec2i := linAlg:Vec2i;
+    Vec2f := linAlg:Vec2f;
 };

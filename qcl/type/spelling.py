@@ -1,10 +1,10 @@
 from . import identity
 from . import elem
 from . import scalar_width_in_bytes
-from . import is_mut
+from . import mem_window
 from . import kind
 from . import side_effects
-from . import memory
+from ..typer import memory
 
 VarPrintComponent = str
 
@@ -32,17 +32,17 @@ def of(tid: identity.TID):
         return f"F{8 * scalar_width_in_bytes.of(tid)}"
 
     elif type_kind == kind.TK.Pointer:
-        if is_mut.ptr(tid):
+        if mem_window.ptr(tid):
             return f"![{of(elem.tid_of_ptd(tid))}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}]"
     elif type_kind == kind.TK.Array:
-        if is_mut.ptr(tid):
+        if mem_window.ptr(tid):
             return f"![{of(elem.tid_of_ptd(tid))}, N_{tid}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
     elif type_kind == kind.TK.Slice:
-        if is_mut.ptr(tid):
+        if mem_window.ptr(tid):
             return f"![{of(elem.tid_of_ptd(tid))}, ?]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, ?]"

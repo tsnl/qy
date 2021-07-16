@@ -113,8 +113,8 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
             return sub
 
         elif tk_t == tk_u and tk_t in (type.kind.TK.Pointer, type.kind.TK.Array, type.kind.TK.Slice):
-            t_is_mut = type.is_mut.ptr_or_array_or_slice(t)
-            u_is_mut = type.is_mut.ptr_or_array_or_slice(u)
+            t_is_mut = type.mem_window.is_mut(t)
+            u_is_mut = type.mem_window.is_mut(u)
 
             if allow_u_mut_ptr:
                 if t_is_mut and not u_is_mut:
@@ -160,6 +160,16 @@ def unify_ses(*ses_iterator):
     
 
 def unify_ses_binary(ses1, ses2):
+    # NOTE: assign expressions have an ST side-effect if they alter state outside the function's frame.
+    #       This is ascertained via Control Flow Analysis (CFA), where each value is discriminated rather than
+    #        grouped by type.
+    #       During unification, we PRETEND this is simply Tot, and defer errors where the ST effect is generated in a
+    #       TOT scope.
+    if ses1 == SES.Elim_Tot_LaterTotOrST:
+        ses1 = SES.Tot
+    if ses2 == SES.Elim_Tot_LaterTotOrST:
+        ses2 = SES.Tot
+
     opt_unified_ses = {
         (type.side_effects.SES.Tot, type.side_effects.SES.Tot): type.side_effects.SES.Tot,
         (type.side_effects.SES.Tot, type.side_effects.SES.Dv): type.side_effects.SES.Dv,
@@ -176,12 +186,12 @@ def unify_ses_binary(ses1, ses2):
         (type.side_effects.SES.ST, type.side_effects.SES.Tot): type.side_effects.SES.ST,
         (type.side_effects.SES.ST, type.side_effects.SES.Dv): type.side_effects.SES.ST,
         (type.side_effects.SES.ST, type.side_effects.SES.ST): type.side_effects.SES.ST,
-        (type.side_effects.SES.ST, type.side_effects.SES.Exn): type.side_effects.SES.ML,      # notable: push 'up' the lattice
+        (type.side_effects.SES.ST, type.side_effects.SES.Exn): type.side_effects.SES.ML,
         (type.side_effects.SES.ST, type.side_effects.SES.ML): type.side_effects.SES.ML,
 
         (type.side_effects.SES.Exn, type.side_effects.SES.Tot): type.side_effects.SES.Exn,
         (type.side_effects.SES.Exn, type.side_effects.SES.Dv): type.side_effects.SES.Exn,
-        (type.side_effects.SES.Exn, type.side_effects.SES.ST): type.side_effects.SES.ML,      # notable: push 'up' the lattice
+        (type.side_effects.SES.Exn, type.side_effects.SES.ST): type.side_effects.SES.ML,
         (type.side_effects.SES.Exn, type.side_effects.SES.Exn): type.side_effects.SES.Exn,
         (type.side_effects.SES.Exn, type.side_effects.SES.ML): type.side_effects.SES.ML,
 
@@ -223,12 +233,20 @@ def compare_ses(top_allowed_ses: "type.side_effects.SES", compared_ses: "type.si
         elif top_allowed_ses == type.side_effects.SES.ST:
             return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST)
         elif top_allowed_ses == type.side_effects.SES.ML:
-            return compared_ses in (type.side_effects.SES.Tot, type.side_effects.SES.Dv, type.side_effects.SES.ST, type.side_effects.SES.ML)
+            return compared_ses in (
+                type.side_effects.SES.Tot,
+                type.side_effects.SES.Dv,
+                type.side_effects.SES.ST,
+                type.side_effects.SES.ML
+            )
         else:
             raise excepts.CompilationError("Unknown side-effects specifier in `compare_ses`")
 
 
-def ses_are_equal(ses1: "type.side_effects.SES", ses2: "type.side_effects.SES"):
+type_ = type
+
+
+def ses_are_equal(ses1: "type_.side_effects.SES", ses2: "type_.side_effects.SES"):
     if ses1 == SES.Elim_AnyNonTot:
         return ses2 == SES.Elim_AnyNonTot or ses2 != SES.Tot
     else:
@@ -239,38 +257,17 @@ def ses_are_equal(ses1: "type.side_effects.SES", ses2: "type.side_effects.SES"):
 # ClosureSpec inference:
 #
 
-ClosureSpec = type.memory.ClosureSpec
+CS = type.closure_spec.CS
 
 
-def unify_closure_spec(cs1: ClosureSpec, cs2: ClosureSpec) -> ClosureSpec:
-    if ClosureSpec.Yes in (cs1, cs2) and ClosureSpec.No in (cs1, cs2):
+def unify_closure_spec(cs1: CS, cs2: CS) -> CS:
+    if CS.Yes in (cs1, cs2) and CS.No in (cs1, cs2):
         msg_suffix = f"cannot unify opposing closure specifiers: a `ClosureBan` function uses non-local IDs"
         raise excepts.TyperCompilationError(msg_suffix)
-    elif ClosureSpec.Yes in (cs1, cs2):
-        return ClosureSpec.Yes
-    elif ClosureSpec.No in (cs1, cs2):
-        return ClosureSpec.No
+    elif CS.Yes in (cs1, cs2):
+        return CS.Yes
+    elif CS.No in (cs1, cs2):
+        return CS.No
     else:
-        assert cs1 == cs2 == ClosureSpec.Maybe
-        return ClosureSpec.Maybe
-
-
-#
-# RelMemoryLoc inference:
-#
-
-
-RML = type.memory.RelMemLoc
-
-
-def unify_rml(rml1: t.Optional[RML], rml2: t.Optional[RML]) -> t.Optional[RML]:
-    if rml1 is None and rml2 is None:
-        return None
-    elif rml1 is None or rml2 is None:
-        raise excepts.TyperCompilationError("Invalid RelMemLoc: trying to unify mem-window and non-mem-window RML")
-    else:
-        if RML.HeapOrStackNonLocal in (rml1, rml2):
-            return RML.HeapOrStackNonLocal
-        else:
-            assert rml1 == rml2 == RML.StackLocal
-            return RML.StackLocal
+        assert cs1 == cs2 == CS.Maybe
+        return CS.Maybe

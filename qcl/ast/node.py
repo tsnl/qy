@@ -52,7 +52,7 @@ class TypedBaseNode(BaseNode):
         return self.x_ctx
 
     @property
-    def cs(self) -> Optional["type.memory.ClosureSpec"]:
+    def cs(self) -> Optional["type.closure_spec.CS"]:
         return self.x_cs
 
     @property
@@ -66,7 +66,7 @@ class TypedBaseNode(BaseNode):
             self,
             tid: type.identity.TID,
             ses: type.side_effects.SES,
-            cs: type.memory.ClosureSpec,
+            cs: type.closure_spec.CS,
             ctx: typer.context.Context
     ):
         assert not self.type_info_finalized
@@ -457,7 +457,7 @@ class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
     opt_ses: Optional[type.side_effects.SES]
-    closure_spec: type.memory.ClosureSpec
+    closure_spec: type.closure_spec.CS
 
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)
@@ -466,7 +466,7 @@ class FnSignatureTypeSpec(BaseTypeSpec):
         self.opt_ses = opt_ses
 
         # by default, the closure spec is `Yes`, since our language uses fat pointers internally.
-        self.closure_spec = type.memory.ClosureSpec.Yes
+        self.closure_spec = type.closure_spec.CS.Yes
 
 
 class BaseMemWindowTypeSpec(BaseTypeSpec, metaclass=abc.ABCMeta):

@@ -13,11 +13,12 @@ from . import identity
 from . import kind
 from . import elem
 from . import scalar_width_in_bytes
-from . import is_mut
+from . import mem_window
 from . import spelling
 from . import side_effects
 from . import free
-from . import memory
+from . import closure_spec
+from . import mem_loc
 
 
 @functools.cache
@@ -58,7 +59,7 @@ def get_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Pointer)
     elem.init_ptr(tid, ptd_tid)
-    is_mut.init_ptr(tid, ptr_is_mut)
+    mem_window.init(tid, ptr_is_mut)
     return tid
 
 
@@ -67,7 +68,7 @@ def get_array_type(ptd_tid: identity.TID, array_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Array)
     elem.init_array(tid, ptd_tid)
-    is_mut.init_array(tid, array_is_mut)
+    mem_window.init(tid, array_is_mut)
     return tid
 
 
@@ -76,7 +77,7 @@ def get_slice_type(ptd_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Slice)
     elem.init_slice(tid, ptd_tid)
-    is_mut.init_slice(tid, slice_is_mut)
+    mem_window.init(tid, slice_is_mut)
     return tid
 
 
@@ -84,14 +85,14 @@ def get_slice_type(ptd_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
 def get_fn_type(
         arg_tid: identity.TID, ret_tid: identity.TID,
         ses: side_effects.SES,
-        closure_spec: memory.ClosureSpec
+        cs: closure_spec.CS
 ) -> identity.TID:
     assert ses is not None
     assert closure_spec is not None
     tid = identity.mint()
     kind.init(tid, kind.TK.Fn)
     elem.init_func(tid, arg_tid, ret_tid)
-    memory.init_func(tid, closure_spec)
+    closure_spec.init_func(tid, cs)
     side_effects.init(tid, ses)
     return tid
 

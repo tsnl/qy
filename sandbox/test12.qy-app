@@ -1,0 +1,10 @@
+dm xyz [n] {};
+
+dm abc {
+    abc := (x) -> TOT {
+        2*x + 1
+    };
+
+
+    truth := 7*7 = xyz[abc(24)]:n;
+};

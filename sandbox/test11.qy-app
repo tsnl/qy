@@ -1,0 +1,20 @@
+dm test11 {
+    outer := (y) -> {
+        inner := (p1) -> {
+            p := make![F32 * y];
+            condition := 1_B;
+            if (condition) {
+                inner(p)
+            } else {
+                do (p <- 42);
+                @!p
+            }
+        };
+
+        assigned := inner();
+
+        x
+    };
+
+    add_v1 :: (I32) -> (I32) -> I32;
+};

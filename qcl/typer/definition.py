@@ -7,6 +7,7 @@ from qcl import type
 from qcl import ast
 
 from . import scheme
+from . import va
 
 
 class BaseRecord(object, metaclass=abc.ABCMeta):
@@ -38,14 +39,26 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
 
 
 class ValueRecord(BaseRecord):
+    val_var: va.ValVar
+
     def __init__(
             self,
             name: str, loc: feedback.ILoc, value_tid: type.identity.TID,
             opt_func,
-            is_protected_from_global_scope=True
+            is_protected_from_global_scope=True,
+            opt_val_var=None
     ):
-        super().__init__(name, loc, scheme.Scheme(value_tid), Universe.Value, opt_func, is_protected_from_global_scope)
-        
+        super().__init__(
+            name, loc,
+            scheme.Scheme(value_tid), Universe.Value,
+            opt_func, is_protected_from_global_scope
+        )
+
+        if opt_val_var is not None:
+            self.val_var = opt_val_var
+        else:
+            self.val_var = va.ValVar(f"def:name", loc)
+
         if self.is_globally_visible:
             all_global_value_recs.append(self)
 
@@ -65,25 +78,13 @@ class TypeRecord(BaseRecord):
 
 class ModRecord(BaseRecord):
     def __init__(self, name: str, loc: feedback.ILoc, mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp"):
-        super().__init__(name, loc, mod_scheme, Universe.Module, opt_func=None, is_protected_from_global_scope=False)
+        super().__init__(
+            name, loc,
+            mod_scheme, Universe.Module,
+            opt_func=None,
+            is_protected_from_global_scope=False
+        )
         self.mod_exp = mod_exp
-
-
-# @dataclasses.dataclass
-# class Definition(object):
-#     loc: feedback.ILoc
-#     universe: "DefinitionUniverse"
-#     scheme: "scheme.Scheme"
-#
-#     def copy_with_new_scheme(self, new_scheme: "scheme.Scheme"):
-#         """
-#         :return: a copy of this definition object with the `scheme` field substituted.
-#         """
-#         return Definition(
-#             loc=self.loc,
-#             universe=self.universe,
-#             scheme=new_scheme
-#         )
 
 
 @enum.unique
