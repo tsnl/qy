@@ -9,10 +9,6 @@ Rather than being efficient, this algorithm prioritizes producing traceable outp
 - use theory to its fullest
 """
 
-from qcl import antlr
-from qcl import frontend
-from qcl import type
-from qcl import ast
 from qcl import excepts
 
 from . import context
@@ -21,7 +17,6 @@ from . import substitution
 from . import scheme
 from . import seeding
 from . import inference
-from . import memory
 
 
 def type_project(project):

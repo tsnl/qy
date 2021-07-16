@@ -291,6 +291,8 @@ def infer_imp_elem_types(
 
 
 def infer_typing_elem_types(ctx: "context.Context", elem: "ast.node.BaseTypingElem") -> substitution.Substitution:
+    # TODO: we can use typing elements to initialize ValVar `opt_value` fields with placeholders of appropriate type.
+
     if isinstance(elem, ast.node.Type1VElem):
         sub, rhs_tid = infer_type_spec_tid(ctx, elem.type_spec)
 
@@ -441,8 +443,8 @@ def help_infer_exp_tid(
         return ret_sub, def_tid, call_ses, closure_spec, found_def_obj.val_var
 
     elif isinstance(exp, ast.node.IdExpInModule):
-        sub, tid, ses, cs, arg_val_info = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
-        return sub, tid, ses, cs, arg_val_info
+        sub, tid, ses, cs, arg_val_var = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
+        return sub, tid, ses, cs, arg_val_var
 
     #
     # context-independent branches:
@@ -454,7 +456,7 @@ def help_infer_exp_tid(
             type.get_unit_type(),
             SES.Tot,
             CS.No,
-            sva.ValVar("literal:unit", exp.loc, sva.UnitValue())
+            sva.ValVar(ctx, "literal:unit", exp.loc, sva.UnitValue())
         )
 
     elif isinstance(exp, ast.node.StringExp):
@@ -463,7 +465,7 @@ def help_infer_exp_tid(
             type.get_str_type(),
             SES.Tot,
             CS.No,
-            sva.ValVar("literal:string", exp.loc, sva.StringValue())
+            sva.ValVar(ctx, "literal:string", exp.loc, sva.StringValue())
         )
 
     elif isinstance(exp, ast.node.NumberExp):
@@ -482,7 +484,7 @@ def help_infer_exp_tid(
                 type.get_float_type(width_in_bits//8),
                 SES.Tot,
                 CS.No,
-                sva.ValVar("literal:float", exp.loc, sva.FloatValue())
+                sva.ValVar(ctx, "literal:float", exp.loc, sva.FloatValue())
             )
 
         elif exp.is_explicitly_unsigned_int:
@@ -491,7 +493,7 @@ def help_infer_exp_tid(
                 type.get_int_type(width_in_bits//8, is_unsigned=True),
                 SES.Tot,
                 CS.No,
-                sva.ValVar("literal:uint", exp.loc, sva.IntValue())
+                sva.ValVar(ctx, "literal:uint", exp.loc, sva.IntValue())
             )
         else:
             assert exp.is_explicitly_signed_int
@@ -500,7 +502,7 @@ def help_infer_exp_tid(
                 type.get_int_type(width_in_bits//8, is_unsigned=False),
                 SES.Tot,
                 CS.No,
-                sva.ValVar("literal:sint", exp.loc, sva.IntValue())
+                sva.ValVar(ctx, "literal:sint", exp.loc, sva.IntValue())
             )
 
     elif isinstance(exp, ast.node.PostfixVCallExp):
@@ -508,7 +510,7 @@ def help_infer_exp_tid(
 
         s1, formal_fn_tid, fn_exp_ses, fn_cs, fn_val_var = infer_exp_tid(ctx, exp.called_exp)
 
-        s2, formal_arg_tid, arg_exp_ses, arg_cs, arg_val_info = infer_exp_tid(ctx, exp.arg_exp)
+        s2, formal_arg_tid, arg_exp_ses, arg_cs, arg_val_var = infer_exp_tid(ctx, exp.arg_exp)
         formal_arg_tid = s1.rewrite_type(formal_arg_tid)
 
         s12 = s2.compose(s1)
@@ -542,12 +544,12 @@ def help_infer_exp_tid(
         # val var handling:
         # TODO: use the `relate_?` methods to associate arg with fn val vars
         #   - BEWARE: `may_be_non_local` can never be true for any formal args: no inference flow should disturb this
-        ret_val_var = sva.ValVar("return", exp.loc)
+        ret_val_var = sva.ValVar(ctx, "return", exp.loc)
 
         return s123, s123.rewrite_type(ret_tid), exp_ses, exp_cs, ret_val_var
 
     elif isinstance(exp, ast.node.CastExp):
-        s1, src_tid, exp_ses, exp_cs, arg_val_info = infer_exp_tid(ctx, exp.initializer_data)
+        s1, src_tid, exp_ses, exp_cs, arg_val_var = infer_exp_tid(ctx, exp.initializer_data)
         s2, dst_tid = infer_type_spec_tid(ctx, exp.constructor_ts)
         dst_tid = s1.rewrite_type(dst_tid)
         ret_sub = s1.compose(s2)
@@ -649,7 +651,7 @@ def help_infer_exp_tid(
         # all OK!
         #
 
-        return ret_sub, ret_sub.rewrite_type(dst_tid), exp_ses, exp_cs, arg_val_info
+        return ret_sub, ret_sub.rewrite_type(dst_tid), exp_ses, exp_cs, arg_val_var
 
     elif isinstance(exp, ast.node.LambdaExp):
         # each lambda gets its own scope (for formal args)
@@ -662,7 +664,7 @@ def help_infer_exp_tid(
         # - if 1 arg, arg type is just that arg's type.
         if not exp.arg_names:
             formal_arg_tid = type.get_unit_type()
-            formal_arg_val_var = sva.ValVar("args:()", exp.loc, sva.UnitValue())
+            formal_arg_val_var = sva.ValVar(lambda_ctx, "args:()", exp.loc, sva.UnitValue())
         else:
             elem_arg_tid_list = []
             arg_val_info_list = []
@@ -671,13 +673,13 @@ def help_infer_exp_tid(
                 formal_arg_tid = type.new_free_var(f"lambda-formal-arg:{arg_name}")
 
                 # creating the formal arg value info:
-                arg_val_info = sva.ValVar(f"arg:{arg_name}", exp.loc)
+                arg_val_var = sva.ValVar(lambda_ctx, f"arg:{arg_name}", exp.loc)
 
                 # defining the formal arg in the function context:
                 arg_def_obj = definition.ValueRecord(
                     arg_name, exp.loc, formal_arg_tid,
                     opt_func=exp,
-                    opt_val_var=arg_val_info
+                    opt_val_var=arg_val_var
                 )
                 formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
                 if not formal_arg_def_ok:
@@ -685,16 +687,16 @@ def help_infer_exp_tid(
                     raise excepts.TyperCompilationError(msg_suffix)
 
                 elem_arg_tid_list.append(formal_arg_tid)
-                arg_val_info_list.append(arg_val_info)
+                arg_val_info_list.append(arg_val_var)
 
             assert elem_arg_tid_list
             if len(elem_arg_tid_list) == 1:
                 formal_arg_tid = elem_arg_tid_list[0]
-                formal_arg_val_var = sva.ValVar(f"args:({exp.arg_names[0]})", exp.loc)
+                formal_arg_val_var = sva.ValVar(lambda_ctx, f"args:({exp.arg_names[0]})", exp.loc)
             else:
                 formal_arg_tid = type.get_tuple_type(tuple(elem_arg_tid_list))
-                formal_arg_val_var = sva.ValVar("args:(...)", exp.loc, sva.TupleValue([
-                    sva.ValVar(f"arg:{arg_name}", exp.loc) for arg_name in exp.arg_names
+                formal_arg_val_var = sva.ValVar(lambda_ctx, "args:(...)", exp.loc, sva.TupleValue([
+                    sva.ValVar(lambda_ctx, f"arg:{arg_name}", exp.loc) for arg_name in exp.arg_names
                 ]))
 
         assert formal_arg_tid is not None
@@ -704,7 +706,7 @@ def help_infer_exp_tid(
         exp.finalize_fn_ses(ret_ses)
 
         # computing the function val-var:
-        lambda_val_var = sva.ValVar("lambda", exp.loc, sva.FuncValue(formal_arg_val_var, ret_val_var))
+        lambda_val_var = sva.ValVar(ctx, "lambda", exp.loc, sva.FuncValue(formal_arg_val_var, ret_val_var))
 
         # if `closure_spec` is `No`, changing to `Maybe` so we can unify with both kinds of functions.
         #   - `Maybe` indicates an empty set of non-locals
@@ -784,7 +786,7 @@ def help_infer_exp_tid(
 
         else:
             tail_tid = type.get_unit_type()
-            tail_val_info = sva.ValVar("chain:implicit_tail", exp.loc, sva.UnitValue())
+            tail_val_info = sva.ValVar(chain_ctx, "chain:implicit_tail", exp.loc, sva.UnitValue())
 
         return sub, tail_tid, expected_ses, output_cs, tail_val_info
 
@@ -814,7 +816,7 @@ def help_infer_exp_tid(
             # NOTE: regardless of whether we de-reference a mutable or immutable pointer, this op is still `TOT`
 
             # TODO: replace with series of `relate_` methods
-            ptr_val_info = sva.ValVar("de-ref:ptr", exp.loc, sva.MemWindowValue(
+            ptr_val_info = sva.ValVar(ctx, "de-ref:ptr", exp.loc, sva.MemWindowValue(
                 content_mem_may_be_local=True,
                 content_mem_may_be_non_local=True,
                 ptd_value_info=ptd_val_info
@@ -851,7 +853,7 @@ def help_infer_exp_tid(
         # TODO: analyze ptr and val val-vars to...
         #   - determine if TOT or ST (getting rid of Elim_Tot_LaterTotOrST)
         #   - update/check lifetimes of content if pointers are stored out-of-scope
-        assign_val_var = sva.ValVar("assign:ret", exp.loc)
+        assign_val_var = sva.ValVar(ctx, "assign:ret", exp.loc)
 
         assign_ses = unifier.unify_ses(
             SES.Elim_Tot_LaterTotOrST,
@@ -876,21 +878,26 @@ def help_infer_exp_tid(
 
         # TODO: verify that `push` only invoked in a function: check ctx.opt_func
 
-        initializer_sub, ptd_tid, initializer_ses, initializer_cs = infer_exp_tid(ctx, exp.initializer_exp)
+        initializer_sub, ptd_tid, initializer_ses, initializer_cs, initializer_val_var = infer_exp_tid(
+            ctx,
+            exp.initializer_exp
+        )
         if isinstance(exp, ast.node.AllocatePtrExp):
             ptr_tid = type.get_ptr_type(ptd_tid, exp.is_mut)
             ptr_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            return initializer_sub, ptr_tid, ptr_ses, initializer_cs
+            return initializer_sub, ptr_tid, ptr_ses, initializer_cs, initializer_val_var
         elif isinstance(exp, ast.node.AllocateArrayExp):
             # TODO: unify array 'size' parameter's type, get SES and CS
             array_tid = type.get_array_type(ptd_tid, exp.is_mut)
             array_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            return initializer_sub, array_tid, array_ses, initializer_cs
+            array_val_var = sva.ValVar(ctx, "literal:array", exp.loc, initializer_val_var)
+            return initializer_sub, array_tid, array_ses, initializer_cs, array_val_var
         elif isinstance(exp, ast.node.AllocateSliceExp):
-            slice_tid = type.get_slice_type(ptd_tid, exp.is_mut)
             # TODO: unify slice 'size' parameter's type, get SES and CS
+            slice_tid = type.get_slice_type(ptd_tid, exp.is_mut)
             slice_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            return initializer_sub, slice_tid, slice_ses, initializer_cs
+            slice_val_var = sva.ValVar(ctx, "literal:slice", exp.loc, initializer_val_var)
+            return initializer_sub, slice_tid, slice_ses, initializer_cs, slice_val_var
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
@@ -980,17 +987,12 @@ def help_infer_type_spec_tid(
         return sub, adt_tid
 
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        sub, tid, ses, cs = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
+        sub, tid, ses, cs, opt_val_var = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
+        assert opt_val_var is None
 
-        if ses != SES.Tot:
-            raise excepts.TyperCompilationError(
-                "Cannot use non-TOT expressions as template arguments"
-            )
+        assert ses == SES.Tot
 
-        if cs == CS.Yes:
-            raise excepts.TyperCompilationError(
-                "Cannot use non-local variables as constants in type expressions"
-            )
+        # ignore the closure-spec: if the value is not computable from constants, it will be caught in PTC-checks.
 
         return sub, tid
 
@@ -1013,7 +1015,7 @@ def raise_cast_error(src_tid, dst_tid, more=None):
 
 def help_type_id_in_module_node(
     ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe
-) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS, sva.ValueInfo]:
+) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS, sva.ValVar]:
     # NOTE: IdInModuleNodes are nested and share formal variable mappings THAT CANNOT LEAVE THIS SUB-SYSTEM.
     #   - this means that the substitution returns formal -> actual mappings UNLESS it has no child, in which case
     #     it is the last IdInModuleNode in the process.
@@ -1146,8 +1148,12 @@ def help_type_id_in_module_node(
                     )
                     sub = sub.compose(this_val_arg_sub)
 
-                    # unifying SES and CS:
-                    out_ses = unifier.unify_ses(out_ses, actual_arg_ses)
+                    # ensuring SES is 'Tot'
+                    if actual_arg_ses != SES.Tot:
+                        msg_suffix = f"template arg #{1+arg_index} at {actual_arg_node.loc} must be `TOT`"
+                        raise excepts.TyperCompilationError(msg_suffix)
+
+                    # unifying CS:
                     out_cs = unifier.unify_closure_spec(out_cs, actual_arg_cs)
             else:
                 assert isinstance(actual_arg_node, ast.node.BaseTypeSpec)
@@ -1205,5 +1211,10 @@ def help_type_id_in_module_node(
             replace_deeply=True
         )
 
+    # if looked up symbol is a value definition, retrieve the ValVar:
+    opt_val_var = None
+    if isinstance(found_def_obj, definition.ValueRecord):
+        opt_val_var = found_def_obj.val_var
+
     # returning the resulting substitution, TID, SES, and CS:
-    return sub, found_tid, out_ses, out_cs, opt_mem_window_info
+    return sub, found_tid, out_ses, out_cs, opt_val_var

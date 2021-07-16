@@ -345,9 +345,6 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     def visitTupleExp(self, ctx):
         return self.visit(ctx.it)
 
-    def visitAssignExpAsParenWrappedExp(self, ctx):
-        return self.visit(ctx.it)
-
     def visitCastExp(self, ctx):
         return self.visit(ctx.it)
 
@@ -494,14 +491,11 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     #
 
     def visitAssignExp(self, ctx):
-        if ctx.through is not None:
-            return self.visit(ctx.through)
-        else:
-            return ast.node.AssignExp(
-                self.ctx_loc(ctx),
-                self.visit(ctx.dst),
-                self.visit(ctx.src)
-            )
+        return ast.node.AssignExp(
+            self.ctx_loc(ctx),
+            self.visit(ctx.dst),
+            self.visit(ctx.src)
+        )
 
     #
     # bulkyExp
@@ -510,12 +504,14 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     def visitBulkyExp(self, ctx):
         if ctx.through:
             return self.visit(ctx.through)
-        elif ctx.if_exp:
+        elif ctx.if_exp is not None:
             return self.visit(ctx.if_exp)
-        elif ctx.fn_exp:
+        elif ctx.fn_exp is not None:
             return self.visit(ctx.fn_exp)
-        elif ctx.allocate_exp:
+        elif ctx.allocate_exp is not None:
             return self.visit(ctx.allocate_exp)
+        elif ctx.assign_exp is not None:
+            return self.visit(ctx.assign_exp)
         else:
             assert False and "Unknown bulkyExp type."
 
@@ -685,7 +681,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             raise excepts.ParserCompilationError(msg_suffix)
         else:
             # updating the closure spec to deny any closure pointer:
-            nested.closure_spec = qcl.typer.memory.CS.No
+            nested.closure_spec = type.closure_spec.CS.No
 
         return nested
 

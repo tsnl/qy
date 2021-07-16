@@ -27,24 +27,27 @@ import typing as t
 
 from qcl import type
 from qcl import feedback as fb
+from . import context
 
 
 class ValVar(object):
-    def __init__(self, client_name: str, client_loc: fb.ILoc, opt_initial_value=None):
+    def __init__(self, opt_ctx: t.Optional["context.Context"], client_name: str, client_loc: fb.ILoc, opt_initial_value=None):
         super().__init__()
+        self.opt_ctx = opt_ctx
         self.client_name = client_name
         self.client_loc = client_loc
         self.opt_value = opt_initial_value
-        self.flow_src_list = []
 
-    def add_incoming(self, val_var: "ValVar"):
-        self.flow_src_list.append(val_var)
-
-    def get_value(self):
-        if self.opt_value is not None:
-            return self.opt_value
+    def delayed_init_ctx(self, ctx: "context.Context"):
+        if self.opt_ctx is not None:
+            assert self.opt_ctx is ctx
         else:
-            raise NotImplementedError("reducing `flow_src_list` into a value, raising excepts if failed")
+            self.opt_ctx = ctx
+
+    @property
+    def ctx(self):
+        assert self.opt_ctx is not None
+        return self.opt_ctx
 
     # TODO: write `relate_?` functions to support different value kinds:
     #   - e.g. for func: 'get arg val var', 'get ret val var'
@@ -53,6 +56,10 @@ class ValVar(object):
     #   - otherwise, we must add a constraint to a deferred set that is resolved when `get_value` is called.
     #   - BETTER: store constraints, map to ALL values in `flow_src_list` (OR depending on edge rules)
 
+    # - assigns (for direct assignment or binding/initialization)
+    # - stores (for memory window contents)
+    # - is_called_with (for function-- similar to assign, but with separate memory windows)
+    # - is_indexed_by (for array/slice index type)
 
 class BaseValue(object, metaclass=abc.ABCMeta):
     pass

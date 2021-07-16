@@ -140,7 +140,7 @@ class Substitution(object):
                 self.rewrite_type(type.elem.tid_of_fn_arg(tid)),
                 self.rewrite_type(type.elem.tid_of_fn_ret(tid)),
                 type.side_effects.of(tid),
-                qcl.typer.memory.of(tid)
+                type.closure_spec.of(tid)
             )
 
         # unknown:

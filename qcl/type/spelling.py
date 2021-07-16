@@ -4,7 +4,7 @@ from . import scalar_width_in_bytes
 from . import mem_window
 from . import kind
 from . import side_effects
-from ..typer import memory
+from . import closure_spec
 
 VarPrintComponent = str
 
@@ -32,17 +32,17 @@ def of(tid: identity.TID):
         return f"F{8 * scalar_width_in_bytes.of(tid)}"
 
     elif type_kind == kind.TK.Pointer:
-        if mem_window.ptr(tid):
+        if mem_window.is_mut(tid):
             return f"![{of(elem.tid_of_ptd(tid))}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}]"
     elif type_kind == kind.TK.Array:
-        if mem_window.ptr(tid):
+        if mem_window.is_mut(tid):
             return f"![{of(elem.tid_of_ptd(tid))}, N_{tid}]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, N_{tid}]"
     elif type_kind == kind.TK.Slice:
-        if mem_window.ptr(tid):
+        if mem_window.is_mut(tid):
             return f"![{of(elem.tid_of_ptd(tid))}, ?]"
         else:
             return f"[{of(elem.tid_of_ptd(tid))}, ?]"
@@ -56,10 +56,10 @@ def of(tid: identity.TID):
         #     lhs_spelling = f"({lhs_spelling})"
 
         opt_prefix, opt_suffix = {
-            memory.ClosureSpec.Yes: ("", ""),
-            memory.ClosureSpec.No: ("ClosureBan { ", " }"),
-            memory.ClosureSpec.Maybe: ("EmptyClosure { ", " }")
-        }[memory.closure_spec(tid)]
+            closure_spec.CS.Yes: ("", ""),
+            closure_spec.CS.No: ("ClosureBan { ", " }"),
+            closure_spec.CS.Maybe: ("EmptyClosure { ", " }")
+        }[closure_spec.of(tid)]
 
         return f"{opt_prefix}{lhs_spelling} -> {ses_spelling} {rhs_spelling}{opt_suffix}"
 

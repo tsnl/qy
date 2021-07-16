@@ -12,6 +12,7 @@ from qcl import feedback as fb
 from qcl import ast
 
 from . import definition
+from . import sva
 
 
 class Context(object):
@@ -106,6 +107,8 @@ class Context(object):
             assert def_record is not None
             self.symbol_table[def_name] = def_record
             def_record.scheme.init_def_context(self)
+            if isinstance(def_record, definition.ValueRecord):
+                def_record.val_var.delayed_init_ctx(self)
             return True
 
     def lookup(self, def_name, shallow=False):

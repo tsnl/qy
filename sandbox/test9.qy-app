@@ -1,7 +1,7 @@
 dm howdy {
     x := (v) -> (p) -> ST {
         # v--- violates the closure ban
-        # do p := v;
+        # do p <- v;
 
         do p <- 42f;
         @!p

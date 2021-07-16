@@ -73,7 +73,6 @@ parenWrappedExp
     : '(' ')'                #unitExp
     | '(' wrapped=expr ')'   #identityParenExp
     | it=tuplePrimaryExp     #tupleExp
-    | it=assignExp           #assignExpAsParenWrappedExp
     ;
 wrappedExp
     : it=parenWrappedExp    #throughWrappedExp
@@ -88,9 +87,6 @@ chainPrimaryExp
     ;
 castPrimaryExp
     : ts=primaryTypeSpec data=parenWrappedExp
-    ;
-assignExp
-    : '(' dst=binaryExp '<-' src=assignExp ')'
     ;
 
 idExp
@@ -183,6 +179,7 @@ bulkyExp
     | if_exp=ifExp
     | fn_exp=lambdaExp
     | allocate_exp=allocateExp
+    | assign_exp=assignExp
     ;
 ifExp
     : 'if' cond=wrappedExp then_branch=chainPrimaryExp ('else' opt_else_branch=elseBranchExp)?
@@ -199,6 +196,9 @@ allocateExp
     | hint=allocatorHint (is_mut='!')? '[' collection_ts=typeSpec '*' (size=expr|'?') ']' (initializer=parenWrappedExp)?
     ;
 allocatorHint: 'make' | 'push' ;
+assignExp
+    : dst=binaryExp '<-' src=bulkyExp
+    ;
 
 //
 // Type specs:
