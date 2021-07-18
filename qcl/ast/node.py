@@ -64,10 +64,10 @@ class TypedBaseNode(BaseNode):
 
     def finalize_type_info(
             self,
-            tid: type.identity.TID,
-            ses: type.side_effects.SES,
-            cs: type.closure_spec.CS,
-            ctx: typer.context.Context
+            tid: "type.identity.TID",
+            ses: "type.side_effects.SES",
+            cs: "type.closure_spec.CS",
+            ctx: "typer.context.Context"
     ):
         assert not self.type_info_finalized
         self.x_tid = tid
@@ -225,8 +225,7 @@ class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
 
 class UnaryOp(enum.Enum):
     LogicalNot = enum.auto()
-    DeRefImmutable = enum.auto()
-    DeRefMutable = enum.auto()
+    DeRef = enum.auto()
     Pos = enum.auto()
     Neg = enum.auto()
 
@@ -280,10 +279,11 @@ class PostfixVCallExp(BaseCallExp):
 #
 
 class AssignExp(BaseExp):
-    def __init__(self, loc, dst_exp: BaseExp, src_exp: BaseExp):
+    def __init__(self, loc, dst_exp: BaseExp, src_exp: BaseExp, is_tot: bool):
         super().__init__(loc)
         self.dst_exp = dst_exp
         self.src_exp = src_exp
+        self.is_tot = is_tot
 
 
 #
@@ -358,7 +358,7 @@ class ChainExp(BaseExp):
     def __init__(
             self, loc, elements, opt_tail: Optional[BaseExp],
             opt_prefix_ts: Optional["BaseTypeSpec"],
-            opt_prefix_es: Optional[type.side_effects.SES]
+            opt_prefix_es: Optional["type.side_effects.SES"]
     ):
         """
         Creates a new chain expression.
@@ -456,8 +456,8 @@ class TupleTypeSpec(BaseTypeSpec):
 class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
-    opt_ses: Optional[type.side_effects.SES]
-    closure_spec: type.closure_spec.CS
+    opt_ses: Optional["type.side_effects.SES"]
+    closure_spec: "type.closure_spec.CS"
 
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)

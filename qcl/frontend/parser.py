@@ -429,8 +429,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             'not': ast.node.UnaryOp.LogicalNot,
             '+': ast.node.UnaryOp.Pos,
             '-': ast.node.UnaryOp.Neg,
-            '@': ast.node.UnaryOp.DeRefImmutable,
-            '@!': ast.node.UnaryOp.DeRefMutable
+            '@!': ast.node.UnaryOp.DeRef
         }[ctx.getText()]
 
     #
@@ -454,8 +453,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
                 '>': ast.node.BinaryOp.GT,
                 '<=': ast.node.BinaryOp.LEq,
                 '>=': ast.node.BinaryOp.GEq,
-                '==': ast.node.BinaryOp.Eq,
-                '!=': ast.node.BinaryOp.NE,
+                '=': ast.node.BinaryOp.Eq,
+                '<>': ast.node.BinaryOp.NE,
                 'and': ast.node.BinaryOp.LogicalAnd,
                 'or': ast.node.BinaryOp.LogicalOr
             }[ctx.op.text]
@@ -491,10 +490,12 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     #
 
     def visitAssignExp(self, ctx):
+        is_tot = ctx.is_tot is not None
         return ast.node.AssignExp(
             self.ctx_loc(ctx),
             self.visit(ctx.dst),
-            self.visit(ctx.src)
+            self.visit(ctx.src),
+            is_tot=is_tot
         )
 
     #

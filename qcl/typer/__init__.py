@@ -43,7 +43,7 @@ def type_project(project):
 
         # trying inference:
         try:
-            inference.infer_project_types(project, all_file_module_list)
+            inference.infer_project_types(project, root_context, all_file_module_list)
         except excepts.TyperCompilationError as e:
             # DEBUG: so we can inspect types:
             root_context.print("INFERENCE ERROR:")

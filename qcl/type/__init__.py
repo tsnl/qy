@@ -12,7 +12,7 @@ import copy
 from . import identity
 from . import kind
 from . import elem
-from . import scalar_width_in_bytes
+from . import scalar_width_in_bits
 from . import mem_window
 from . import spelling
 from . import side_effects
@@ -21,41 +21,118 @@ from . import closure_spec
 from . import mem_loc
 
 
-@functools.cache
+#
+# Unit type:
+#
+
 def get_unit_type():
+    return _unit_tid
+
+
+def _new_unit_type():
     tid = identity.mint()
     kind.init(tid, kind.TK.Unit)
     return tid
 
 
-@functools.cache
-def get_int_type(width_in_bytes: int, is_unsigned=False) -> identity.TID:
-    tid = identity.mint()
-    if is_unsigned:
-        kind.init(tid, kind.TK.UnsignedInt)
-    else:
-        kind.init(tid, kind.TK.SignedInt)
-    scalar_width_in_bytes.init(tid, width_in_bytes)
-    return tid
+_unit_tid = _new_unit_type()
 
 
-@functools.cache
+#
+# Int types:
+#
+
+def get_int_type(width_in_bits: int, is_unsigned=False) -> identity.TID:
+    return _int_tid_map[width_in_bits, is_unsigned]
+
+
+def _new_int_type_map():
+    def new_int_type(width_in_bits: int, is_unsigned=False) -> identity.TID:
+        tid = identity.mint()
+        if is_unsigned:
+            kind.init(tid, kind.TK.UnsignedInt)
+        else:
+            kind.init(tid, kind.TK.SignedInt)
+        scalar_width_in_bits.init(tid, width_in_bits)
+        return tid
+
+    def bit_widths(is_unsigned):
+        if is_unsigned:
+            return 1, 8, 16, 32, 64, 128
+        else:
+            return 8, 16, 32, 64, 128
+
+    return {
+        (width_in_bits, is_unsigned): new_int_type(width_in_bits, is_unsigned)
+        for is_unsigned in (False, True)
+        for width_in_bits in bit_widths(is_unsigned)
+    }
+
+
+_int_tid_map = _new_int_type_map()
+
+
+#
+# Float types:
+#
+
 def get_float_type(width_in_bytes: int) -> identity.TID:
-    tid = identity.mint()
-    kind.init(tid, kind.TK.Float)
-    scalar_width_in_bytes.init(tid, width_in_bytes)
-    return tid
+    return _float_tid_map[width_in_bytes]
 
 
-@functools.cache
+def _new_float_type_map():
+    def new_float_type(width_in_bits):
+        tid = identity.mint()
+        kind.init(tid, kind.TK.Float)
+        scalar_width_in_bits.init(tid, width_in_bits)
+        return tid
+
+    return {
+        i: new_float_type(i)
+        for i in (
+            16,
+            32,
+            64
+        )
+    }
+
+
+_float_tid_map = _new_float_type_map()
+
+
+#
+# String types:
+#
+
 def get_str_type() -> identity.TID:
+    return _str_tid
+
+
+def _new_str_type() -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.String)
     return tid
 
 
-@functools.cache
+_str_tid = _new_str_type()
+
+
+#
+# Pointer types:
+#
+
 def get_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
+    key = (ptd_tid, ptr_is_mut)
+    opt_val = _ptr_tid_map.get(key, None)
+    if opt_val is None:
+        val = _new_ptr_type(ptd_tid, ptr_is_mut)
+        _ptr_tid_map[key] = val
+        return val
+    else:
+        return opt_val
+
+
+def _new_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Pointer)
     elem.init_ptr(tid, ptd_tid)
@@ -63,20 +140,37 @@ def get_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
     return tid
 
 
+_ptr_tid_map = {}
+
+
+#
+#
+#
+# TODO: replace remaining uses of `functools.cache` with maps since
+#       cache does not seem to be persist correctly
+#
+#
+#
+
+
+#
+# Array types:
+#
+
 @functools.cache
-def get_array_type(ptd_tid: identity.TID, array_is_mut: bool) -> identity.TID:
+def get_array_type(ptd_tid: identity.TID, size_tid: identity.TID, array_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Array)
-    elem.init_array(tid, ptd_tid)
+    elem.init_array(tid, ptd_tid, size_tid)
     mem_window.init(tid, array_is_mut)
     return tid
 
 
 @functools.cache
-def get_slice_type(ptd_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
+def get_slice_type(ptd_tid: identity.TID, size_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Slice)
-    elem.init_slice(tid, ptd_tid)
+    elem.init_slice(tid, ptd_tid, size_tid)
     mem_window.init(tid, slice_is_mut)
     return tid
 

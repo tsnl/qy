@@ -132,7 +132,6 @@ unaryOp
     | '+'
     | '-'
     | '@'
-    | '@!'
     ;
 
 binaryExp
@@ -197,7 +196,7 @@ allocateExp
     ;
 allocatorHint: 'make' | 'push' ;
 assignExp
-    : dst=binaryExp '<-' src=bulkyExp
+    : (is_tot='TOT')? dst=binaryExp '<-' src=bulkyExp
     ;
 
 //

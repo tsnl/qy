@@ -1,20 +1,13 @@
-dm test11 {
-    outer := (y) -> {
-        inner := (p1) -> {
-            p := make![F32 * y];
-            condition := 1_B;
-            if (condition) {
-                inner(p)
-            } else {
-                do (p <- 42);
-                @!p
-            }
-        };
+dm xyz [n] {
+    n :: I32;
+};
 
-        assigned := inner();
-
-        x
+dm abc {
+    abc := (x) -> TOT {
+        a := 2*x + 1;
+        b := 42^a;
+        a + b
     };
 
-    add_v1 :: (I32) -> (I32) -> I32;
+    truth := (7*7 = xyz[abc(24)]:n);
 };

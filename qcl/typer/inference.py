@@ -1,4 +1,3 @@
-import abc
 import dataclasses
 import typing as t
 from collections import namedtuple
@@ -14,7 +13,7 @@ from . import definition
 from . import unifier
 from . import substitution
 from . import names
-from . import sva
+from . import deferred
 
 
 SES = type.side_effects.SES
@@ -45,23 +44,45 @@ sub_mod_inferences: t.Dict["ast.node.SubModExp", SubModTypeInferenceInfo]
 
 def infer_project_types(
         project: frontend.Project,
+        root_ctx: context.Context,
         all_file_module_list: t.List["ast.node.FileModExp"]
 ):
     """
     this pass uses `unify` to generate substitutions that, once all applied, eliminate all free type variables from the
     system.
     :param project: the project whose modules to perform type inference on
+    :para, root_ctx: the root context used by this project
     :param all_file_module_list: a list of all discovered FileModuleExp nodes.
     """
+
+    # TODO: make a list of `BaseDeferredOrder` instances and pass it (by reference) to `infer` calls.
+    deferred_list = deferred.DeferredList()
 
     # each imported file module is looked up in the global context and stored.
     # Later, it is mapped to a file-module-scope-native symbol.
     for file_module_exp in all_file_module_list:
-        sub, file_mod_tid = infer_file_mod_exp_tid(file_module_exp)
+        sub, file_mod_tid = infer_file_mod_exp_tid(file_module_exp, deferred_list)
+
+    # TODO: iteratively and repeatedly attempt to resolve each DeferredOrder
+    #   - DeferredOrder `solve` calls resolve overloaded type operations
+    #   - can begin by simply printing each item in the DeferredList
+    #   - simply call `solve`, and manage a list of stuff that is stalled.
+    #       - boolean ret field True if further iterations requested
+
+    any_solved = True
+    while any_solved:
+        any_solved, sub = deferred_list.solve_step()
+        rewrite_system_with_sub(root_ctx, deferred_list, sub)
+
+    if not deferred_list.check_all_solved():
+        unsolved = deferred_list.unsolved_str()
+        msg_suffix = f"could not resolve all type overloads:\n{unsolved}"
+        raise excepts.TyperCompilationError(msg_suffix)
 
 
 def infer_file_mod_exp_tid(
-        file_mod_exp: "ast.node.FileModExp"
+        file_mod_exp: "ast.node.FileModExp",
+        deferred_list: "deferred.DeferredList"
 ) -> t.Tuple[substitution.Substitution, type.identity.TID]:
     # we use `seeding.mod_tid[...]` to resolve module imports out-of-order
     cached_mod_inference = file_mod_inferences.get(file_mod_exp, None)
@@ -91,7 +112,7 @@ def infer_file_mod_exp_tid(
             #   - when the original module finishes resolution, the seeded TID will be eliminated.
             assert isinstance(import_mod_source, frontend.FileModuleSource)
             imported_file_mod_exp = import_mod_source.ast_file_mod_exp_from_frontend
-            import_sub, imported_mod_tid = infer_file_mod_exp_tid(imported_file_mod_exp)
+            import_sub, imported_mod_tid = infer_file_mod_exp_tid(imported_file_mod_exp, deferred_list)
 
             # composing substitutions:
             # NOTE: all previous elements are now invalidated.
@@ -104,7 +125,7 @@ def infer_file_mod_exp_tid(
         # FROM SUB-MODS:
         # adding elem_info for each sub-mod:
         for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
-            sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(sub_mod_exp)
+            sub_mod_substitution, sub_mod_tid = infer_sub_mod_exp_tid(sub_mod_exp, deferred_list)
 
             # composing substitutions:
             # NOTE: all previous elements are now invalidated.
@@ -123,7 +144,11 @@ def infer_file_mod_exp_tid(
         
         # applying the substitution:
         file_mod_tid = out_sub.rewrite_type(file_mod_tid)
-        out_sub.rewrite_contexts_everywhere(file_mod_ctx)
+        rewrite_system_with_sub(
+            any_ctx=file_mod_ctx,
+            deferred_list=deferred_list,
+            rw_sub=out_sub
+        )
 
         # finalizing type data:
         file_mod_ses = SES.Tot
@@ -140,7 +165,8 @@ def infer_file_mod_exp_tid(
 
 
 def infer_sub_mod_exp_tid(
-        sub_mod_exp: "ast.node.SubModExp"
+        sub_mod_exp: "ast.node.SubModExp",
+        deferred_list: "deferred.DeferredList"
 ) -> t.Tuple[substitution.Substitution, type.identity.TID]:
     # acquiring the seeded context, updating our caches:
     seeded_sub_mod_exp_tid = seeding.mod_exp_tid_map[sub_mod_exp]
@@ -152,7 +178,7 @@ def infer_sub_mod_exp_tid(
 
     for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
         assert isinstance(elem, ast.node.BaseBindElem)
-        opt_ses, cs, opt_val_info, elem_sub = infer_binding_elem_types(sub_mod_ctx, elem, True, elem_info_list)
+        opt_ses, cs, elem_sub = infer_binding_elem_types(sub_mod_ctx, deferred_list, elem, True, elem_info_list)
         out_sub = elem_sub.compose(out_sub)
         # ignoring CS:
         # if not NO, must be a function that requires closures.
@@ -160,11 +186,11 @@ def infer_sub_mod_exp_tid(
         #   it is global and cannot have any closed elements.
 
     for elem in sub_mod_exp.table.ordered_type_bind_elems:
-        opt_ses, cs, opt_val_info, elem_sub = infer_binding_elem_types(sub_mod_ctx, elem, True, elem_info_list)
+        opt_ses, cs, elem_sub = infer_binding_elem_types(sub_mod_ctx, deferred_list, elem, True, elem_info_list)
         out_sub = elem_sub.compose(out_sub)
 
     for elem in sub_mod_exp.table.ordered_typing_elems:
-        elem_sub = infer_typing_elem_types(sub_mod_ctx, elem)
+        elem_sub = infer_typing_elem_types(sub_mod_ctx, deferred_list, elem)
         out_sub = elem_sub.compose(out_sub)
 
     # re-applying the latest substitution to all elements but the last:
@@ -210,29 +236,30 @@ def update_elem_info_list(out_sub, elem_info_list):
 
 
 def infer_binding_elem_types(
-        ctx: "context.Context", elem: "ast.node.BaseBindElem",
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        elem: "ast.node.BaseBindElem",
         is_bound_globally_visible: bool,
         opt_elem_info_list: t.Optional[t.List[type.elem.ElemInfo]]
-) -> t.Tuple[t.Optional[SES], CS, t.Optional[sva.ValVar], substitution.Substitution]:
+) -> t.Tuple[t.Optional[SES], CS, substitution.Substitution]:
 
     if isinstance(elem, (ast.node.Bind1VElem, ast.node.Bind1TElem)):
         if isinstance(elem, ast.node.Bind1VElem):
-            sub, rhs_tid, opt_rhs_ses, rhs_cs, opt_rhs_val_var = infer_exp_tid(ctx, elem.bound_exp)
+            sub, rhs_tid, opt_rhs_ses, rhs_cs = infer_exp_tid(ctx, deferred_list, elem.bound_exp)
             du = definition.Universe.Value
             is_type_field = False
         else:
             assert isinstance(elem, ast.node.Bind1TElem)
             assert elem.bound_type_spec is not None
-            sub, rhs_tid = infer_type_spec_tid(ctx, elem.bound_type_spec)
+            sub, rhs_tid = infer_type_spec_tid(ctx, deferred_list, elem.bound_type_spec)
             opt_rhs_ses = None
-            opt_rhs_val_var = None
             rhs_cs = CS.No
             du = definition.Universe.Type
             is_type_field = True
 
         lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
         if lhs_def_obj is not None:
-            def_sub = unify_existing_def(ctx, lhs_def_obj, rhs_tid, sub)
+            def_sub = unify_existing_def(ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
             sub = def_sub.compose(sub)
         else:
             # un-seeded: bound inside a chain.
@@ -273,28 +300,32 @@ def infer_binding_elem_types(
             opt_elem_info_list.append(elem_info)
         
         # return bound TID, closure-spec, and optionally SES
-        return opt_rhs_ses, rhs_cs, opt_rhs_val_var, sub
+        return opt_rhs_ses, rhs_cs, sub
 
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
 def infer_imp_elem_types(
-    ctx: "context.Context", elem: "ast.node.BaseImperativeElem"
-) -> t.Tuple[type.identity.TID, SES, CS, sva.ValVar, substitution.Substitution]:
+    ctx: "context.Context",
+    deferred_list: "deferred.DeferredList",
+    elem: "ast.node.BaseImperativeElem"
+) -> t.Tuple[type.identity.TID, SES, CS, substitution.Substitution]:
     if isinstance(elem, ast.node.ForceEvalElem):
-        sub, exp_tid, exp_ses, exp_cs, opt_mem_window_value_info = infer_exp_tid(ctx, elem.discarded_exp)
+        sub, exp_tid, exp_ses, exp_cs = infer_exp_tid(ctx, deferred_list, elem.discarded_exp)
         # sub.rewrite_contexts_everywhere(ctx)
-        return exp_tid, exp_ses, exp_cs, opt_mem_window_value_info, sub
+        return exp_tid, exp_ses, exp_cs, sub
     else:
         raise NotImplementedError(f"Unknown elem type: {elem.__class__.__name__}")
 
 
-def infer_typing_elem_types(ctx: "context.Context", elem: "ast.node.BaseTypingElem") -> substitution.Substitution:
-    # TODO: we can use typing elements to initialize ValVar `opt_value` fields with placeholders of appropriate type.
-
+def infer_typing_elem_types(
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        elem: "ast.node.BaseTypingElem"
+) -> substitution.Substitution:
     if isinstance(elem, ast.node.Type1VElem):
-        sub, rhs_tid = infer_type_spec_tid(ctx, elem.type_spec)
+        sub, rhs_tid = infer_type_spec_tid(ctx, deferred_list, elem.type_spec)
 
         # since binding elements are always processed before typing elements, we can
         # assume any used symbols are in this context.
@@ -303,7 +334,7 @@ def infer_typing_elem_types(ctx: "context.Context", elem: "ast.node.BaseTypingEl
         #       at depth 2 (since formal args are defined in their own shell-context)
         lhs_def_obj = ctx.lookup(elem.id_name)
         if lhs_def_obj is not None:
-            def_sub = unify_existing_def(ctx, lhs_def_obj, rhs_tid, sub)
+            def_sub = unify_existing_def(ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
             sub = def_sub.compose(sub)
         else:
             msg_suffix = f"cannot type undefined symbol {elem.id_name}"
@@ -322,7 +353,7 @@ def infer_typing_elem_types(ctx: "context.Context", elem: "ast.node.BaseTypingEl
         raise NotImplementedError("Typing any BaseTypingElem")
 
 
-def unify_existing_def(ctx, lhs_def_obj, new_def_tid, sub) -> substitution.Substitution:
+def unify_existing_def(ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> substitution.Substitution:
     # NOTE: since this ID is pre-seeded, we do not need to instantiate the scheme, rather unify body directly.
     assert not lhs_def_obj.scheme.bound_vars
     sub = sub.get_scheme_body_sub_without_bound_vars(lhs_def_obj.scheme)
@@ -336,7 +367,7 @@ def unify_existing_def(ctx, lhs_def_obj, new_def_tid, sub) -> substitution.Subst
     # NOTE: we need to rewrite contexts as soon as unifying definitions to avoid multiple subs of an old seed
     #   - sub composition cannot handle such divergent mappings
     #   - this may rewrite `old_def_tid`
-    sub.rewrite_contexts_everywhere(ctx)
+    rewrite_system_with_sub(ctx, deferred_list, sub)
 
     # replacing existing def with better version if relevant:
     #   - functions with `AnyNonTot` SES should be eliminated if possible in favor of a non-TOT side-effects specifier.
@@ -384,17 +415,21 @@ def unify_existing_def(ctx, lhs_def_obj, new_def_tid, sub) -> substitution.Subst
 
 
 def infer_exp_tid(
-        ctx: "context.Context", exp: "ast.node.BaseExp"
-) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS, sva.ValVar]:
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        exp: "ast.node.BaseExp"
+) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS]:
 
-    sub, tid, ses, cs, val_var = help_infer_exp_tid(ctx, exp)
+    sub, tid, ses, cs = help_infer_exp_tid(ctx, deferred_list, exp)
     exp.finalize_type_info(tid, ses, cs, ctx)
-    return sub, tid, ses, cs, val_var
+    return sub, tid, ses, cs
 
 
 def help_infer_exp_tid(
-        ctx: "context.Context", exp: "ast.node.BaseExp"
-) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS, sva.ValVar]:
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        exp: "ast.node.BaseExp"
+) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS]:
     # context-dependent branches: ID, ModAddressID
     if isinstance(exp, ast.node.IdExp):
         found_def_obj = ctx.lookup(exp.name)
@@ -440,11 +475,11 @@ def help_infer_exp_tid(
 
         # returning:
         ret_sub, def_tid = found_def_obj.scheme.shallow_instantiate()
-        return ret_sub, def_tid, call_ses, closure_spec, found_def_obj.val_var
+        return ret_sub, def_tid, call_ses, closure_spec
 
     elif isinstance(exp, ast.node.IdExpInModule):
-        sub, tid, ses, cs, arg_val_var = help_type_id_in_module_node(ctx, exp.data, definition.Universe.Value)
-        return sub, tid, ses, cs, arg_val_var
+        sub, tid, ses, cs = help_type_id_in_module_node(ctx, deferred_list, exp.data, definition.Universe.Value)
+        return sub, tid, ses, cs
 
     #
     # context-independent branches:
@@ -455,8 +490,7 @@ def help_infer_exp_tid(
             substitution.empty,
             type.get_unit_type(),
             SES.Tot,
-            CS.No,
-            sva.ValVar(ctx, "literal:unit", exp.loc, sva.UnitValue())
+            CS.No
         )
 
     elif isinstance(exp, ast.node.StringExp):
@@ -464,8 +498,7 @@ def help_infer_exp_tid(
             substitution.empty,
             type.get_str_type(),
             SES.Tot,
-            CS.No,
-            sva.ValVar(ctx, "literal:string", exp.loc, sva.StringValue())
+            CS.No
         )
 
     elif isinstance(exp, ast.node.NumberExp):
@@ -481,36 +514,33 @@ def help_infer_exp_tid(
         if exp.is_explicitly_float:
             return (
                 substitution.empty,
-                type.get_float_type(width_in_bits//8),
+                type.get_float_type(width_in_bits),
                 SES.Tot,
-                CS.No,
-                sva.ValVar(ctx, "literal:float", exp.loc, sva.FloatValue())
+                CS.No
             )
 
         elif exp.is_explicitly_unsigned_int:
             return (
                 substitution.empty,
-                type.get_int_type(width_in_bits//8, is_unsigned=True),
+                type.get_int_type(width_in_bits, is_unsigned=True),
                 SES.Tot,
-                CS.No,
-                sva.ValVar(ctx, "literal:uint", exp.loc, sva.IntValue())
+                CS.No
             )
         else:
             assert exp.is_explicitly_signed_int
             return (
                 substitution.empty,
-                type.get_int_type(width_in_bits//8, is_unsigned=False),
+                type.get_int_type(width_in_bits, is_unsigned=False),
                 SES.Tot,
-                CS.No,
-                sva.ValVar(ctx, "literal:sint", exp.loc, sva.IntValue())
+                CS.No
             )
 
     elif isinstance(exp, ast.node.PostfixVCallExp):
         ret_tid = type.new_free_var(f"fn-call")
 
-        s1, formal_fn_tid, fn_exp_ses, fn_cs, fn_val_var = infer_exp_tid(ctx, exp.called_exp)
+        s1, formal_fn_tid, fn_exp_ses, fn_cs = infer_exp_tid(ctx, deferred_list, exp.called_exp)
 
-        s2, formal_arg_tid, arg_exp_ses, arg_cs, arg_val_var = infer_exp_tid(ctx, exp.arg_exp)
+        s2, formal_arg_tid, arg_exp_ses, arg_cs = infer_exp_tid(ctx, deferred_list, exp.arg_exp)
         formal_arg_tid = s1.rewrite_type(formal_arg_tid)
 
         s12 = s2.compose(s1)
@@ -541,117 +571,21 @@ def help_infer_exp_tid(
 
         exp_cs = unifier.unify_closure_spec(fn_cs, arg_cs)
 
-        # val var handling:
-        # TODO: use the `relate_?` methods to associate arg with fn val vars
-        #   - BEWARE: `may_be_non_local` can never be true for any formal args: no inference flow should disturb this
-        ret_val_var = sva.ValVar(ctx, "return", exp.loc)
-
-        return s123, s123.rewrite_type(ret_tid), exp_ses, exp_cs, ret_val_var
+        return s123, s123.rewrite_type(ret_tid), exp_ses, exp_cs
 
     elif isinstance(exp, ast.node.CastExp):
-        s1, src_tid, exp_ses, exp_cs, arg_val_var = infer_exp_tid(ctx, exp.initializer_data)
-        s2, dst_tid = infer_type_spec_tid(ctx, exp.constructor_ts)
+        s1, src_tid, exp_ses, exp_cs = infer_exp_tid(ctx, deferred_list, exp.initializer_data)
+        s2, dst_tid = infer_type_spec_tid(ctx, deferred_list, exp.constructor_ts)
         dst_tid = s1.rewrite_type(dst_tid)
         ret_sub = s1.compose(s2)
 
-        #
-        # checking if conversion is valid:
-        #
-
-        src_tk = type.kind.of(src_tid)
-        dst_tk = type.kind.of(dst_tid)
-
-        simple_monomorphic_tk_set = {
-            type.kind.TK.Unit,
-            type.kind.TK.String
-        }
-        number_tk_set = {
-            type.kind.TK.SignedInt,
-            type.kind.TK.UnsignedInt,
-            type.kind.TK.Float
-        }
-        simple_window_tk_set = {
-            type.kind.TK.Pointer,
-            type.kind.TK.Array
-        }
-        slice_src_tk_set = {
-            type.kind.TK.Slice,
-            type.kind.TK.Array
-        }
-        var_tk_set = {
-            type.kind.TK.FreeVar,
-            type.kind.TK.BoundVar,
-        }
-
-        # TODO: compare src_tid and dst_tid to ensure they can be inter-converted.
-        #   - Unit only from Unit, String only from String
-        #   - SignedInt, UnsignedInt, Float from SignedInt, UnsignedInt, Float (numbers interchangeable)
-        #   - Struct, Tuple from Struct, Tuple
-        #       - need to perform element-wise conversion
-        #       - length mismatch from tuple or struct unacceptable <=> mostly identity operation on packed bytes
-        #   - Enum, Union from other Enum, Union
-        #       - can construct enum/union branch using `EnumType:variant` or `UnionType:variant` (syntax WIP)
-        #   - Array from Array only, Pointer from Pointer only, Slice from Array or Slice
-        #       - NOTE: can unify content type for all three containers: implies that `reinterpret_cast`-type behavior
-        #         is a totally different expression/function.
-        #       - NOTE: must also ensure `mut` specifier matches: can convert from `mut` to non-mut but not vice-versa.
-        #   - cannot cast any other type kind
-
-        # case 1: String, Unit
-        if dst_tk in simple_monomorphic_tk_set:
-            if src_tid != dst_tid:
-                raise_cast_error(src_tid, dst_tid)
-
-        # case 2: numbers
-        elif dst_tk in number_tk_set:
-            if src_tk not in number_tk_set:
-                raise_cast_error(src_tid, dst_tid)
-
-        # case 3: array/ptr
-        elif dst_tk in simple_window_tk_set:
-            # assigning the 'mem window info' from the cast argument:
-
-            # checking that we are only converting array -> array and ptr -> ptr
-            if src_tk != dst_tk:
-                raise_cast_error(src_tid, dst_tid, "cannot convert array to pointer or vice-versa")
-
-            # checking both share the same mutability:
-            dst_is_mut = bool(type.mem_window.is_mut(dst_tid))
-            src_is_mut = bool(type.mem_window.is_mut(src_tid))
-            if dst_is_mut and not src_is_mut:
-                raise_cast_error(src_tid, dst_tid, "cannot cast immutable window to a mutable one")
-
-            # attempting to unify content types => error if failed.
-            ptd_unify_sub = unifier.unify(
-                type.elem.tid_of_ptd(src_tid),
-                type.elem.tid_of_ptd(dst_tid)
-            )
-            ret_sub = ptd_unify_sub.compose(ret_sub)
-
-            # if both arrays, check if length is identical:
-            if dst_tk == type.kind.TK.Array:
-                # TODO: need to further validate the arrays are of the same length
-                # NOTE: can also determine this in 'basic checks' later
-                pass
-
-        # case 4: slice
-        elif dst_tk == type.kind.TK.Slice:
-            if src_tk not in slice_src_tk_set:
-                raise_cast_error(src_tid, dst_tid)
-
-        # case 5: ensure no inference errors
-        elif src_tk in var_tk_set or dst_tk in var_tk_set:
-            # TODO: since this is tripped, we should switch to a deferred checking system
-            #   - this means appending `src_tid` and `dst_tid` to a list in the context that admits substitutions
-            #       - consider extending the context with 'orders' so 'sub' works
-            #   - run the above code on `src_tid` and `dst_tid` after inference (introduce a 3rd pass)
-            raise NotImplementedError("cannot check casting of var types")
+        # TODO: use a DeferredOrder
 
         #
         # all OK!
         #
 
-        return ret_sub, ret_sub.rewrite_type(dst_tid), exp_ses, exp_cs, arg_val_var
+        return ret_sub, ret_sub.rewrite_type(dst_tid), exp_ses, exp_cs
 
     elif isinstance(exp, ast.node.LambdaExp):
         # each lambda gets its own scope (for formal args)
@@ -664,22 +598,16 @@ def help_infer_exp_tid(
         # - if 1 arg, arg type is just that arg's type.
         if not exp.arg_names:
             formal_arg_tid = type.get_unit_type()
-            formal_arg_val_var = sva.ValVar(lambda_ctx, "args:()", exp.loc, sva.UnitValue())
         else:
             elem_arg_tid_list = []
-            arg_val_info_list = []
             for i, arg_name in enumerate(exp.arg_names):
                 # creating the formal arg TID:
                 formal_arg_tid = type.new_free_var(f"lambda-formal-arg:{arg_name}")
 
-                # creating the formal arg value info:
-                arg_val_var = sva.ValVar(lambda_ctx, f"arg:{arg_name}", exp.loc)
-
                 # defining the formal arg in the function context:
                 arg_def_obj = definition.ValueRecord(
                     arg_name, exp.loc, formal_arg_tid,
-                    opt_func=exp,
-                    opt_val_var=arg_val_var
+                    opt_func=exp
                 )
                 formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
                 if not formal_arg_def_ok:
@@ -687,26 +615,18 @@ def help_infer_exp_tid(
                     raise excepts.TyperCompilationError(msg_suffix)
 
                 elem_arg_tid_list.append(formal_arg_tid)
-                arg_val_info_list.append(arg_val_var)
 
             assert elem_arg_tid_list
             if len(elem_arg_tid_list) == 1:
                 formal_arg_tid = elem_arg_tid_list[0]
-                formal_arg_val_var = sva.ValVar(lambda_ctx, f"args:({exp.arg_names[0]})", exp.loc)
             else:
                 formal_arg_tid = type.get_tuple_type(tuple(elem_arg_tid_list))
-                formal_arg_val_var = sva.ValVar(lambda_ctx, "args:(...)", exp.loc, sva.TupleValue([
-                    sva.ValVar(lambda_ctx, f"arg:{arg_name}", exp.loc) for arg_name in exp.arg_names
-                ]))
 
         assert formal_arg_tid is not None
 
         # inferring the 'ret_tid', 'closure_spec', and return 'val_var' from the body expression:
-        ret_sub, ret_tid, ret_ses, closure_spec, ret_val_var = infer_exp_tid(lambda_ctx, exp.body)
+        ret_sub, ret_tid, ret_ses, closure_spec = infer_exp_tid(lambda_ctx, deferred_list, exp.body)
         exp.finalize_fn_ses(ret_ses)
-
-        # computing the function val-var:
-        lambda_val_var = sva.ValVar(ctx, "lambda", exp.loc, sva.FuncValue(formal_arg_val_var, ret_val_var))
 
         # if `closure_spec` is `No`, changing to `Maybe` so we can unify with both kinds of functions.
         #   - `Maybe` indicates an empty set of non-locals
@@ -724,7 +644,7 @@ def help_infer_exp_tid(
         #     this func cannot be called.
         #   - `NoClosure` functions must be safe to call in C, where we do not have closures.
 
-        return ret_sub, fn_tid, SES.Tot, closure_spec, lambda_val_var
+        return ret_sub, fn_tid, SES.Tot, closure_spec
 
     # typing chain expressions:
     elif isinstance(exp, ast.node.ChainExp):
@@ -738,8 +658,10 @@ def help_infer_exp_tid(
             #   - this ensures that initialization orders are correct
             for elem_index, elem in enumerate(exp.table.ordered_value_imp_bind_elems):
                 if isinstance(elem, ast.node.Bind1VElem):
-                    exp_ses, exp_cs, exp_val_info, exp_sub = infer_binding_elem_types(
-                        chain_ctx, elem,
+                    exp_ses, exp_cs, exp_sub = infer_binding_elem_types(
+                        chain_ctx,
+                        deferred_list,
+                        elem,
                         is_bound_globally_visible=False,
                         opt_elem_info_list=None
                     )
@@ -748,7 +670,7 @@ def help_infer_exp_tid(
                     output_cs = unifier.unify_closure_spec(output_cs, exp_cs)
                 else:
                     assert isinstance(elem, ast.node.BaseImperativeElem)
-                    exp_tid, exp_ses, exp_cs, exp_val_info, exp_sub = infer_imp_elem_types(chain_ctx, elem)
+                    ret_tid, exp_ses, exp_cs, exp_sub = infer_imp_elem_types(chain_ctx, deferred_list, elem)
                     sub = exp_sub.compose(sub)
                     output_cs = unifier.unify_closure_spec(output_cs, exp_cs)
 
@@ -759,8 +681,10 @@ def help_infer_exp_tid(
 
             # then, defining each type binding element:
             for elem in exp.table.ordered_type_bind_elems:
-                opt_ses, elem_cs, elem_val_info, elem_sub = infer_binding_elem_types(
-                    chain_ctx, elem,
+                opt_ses, elem_cs, elem_sub = infer_binding_elem_types(
+                    chain_ctx,
+                    deferred_list,
+                    elem,
                     is_bound_globally_visible=False,
                     opt_elem_info_list=None
                 )
@@ -770,10 +694,10 @@ def help_infer_exp_tid(
 
             # then, effecting each 'typing' element:
             for elem in exp.table.ordered_typing_elems:
-                infer_typing_elem_types(chain_ctx, elem)
+                infer_typing_elem_types(chain_ctx, deferred_list, elem)
 
         if exp.opt_tail is not None:
-            tail_sub, tail_tid, tail_ses, tail_cs, tail_val_info = infer_exp_tid(chain_ctx, exp.opt_tail)
+            tail_sub, tail_tid, tail_ses, tail_cs = infer_exp_tid(chain_ctx, deferred_list, exp.opt_tail)
             sub = tail_sub.compose(sub)
 
             # checking SES:
@@ -786,49 +710,55 @@ def help_infer_exp_tid(
 
         else:
             tail_tid = type.get_unit_type()
-            tail_val_info = sva.ValVar(chain_ctx, "chain:implicit_tail", exp.loc, sva.UnitValue())
 
-        return sub, tail_tid, expected_ses, output_cs, tail_val_info
+        return sub, tail_tid, expected_ses, output_cs
 
     # typing unary, binary expressions:
     elif isinstance(exp, ast.node.UnaryExp):
-        if exp.unary_op in (ast.node.UnaryOp.DeRefImmutable, ast.node.UnaryOp.DeRefMutable):
-            sub = substitution.empty
+        arg_exp_sub, arg_exp_tid, arg_exp_ses, arg_exp_cs = infer_exp_tid(
+            ctx,
+            deferred_list,
+            exp.arg_exp
+        )
 
-            # getting `var_ptr_tid`: a pointer expression in terms of `ptd_tid`
-            ptd_tid = type.new_free_var("ptd")
-            if exp.unary_op == ast.node.UnaryOp.DeRefImmutable:
-                var_ptr_tid = type.get_ptr_type(ptd_tid, ptr_is_mut=False)
-            elif exp.unary_op == ast.node.UnaryOp.DeRefMutable:
-                var_ptr_tid = type.get_ptr_type(ptd_tid, ptr_is_mut=True)
-            else:
-                raise NotImplementedError("unknown ptr type for `var_ptr_tid`")
+        # NOTE: we cannot resolve this typing immediately since we need to overload/dispatch based on the type of
+        #       the argument.
+        # NOTE: instead, add a deferred order.
+        ret_tid = type.new_free_var("unary_exp_ret")
 
-            ptr_exp_sub, ptr_exp_tid, ptr_exp_ses, ptr_exp_cs, ptd_val_info = infer_exp_tid(ctx, exp.arg_exp)
-            sub = ptr_exp_sub.compose(sub)
+        deferred_list.add(deferred.UnaryOpDeferredOrder(
+            exp.loc,
+            exp.unary_op,
+            arg_exp_tid,
+            ret_tid
+        ))
 
-            # NOTE: very important to place `exp` second here, since `allow_u_mut_ptr` lets us
-            #       unify the immutable `var_ptr_tid` with a potentially mutable `exp_ptr_tid`
-            unify_sub = unifier.unify(var_ptr_tid, ptr_exp_tid, allow_u_mut_ptr=True)
-            sub = unify_sub.compose(sub)
-            ptd_tid = sub.rewrite_type(ptd_tid)
+        return arg_exp_sub, ret_tid, arg_exp_ses, arg_exp_cs
 
-            # NOTE: regardless of whether we de-reference a mutable or immutable pointer, this op is still `TOT`
-
-            # TODO: replace with series of `relate_` methods
-            ptr_val_info = sva.ValVar(ctx, "de-ref:ptr", exp.loc, sva.MemWindowValue(
-                content_mem_may_be_local=True,
-                content_mem_may_be_non_local=True,
-                ptd_value_info=ptd_val_info
-            ))
-
-            return sub, ptd_tid, ptr_exp_ses, ptr_exp_cs, ptd_val_info
-
-        else:
-            raise NotImplementedError(f"typing UnaryExp with unary op {exp.unary_op.name}")
-        
     elif isinstance(exp, ast.node.BinaryExp):
-        raise NotImplementedError(f"typing BinaryExp with binary op {exp.binary_op.name}")
+        sub = substitution.empty
+
+        lt_arg_sub, lt_arg_tid, lt_arg_ses, lt_arg_cs = infer_exp_tid(ctx, deferred_list, exp.lt_arg_exp)
+        sub = lt_arg_sub.compose(sub)
+
+        rt_arg_sub, rt_arg_tid, rt_arg_ses, rt_arg_cs = infer_exp_tid(ctx, deferred_list, exp.rt_arg_exp)
+        sub = rt_arg_sub.compose(sub)
+
+        # NOTE: we can consider adding short-hands for immediate typing resolution
+        #       (rather than using the DeferredOrder system)
+
+        ret_tid = type.new_free_var(f"binary_exp_ret")
+        binary_exp_ses = unifier.unify_ses(lt_arg_ses, rt_arg_ses)  # U SES.Tot (all bin ops)
+        binary_exp_cs = unifier.unify_closure_spec(lt_arg_cs, rt_arg_cs)
+
+        # since we cannot resolve type overloads immediately, we add a DeferredOrder to resolve it:
+        deferred_list.add(deferred.BinaryOpDeferredOrder(
+            exp.loc,
+            exp.binary_op,
+            lt_arg_tid, rt_arg_tid, ret_tid
+        ))
+
+        return sub, ret_tid, binary_exp_ses, binary_exp_cs
 
     # typing AssignExp:
     elif isinstance(exp, ast.node.AssignExp):
@@ -837,37 +767,27 @@ def help_infer_exp_tid(
 
         sub = substitution.empty
 
-        val_exp_sub, val_exp_tid, val_exp_ses, val_exp_cs, val_exp_val_info = infer_exp_tid(ctx, exp.src_exp)
+        val_exp_sub, val_exp_tid, val_exp_ses, val_exp_cs = infer_exp_tid(ctx, deferred_list, exp.src_exp)
         sub = val_exp_sub.compose(sub)
 
-        ptr_exp_sub, ptr_exp_tid, ptr_exp_ses, ptr_exp_cs, ptr_exp_val_info = infer_exp_tid(ctx, exp.dst_exp)
-        sub = ptr_exp_sub.compose(sub)
+        arg_exp_sub, arg_exp_tid, arg_exp_ses, ptr_exp_cs = infer_exp_tid(ctx, deferred_list, exp.dst_exp)
+        sub = arg_exp_sub.compose(sub)
 
-        unify_sub_1 = unifier.unify(ptr_tid, ptr_exp_tid)
+        unify_sub_1 = unifier.unify(ptr_tid, arg_exp_tid)
         sub = unify_sub_1.compose(sub)
         unify_sub_2 = unifier.unify(ptd_tid, val_exp_tid)
         sub = unify_sub_2.compose(sub)
 
         exp_cs = unifier.unify_closure_spec(val_exp_cs, ptr_exp_cs)
 
-        # TODO: analyze ptr and val val-vars to...
-        #   - determine if TOT or ST (getting rid of Elim_Tot_LaterTotOrST)
-        #   - update/check lifetimes of content if pointers are stored out-of-scope
-        assign_val_var = sva.ValVar(ctx, "assign:ret", exp.loc)
-
+        spec_ses = SES.Tot if exp.is_tot else SES.ST
         assign_ses = unifier.unify_ses(
-            SES.Elim_Tot_LaterTotOrST,
+            spec_ses,
             val_exp_ses,
-            ptr_exp_ses
+            arg_exp_ses
         )
 
-        return sub, ptd_tid, assign_ses, exp_cs, assign_val_var
-
-    #
-    #
-    # TODO: implement me: continue checking `val_var`
-    #
-    #
+        return sub, ptd_tid, assign_ses, exp_cs
 
     # typing memory windows:
     elif isinstance(exp, (ast.node.AllocatePtrExp, ast.node.AllocateArrayExp, ast.node.AllocateSliceExp)):
@@ -878,41 +798,122 @@ def help_infer_exp_tid(
 
         # TODO: verify that `push` only invoked in a function: check ctx.opt_func
 
-        initializer_sub, ptd_tid, initializer_ses, initializer_cs, initializer_val_var = infer_exp_tid(
-            ctx,
-            exp.initializer_exp
-        )
         if isinstance(exp, ast.node.AllocatePtrExp):
+            initializer_sub, ptd_tid, initializer_ses, initializer_cs = infer_exp_tid(
+                ctx,
+                deferred_list,
+                exp.initializer_exp
+            )
             ptr_tid = type.get_ptr_type(ptd_tid, exp.is_mut)
             ptr_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            return initializer_sub, ptr_tid, ptr_ses, initializer_cs, initializer_val_var
-        elif isinstance(exp, ast.node.AllocateArrayExp):
-            # TODO: unify array 'size' parameter's type, get SES and CS
-            array_tid = type.get_array_type(ptd_tid, exp.is_mut)
-            array_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            array_val_var = sva.ValVar(ctx, "literal:array", exp.loc, initializer_val_var)
-            return initializer_sub, array_tid, array_ses, initializer_cs, array_val_var
-        elif isinstance(exp, ast.node.AllocateSliceExp):
-            # TODO: unify slice 'size' parameter's type, get SES and CS
-            slice_tid = type.get_slice_type(ptd_tid, exp.is_mut)
-            slice_ses = unifier.unify_ses(initializer_ses, alloc_ses)
-            slice_val_var = sva.ValVar(ctx, "literal:slice", exp.loc, initializer_val_var)
-            return initializer_sub, slice_tid, slice_ses, initializer_cs, slice_val_var
+            return initializer_sub, ptr_tid, ptr_ses, initializer_cs
+
+        else:
+            assert isinstance(exp, (ast.node.AllocateArrayExp, ast.node.AllocateSliceExp))
+
+            sub = substitution.empty
+            ses = SES.Tot
+            cs = CS.No
+
+            # analyzing the type-spec for each element:
+            ts_sub, ptd_ts_tid = infer_type_spec_tid(
+                ctx,
+                deferred_list,
+                exp.collection_ts
+            )
+            sub = ts_sub.compose(sub)
+
+            # unifying initializer:
+            if exp.opt_initializer_exp is not None:
+                initializer_sub, ptd_tid, initializer_ses, initializer_cs = infer_exp_tid(
+                    ctx,
+                    deferred_list,
+                    exp.opt_initializer_exp
+                )
+                unify_sub = unifier.unify(ptd_ts_tid, ptd_tid)
+                sub = unify_sub.compose(sub)
+                ses = unifier.unify_ses(ses, initializer_ses)
+                cs = unifier.unify_closure_spec(cs, initializer_cs)
+
+            # ensuring the 'count' component is an unsigned int:
+            assert exp.array_size_exp is not None
+            array_size_sub, array_size_tid, array_size_ses, array_size_cs = infer_exp_tid(
+                ctx,
+                deferred_list,
+                exp.array_size_exp
+            )
+
+            # creating the array/slice TID from the pointed value:
+            if isinstance(exp, ast.node.AllocateArrayExp):
+                mem_window_tid = type.get_array_type(ptd_ts_tid, array_size_tid, exp.is_mut)
+            else:
+                assert isinstance(exp, ast.node.AllocateSliceExp)
+                mem_window_tid = type.get_slice_type(ptd_ts_tid, array_size_tid, exp.is_mut)
+
+            # TODO: verify that the index type is an unsigned int
+            #   - use a 'deferred' comparison similar to type conversion
+
+            return sub, mem_window_tid, ses, cs
+
+    # typing IfExp:
+    elif isinstance(exp, ast.node.IfExp):
+        ret_tid = type.new_free_var("ite")
+
+        sub = substitution.empty
+        ses = type.side_effects.SES.Tot
+        cs = type.closure_spec.CS.No
+
+        def unify_branch_exp(branch_exp):
+            nonlocal sub, ses, cs
+            branch_exp_sub, branch_exp_tid, branch_exp_ses, branch_exp_cs = infer_exp_tid(
+                ctx,
+                deferred_list,
+                branch_exp
+            )
+            sub = branch_exp_sub.compose(sub)
+            ses = unifier.unify_ses(ses, branch_exp_ses)
+            cs = unifier.unify_closure_spec(cs, branch_exp_cs)
+
+            branch_unify_sub = unifier.unify(branch_exp_tid, ret_tid)
+            sub = branch_unify_sub.compose(sub)
+
+        cond_exp_sub, cond_exp_tid, cond_exp_ses, cond_exp_cs = infer_exp_tid(
+            ctx,
+            deferred_list,
+            exp.cond_exp
+        )
+        sub = cond_exp_sub.compose(sub)
+        ses = unifier.unify_ses(ses, cond_exp_ses)
+        cs = unifier.unify_closure_spec(cs, cond_exp_cs)
+
+        cond_unify_sub = unifier.unify(cond_exp_tid, type.get_int_type(1, is_unsigned=False))
+        sub = cond_unify_sub.compose(sub)
+
+        unify_branch_exp(exp.then_exp)
+
+        if exp.opt_else_exp is not None:
+            unify_branch_exp(exp.opt_else_exp)
+
+        return sub, ret_tid, ses, cs
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
 
 
 def infer_type_spec_tid(
-        ctx: "context.Context", ts: "ast.node.BaseTypeSpec"
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        ts: "ast.node.BaseTypeSpec"
 ):
-    sub, tid = help_infer_type_spec_tid(ctx, ts)
+    sub, tid = help_infer_type_spec_tid(ctx, deferred_list, ts)
     ts.finalize_type_info(tid, SES.Tot, CS.No, ctx)
     return sub, tid
 
 
 def help_infer_type_spec_tid(
-        ctx: "context.Context", ts: "ast.node.BaseTypeSpec"
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        ts: "ast.node.BaseTypeSpec"
 ) -> t.Tuple[substitution.Substitution, type.identity.TID]:
     if isinstance(ts, ast.node.IdTypeSpec):
         # looking up the definition:
@@ -947,10 +948,10 @@ def help_infer_type_spec_tid(
 
         sub = substitution.empty
 
-        lhs_sub, lhs_tid = infer_type_spec_tid(ctx, lhs_ts)
+        lhs_sub, lhs_tid = infer_type_spec_tid(ctx, deferred_list, lhs_ts)
         sub = lhs_sub.compose(sub)
 
-        rhs_sub, rhs_tid = infer_type_spec_tid(ctx, rhs_ts)
+        rhs_sub, rhs_tid = infer_type_spec_tid(ctx, deferred_list, rhs_ts)
         sub = rhs_sub.compose(sub)
 
         cs = ts.closure_spec
@@ -971,7 +972,11 @@ def help_infer_type_spec_tid(
             if len(field_type_spec_elem_list) == 1:
                 field_type_spec_elem = field_type_spec_elem_list[0]
                 assert isinstance(field_type_spec_elem, ast.node.Type1VElem)
-                field_sub, field_tid = infer_type_spec_tid(ctx, field_type_spec_elem.type_spec)
+                field_sub, field_tid = infer_type_spec_tid(
+                    ctx,
+                    deferred_list,
+                    field_type_spec_elem.type_spec
+                )
                 sub = field_sub.compose(sub)
             else:
                 # TODO: consider generalizing this constraint to all tables.
@@ -987,8 +992,12 @@ def help_infer_type_spec_tid(
         return sub, adt_tid
 
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        sub, tid, ses, cs, opt_val_var = help_type_id_in_module_node(ctx, ts.data, definition.Universe.Type)
-        assert opt_val_var is None
+        sub, tid, ses, cs = help_type_id_in_module_node(
+            ctx,
+            deferred_list,
+            ts.data,
+            definition.Universe.Type
+        )
 
         assert ses == SES.Tot
 
@@ -997,25 +1006,19 @@ def help_infer_type_spec_tid(
         return sub, tid
 
     elif isinstance(ts, ast.node.PtrTypeSpec):
-        ptd_sub, ptd_tid = infer_type_spec_tid(ctx, ts.ptd_ts)
+        ptd_sub, ptd_tid = infer_type_spec_tid(ctx, deferred_list, ts.ptd_ts)
         ptr_tid = type.get_ptr_type(ptd_tid, ts.is_mut)
         return ptd_sub, ptr_tid
 
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 
 
-def raise_cast_error(src_tid, dst_tid, more=None):
-    spell_src = type.spelling.of(src_tid)
-    spell_dst = type.spelling.of(dst_tid)
-    msg_suffix = f"Cannot cast to {spell_dst} from {spell_src}"
-    if more is not None:
-        msg_suffix += f": {more}"
-    raise excepts.TyperCompilationError(msg_suffix)
-
-
 def help_type_id_in_module_node(
-    ctx, data: "ast.node.IdNodeInModuleHelper", expect_du: definition.Universe
-) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS, sva.ValVar]:
+        ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        data: "ast.node.IdNodeInModuleHelper",
+        expect_du: definition.Universe
+) -> t.Tuple[substitution.Substitution, type.identity.TID, SES, CS]:
     # NOTE: IdInModuleNodes are nested and share formal variable mappings THAT CANNOT LEAVE THIS SUB-SYSTEM.
     #   - this means that the substitution returns formal -> actual mappings UNLESS it has no child, in which case
     #     it is the last IdInModuleNode in the process.
@@ -1051,8 +1054,10 @@ def help_type_id_in_module_node(
         #       to itself, i.e. `data.has_child` is true.
 
         # getting a mod-exp for the container:
-        container_sub, container_tid, container_ses, container_cs, opt_mem_window_info = help_type_id_in_module_node(
-            ctx, data.opt_container,
+        container_sub, container_tid, container_ses, container_cs = help_type_id_in_module_node(
+            ctx,
+            deferred_list,
+            data.opt_container,
             definition.Universe.Module
         )
         container_mod_exp = seeding.mod_tid_exp_map[container_tid]
@@ -1130,8 +1135,10 @@ def help_type_id_in_module_node(
                     mismatch_list.append(f"- arg #{arg_index}: expected type arg, received a value")
                 else:
                     actual_arg_exp = actual_arg_node
-                    actual_arg_sub, actual_arg_tid, actual_arg_ses, actual_arg_cs, opt_mem_window_info = infer_exp_tid(
-                        ctx, actual_arg_exp
+                    actual_arg_sub, actual_arg_tid, actual_arg_ses, actual_arg_cs = infer_exp_tid(
+                        ctx,
+                        deferred_list,
+                        actual_arg_exp
                     )
                     sub = sub.compose(actual_arg_sub)
 
@@ -1164,7 +1171,7 @@ def help_type_id_in_module_node(
                     assert names.infer_def_universe_of(formal_name) == definition.Universe.Type
 
                     actual_arg_ts = actual_arg_node
-                    actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, actual_arg_ts)
+                    actual_arg_sub, actual_type_arg_tid = infer_type_spec_tid(ctx, deferred_list, actual_arg_ts)
                     sub = sub.compose(actual_arg_sub)
 
                     actual_type_arg_tid_list.append(actual_type_arg_tid)
@@ -1211,10 +1218,17 @@ def help_type_id_in_module_node(
             replace_deeply=True
         )
 
-    # if looked up symbol is a value definition, retrieve the ValVar:
-    opt_val_var = None
-    if isinstance(found_def_obj, definition.ValueRecord):
-        opt_val_var = found_def_obj.val_var
-
     # returning the resulting substitution, TID, SES, and CS:
-    return sub, found_tid, out_ses, out_cs, opt_val_var
+    return sub, found_tid, out_ses, out_cs
+
+
+def rewrite_system_with_sub(
+        any_ctx: "context.Context",
+        deferred_list: "deferred.DeferredList",
+        rw_sub: "substitution.Substitution"
+):
+    # 1. rewriting contexts:
+    rw_sub.rewrite_contexts_everywhere(any_ctx)
+
+    # 2. rewriting deferred orders:
+    deferred_list.rewrite_orders_with(rw_sub)

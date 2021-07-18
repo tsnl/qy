@@ -1,6 +1,6 @@
 from . import identity
 from . import elem
-from . import scalar_width_in_bytes
+from . import scalar_width_in_bits
 from . import mem_window
 from . import kind
 from . import side_effects
@@ -25,11 +25,11 @@ def of(tid: identity.TID):
         return "String"
 
     elif type_kind == kind.TK.SignedInt:
-        return f"I{8 * scalar_width_in_bytes.of(tid)}"
+        return f"I{scalar_width_in_bits.of(tid)}"
     elif type_kind == kind.TK.UnsignedInt:
-        return f"U{8 * scalar_width_in_bytes.of(tid)}"
+        return f"U{scalar_width_in_bits.of(tid)}"
     elif type_kind == kind.TK.Float:
-        return f"F{8 * scalar_width_in_bytes.of(tid)}"
+        return f"F{scalar_width_in_bits.of(tid)}"
 
     elif type_kind == kind.TK.Pointer:
         if mem_window.is_mut(tid):
@@ -72,14 +72,17 @@ def of(tid: identity.TID):
 
         elem_count = elem.count(tid)
         prefix_keyword = prefix_keyword_map[type_kind]
-        field_text_iterator = (
-            f"{elem.field_name_at_ix(tid, i)} "
-            f"{'=' if elem.is_type_field_at_field_ix(tid, i) else '::'} "
-            f"{of(elem.tid_of_field_ix(tid, i))}"
-            for i in range(elem_count)
-        )
 
-        return f"{prefix_keyword} {{ {'; '.join(field_text_iterator)} }}"
+        if elem_count > 0:
+            field_text_iterator = (
+                f"{elem.field_name_at_ix(tid, i)} "
+                f"{'=' if elem.is_type_field_at_field_ix(tid, i) else '::'} "
+                f"{of(elem.tid_of_field_ix(tid, i))}"
+                for i in range(elem_count)
+            )
+            return f"{prefix_keyword} {{ {'; '.join(field_text_iterator)} }}"
+        else:
+            return f"{prefix_keyword} {{}}"
 
     elif type_kind in (kind.TK.BoundVar, kind.TK.FreeVar):
         return f"{tid}:{var_names[tid]}"

@@ -12,7 +12,6 @@ from qcl import feedback as fb
 from qcl import ast
 
 from . import definition
-from . import sva
 
 
 class Context(object):
@@ -107,8 +106,6 @@ class Context(object):
             assert def_record is not None
             self.symbol_table[def_name] = def_record
             def_record.scheme.init_def_context(self)
-            if isinstance(def_record, definition.ValueRecord):
-                def_record.val_var.delayed_init_ctx(self)
             return True
 
     def lookup(self, def_name, shallow=False):
@@ -181,19 +178,19 @@ def make_default_root():
             },
             **{
                 f"I{n_bits}": new_builtin_type_def(
-                    f"SignedInt<{n_bits}>", type.get_int_type(n_bits // 8, is_unsigned=False)
+                    f"SignedInt<{n_bits}>", type.get_int_type(n_bits, is_unsigned=False)
                 )
                 for n_bits in (8, 16, 32, 64, 128)
             },
             **{
                 f"U{n_bits}": new_builtin_type_def(
-                    f"UnsignedInt<{n_bits}>", type.get_int_type(n_bits//8, is_unsigned=True)
+                    f"UnsignedInt<{n_bits}>", type.get_int_type(n_bits, is_unsigned=True)
                 )
-                for n_bits in (8, 16, 32, 64, 128)
+                for n_bits in (1, 8, 16, 32, 64, 128)
             },
             **{
                 f"F{n_bits}": new_builtin_type_def(
-                    f"Float<{n_bits}>", type.get_float_type(n_bits//8)
+                    f"Float<{n_bits}>", type.get_float_type(n_bits)
                 )
                 for n_bits in (16, 32, 64)
             }

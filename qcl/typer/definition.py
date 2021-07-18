@@ -7,7 +7,6 @@ from qcl import type
 from qcl import ast
 
 from . import scheme
-from . import sva
 
 
 class BaseRecord(object, metaclass=abc.ABCMeta):
@@ -39,27 +38,17 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
 
 
 class ValueRecord(BaseRecord):
-    val_var: sva.ValVar
-
     def __init__(
             self,
             name: str, loc: feedback.ILoc, value_tid: type.identity.TID,
             opt_func,
-            is_protected_from_global_scope=True,
-            opt_val_var=None
+            is_protected_from_global_scope=True
     ):
         super().__init__(
             name, loc,
             scheme.Scheme(value_tid), Universe.Value,
             opt_func, is_protected_from_global_scope
         )
-
-        if opt_val_var is not None:
-            self.val_var = opt_val_var
-        else:
-            # since we don't have the context in which this ValVar is defined yet, we use `delayed_init` from the
-            # `Context` instance in which this record is defined.
-            self.val_var = sva.ValVar(None, f"def:{name}", loc)
 
         if self.is_globally_visible:
             all_global_value_recs.append(self)

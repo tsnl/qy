@@ -83,17 +83,25 @@ def init_ptr(ptr_tid: identity.TID, ptd_tid: identity.TID):
     )
 
 
-def init_array(ptr_tid: identity.TID, elem_tid: identity.TID):
+def init_array(ptr_tid: identity.TID, elem_tid: identity.TID, size_tid: identity.TID):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=(ElemInfo(None, elem_tid, True),)
+        elem_info_tuple=(
+            ElemInfo(None, elem_tid, True),
+            ElemInfo(None, size_tid, True)
+        ),
+        allow_type_fields=True
     )
 
 
-def init_slice(ptr_tid: identity.TID, elem_tid: identity.TID):
+def init_slice(ptr_tid: identity.TID, elem_tid: identity.TID, size_tid: identity.TID):
     return help_init_any(
         ptr_tid,
-        elem_info_tuple=(ElemInfo(None, elem_tid, True),)
+        elem_info_tuple=(
+            ElemInfo(None, elem_tid, True),
+            ElemInfo(None, size_tid, True)
+        ),
+        allow_type_fields=True
     )
 
 
@@ -169,3 +177,8 @@ def field_ix_of_name(algebraic_tid: identity.TID, field_name: str) -> int:
 def tid_of_ptd(tid: identity.TID) -> identity.TID:
     assert kind.of(tid) in (kind.TK.Pointer, kind.TK.Array, kind.TK.Slice)
     return components[tid].elem_info_tuple[0].tid
+
+
+def tid_of_size(tid: identity.TID) -> identity.TID:
+    assert kind.of(tid) in (kind.TK.Array, kind.TK.Slice)
+    return components[tid].elem_info_tuple[1].tid

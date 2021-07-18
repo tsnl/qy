@@ -16,6 +16,10 @@ def run(project):
     # Interpreted checks
     #
 
+    # TODO: check that `TOT`-assignment not misused, i.e.
+    #   - check that pointer contents can never be non-local
+    #   - rather than SMT analysis, consider logical CFA
+
     # TODO: implement 'init_order' checks and other passes involving VM interpretation
     #   here...
 

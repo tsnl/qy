@@ -125,7 +125,19 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
                     msg_suffix = "cannot unify pointers with different mut specifiers"
                     raise_unification_error(t, u, msg_suffix)
 
-            return unify(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
+            if tk_t == type.kind.TK.Pointer:
+                return unify(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
+            else:
+                assert tk_t in (type.kind.TK.Array, type.kind.TK.Slice)
+                s1 = unify(
+                    type.elem.tid_of_ptd(t),
+                    type.elem.tid_of_ptd(u)
+                )
+                s2 = unify(
+                    type.elem.tid_of_size(t),
+                    type.elem.tid_of_size(u)
+                )
+                return s2.compose(s1)
 
         else:
             raise_unification_error(t, u)
@@ -135,7 +147,7 @@ def is_var(tid: type.identity.TID):
     return type.kind.of(tid) in (type.kind.TK.BoundVar, type.kind.TK.FreeVar)
 
 
-def raise_unification_error(t, u, opt_msg=""):
+def raise_unification_error(t: type.identity.TID, u: type.identity.TID, opt_msg=""):
     spell_t = type.spelling.of(t)
     spell_u = type.spelling.of(u)
 
@@ -160,16 +172,6 @@ def unify_ses(*ses_iterator):
     
 
 def unify_ses_binary(ses1, ses2):
-    # NOTE: assign expressions have an ST side-effect if they alter state outside the function's frame.
-    #       This is ascertained via Control Flow Analysis (CFA), where each value is discriminated rather than
-    #        grouped by type.
-    #       During unification, we PRETEND this is simply Tot, and defer errors where the ST effect is generated in a
-    #       TOT scope.
-    if ses1 == SES.Elim_Tot_LaterTotOrST:
-        ses1 = SES.Tot
-    if ses2 == SES.Elim_Tot_LaterTotOrST:
-        ses2 = SES.Tot
-
     opt_unified_ses = {
         (type.side_effects.SES.Tot, type.side_effects.SES.Tot): type.side_effects.SES.Tot,
         (type.side_effects.SES.Tot, type.side_effects.SES.Dv): type.side_effects.SES.Dv,

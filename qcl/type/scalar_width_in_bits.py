@@ -9,7 +9,7 @@ ScalarWidthComponent = int
 
 
 def init(tid, tid_width):
-    assert tid_width in (1, 2, 4, 8, 16)
+    assert tid_width in (1, 8, 16, 32, 64, 128)
     scalar_width_map[tid] = tid_width
 
 
