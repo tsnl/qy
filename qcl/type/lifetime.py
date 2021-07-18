@@ -6,12 +6,12 @@ import typing as t
 
 from qcl import typer
 
-MemLocID = int
+LifetimeID = int
 
 context_list = []
 
 
-def mint(lifetime_ctx: t.Optional["typer.context.Context"]) -> MemLocID:
+def mint(lifetime_ctx: t.Optional["typer.context.Context"]) -> LifetimeID:
     lifetime_id = len(context_list)
     context_list.append(lifetime_ctx)
     assert context_list[lifetime_id] is lifetime_ctx

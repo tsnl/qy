@@ -1,5 +1,7 @@
-from typing import *
-from os import path
+import typing as t
+import os.path as path
+
+from qcl import typer
 
 from . import file
 
@@ -12,6 +14,8 @@ class Project(object):
         self.abs_content_dir_path = None
         self.entry_point_source_module = None
         self.file_module_exp_list = None
+        self.all_def_val_rec_list = []
+        self.final_root_ctx = None
 
     def register_source_module(self, rel_path, is_entry_point=False):
         source_module = self.help_register_source_module(rel_path)
@@ -43,3 +47,22 @@ class Project(object):
     def set_file_module_exp_list(self, file_module_exp_list):
         assert self.file_module_exp_list is None
         self.file_module_exp_list = file_module_exp_list
+
+    #
+    # We store the root context on the project once it is typed:
+    #
+
+    def set_final_root_ctx(self, final_root_ctx: "typer.context.Context"):
+        self.final_root_ctx = final_root_ctx
+
+    #
+    # We store ValDefRecs
+    #
+
+    def allocate_val_def_id(self, val_def_rec: "typer.definition.ValueRecord") -> int:
+        def_id = len(self.all_def_val_rec_list)
+        self.all_def_val_rec_list.append(val_def_rec)
+        return def_id
+
+    def count_val_defs(self):
+        return len(self.all_def_val_rec_list)

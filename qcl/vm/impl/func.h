@@ -3,32 +3,47 @@
 #include "core.h"
 #include "table.h"
 #include "consts.h"
+#include "rtti.h"
 
 typedef struct Func Func;
-typedef struct TemplateValArg TemplateValArg;
-typedef struct TemplateTypeArg TemplateTypeArg;
+typedef struct FormalTemplateValArg FormalTemplateValArg;
+typedef struct FormalTemplateTypeArg FormalTemplateTypeArg;
+typedef struct Instantiation Instantiation;
 
 struct Func {
     DefID opt_def_id;
-    ExprID body_expr_id;
+    ExprID base_body_expr_id;
 
-    size_t template_val_arg_count;
-    TemplateValArg* template_val_args;
-    size_t template_type_arg_count;
-    TemplateTypeArg* template_type_args;
+    // template info:
+    struct {
+        size_t formal_template_val_arg_count;
+        FormalTemplateValArg* formal_template_val_args;
 
-    RtTypeID fn_tid;
+        size_t formal_template_type_arg_count;
+        FormalTemplateTypeArg* formal_template_type_args;
+
+        RtTypeID fn_tid;
+
+        TABLE(Instantiation)* instantiations;
+    } templated;
+
+    // nonlocal info:
+    struct {
+        RtTypeID non_local_struct_rttid;
+    } non_local;
 };
 
-struct TemplateValArg {
+struct FormalTemplateValArg {
     DefID arg_name;
-    TABLE(Const)* passed_consts;
 };
 
-struct TemplateTypeArg {
+struct FormalTemplateTypeArg {
     DefID arg_name;
-    TABLE(RtTypeID)* passed_rttids;
+    RtTypeID arg_rttid;
 };
 
-// todo: allow declare to accept template arguments.
-// todo: figure out closures
+struct Instantiation {
+    Const* passed_const_array;
+    RtTypeID* passed_rttids;
+    ExprID subbed_body;
+};

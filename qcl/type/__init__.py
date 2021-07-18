@@ -18,7 +18,24 @@ from . import spelling
 from . import side_effects
 from . import free
 from . import closure_spec
-from . import mem_loc
+from . import lifetime
+
+
+#
+# Helpers:
+#
+
+def _get_cached_type(cache, ctor, arg_key, ctor_takes_arg_key_directly=False):
+    opt_val = cache.get(arg_key, None)
+    if opt_val is not None:
+        return opt_val
+    else:
+        if ctor_takes_arg_key_directly:
+            val = ctor(arg_key)
+        else:
+            val = ctor(*arg_key)
+        cache[arg_key] = val
+        return val
 
 
 #
@@ -39,8 +56,27 @@ _unit_tid = _new_unit_type()
 
 
 #
+# String types:
+#
+
+def get_str_type() -> identity.TID:
+    return _str_tid
+
+
+def _new_str_type() -> identity.TID:
+    tid = identity.mint()
+    kind.init(tid, kind.TK.String)
+    return tid
+
+
+_str_tid = _new_str_type()
+
+
+#
 # Int types:
 #
+
+
 
 def get_int_type(width_in_bits: int, is_unsigned=False) -> identity.TID:
     return _int_tid_map[width_in_bits, is_unsigned]
@@ -101,35 +137,18 @@ _float_tid_map = _new_float_type_map()
 
 
 #
-# String types:
-#
-
-def get_str_type() -> identity.TID:
-    return _str_tid
-
-
-def _new_str_type() -> identity.TID:
-    tid = identity.mint()
-    kind.init(tid, kind.TK.String)
-    return tid
-
-
-_str_tid = _new_str_type()
-
-
-#
 # Pointer types:
 #
 
+_ptr_tid_map = {}
+
+
 def get_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
-    key = (ptd_tid, ptr_is_mut)
-    opt_val = _ptr_tid_map.get(key, None)
-    if opt_val is None:
-        val = _new_ptr_type(ptd_tid, ptr_is_mut)
-        _ptr_tid_map[key] = val
-        return val
-    else:
-        return opt_val
+    return _get_cached_type(
+        _ptr_tid_map,
+        _new_ptr_type,
+        (ptd_tid, ptr_is_mut)
+    )
 
 
 def _new_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
@@ -140,25 +159,26 @@ def _new_ptr_type(ptd_tid: identity.TID, ptr_is_mut: bool) -> identity.TID:
     return tid
 
 
-_ptr_tid_map = {}
-
-
-#
-#
-#
-# TODO: replace remaining uses of `functools.cache` with maps since
-#       cache does not seem to be persist correctly
-#
-#
-#
-
-
 #
 # Array types:
 #
 
-@functools.cache
-def get_array_type(ptd_tid: identity.TID, size_tid: identity.TID, array_is_mut: bool) -> identity.TID:
+_array_tid_map = {}
+
+
+def get_array_type(
+        ptd_tid: identity.TID,
+        size_tid: identity.TID,
+        array_is_mut: bool
+) -> identity.TID:
+    return _get_cached_type(
+        _array_tid_map,
+        _new_array_tid,
+        (ptd_tid, size_tid, array_is_mut)
+    )
+
+
+def _new_array_tid(ptd_tid: identity.TID, size_tid: identity.TID, array_is_mut: bool):
     tid = identity.mint()
     kind.init(tid, kind.TK.Array)
     elem.init_array(tid, ptd_tid, size_tid)
@@ -166,8 +186,30 @@ def get_array_type(ptd_tid: identity.TID, size_tid: identity.TID, array_is_mut: 
     return tid
 
 
-@functools.cache
-def get_slice_type(ptd_tid: identity.TID, size_tid: identity.TID, slice_is_mut: bool) -> identity.TID:
+#
+# Slice types:
+#
+
+_slice_tid_map = {}
+
+
+def get_slice_type(
+        ptd_tid: identity.TID,
+        size_tid: identity.TID,
+        slice_is_mut: bool
+) -> identity.TID:
+    return _get_cached_type(
+        _slice_tid_map,
+        _new_slice_type,
+        (ptd_tid, size_tid, slice_is_mut)
+    )
+
+
+def _new_slice_type(
+        ptd_tid: identity.TID,
+        size_tid: identity.TID,
+        slice_is_mut: bool
+) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Slice)
     elem.init_slice(tid, ptd_tid, size_tid)
@@ -175,8 +217,26 @@ def get_slice_type(ptd_tid: identity.TID, size_tid: identity.TID, slice_is_mut: 
     return tid
 
 
-@functools.cache
+#
+# Function types:
+#
+
+_fn_tid_map = {}
+
+
 def get_fn_type(
+        arg_tid: identity.TID, ret_tid: identity.TID,
+        ses: side_effects.SES,
+        cs: closure_spec.CS
+) -> identity.TID:
+    return _get_cached_type(
+        _fn_tid_map,
+        _new_fn_type,
+        (arg_tid, ret_tid, ses, cs)
+    )
+
+
+def _new_fn_type(
         arg_tid: identity.TID, ret_tid: identity.TID,
         ses: side_effects.SES,
         cs: closure_spec.CS
@@ -191,16 +251,46 @@ def get_fn_type(
     return tid
 
 
-@functools.cache
-def get_tuple_type(elem_tid_tuple: Tuple[identity.TID]) -> identity.TID:
+#
+# Tuple types:
+#
+
+_tuple_tid_map = {}
+
+
+def get_tuple_type(elem_tid_tuple: tuple) -> identity.TID:
+    return _get_cached_type(
+        _tuple_tid_map,
+        _new_tuple_type,
+        elem_tid_tuple,
+        ctor_takes_arg_key_directly=True
+    )
+
+
+def _new_tuple_type(elem_tid_tuple: tuple) -> identity.TID:
     tid = identity.mint()
     kind.init(tid, kind.TK.Tuple)
     elem.init_tuple(tid, elem_tid_tuple)
     return tid
 
 
-@functools.cache
+#
+# Struct types:
+#
+
+_struct_tid_map = {}
+
+
 def get_struct_type(field_elem_info_tuple) -> identity.TID:
+    return _get_cached_type(
+        _struct_tid_map,
+        _new_struct_type,
+        field_elem_info_tuple,
+        ctor_takes_arg_key_directly=True
+    )
+
+
+def _new_struct_type(field_elem_info_tuple) -> identity.TID:
     assert isinstance(field_elem_info_tuple, tuple)
 
     tid = identity.mint()
@@ -209,8 +299,22 @@ def get_struct_type(field_elem_info_tuple) -> identity.TID:
     return tid
 
 
-@functools.cache
+#
+# Union types:
+#
+
+_union_tid_map = {}
+
+
 def get_union_type(field_elem_info_tuple) -> identity.TID:
+    return _get_cached_type(
+        _union_tid_map,
+        _new_union_type,
+        ctor_takes_arg_key_directly=True
+    )
+
+
+def _new_union_type(field_elem_info_tuple) -> identity.TID:
     assert isinstance(field_elem_info_tuple, tuple)
 
     tid = identity.mint()
@@ -218,6 +322,12 @@ def get_union_type(field_elem_info_tuple) -> identity.TID:
     elem.init_union(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
 
+
+#
+#
+# Un-cached types:
+#
+#
 
 #
 # NOTE: module creation is not cached, because we want each module to have a unique type.
@@ -230,7 +340,6 @@ def new_module_type(field_elem_info_tuple) -> identity.TID:
     kind.init(tid, kind.TK.Module)
     elem.init_module(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
-
 
 #
 # NOTE: variable creation is not cached, even if the created variables share a name.

@@ -26,7 +26,7 @@ def type_project(project):
     # - seeding: we generate the types of all file modules in terms of free-vars so imports will resolve
     # - inference: we resolve imports, then generate the types of all sub-modules
 
-    root_context = context.make_default_root()
+    root_context = context.make_default_root(project)
 
     debug_path = True
     if debug_path:
@@ -56,3 +56,6 @@ def type_project(project):
     else:
         seeding.seed_project_types(root_context, project, all_file_module_list)
         inference.infer_project_types(project, all_file_module_list)
+
+    # Finalizing/storing:
+    project.set_final_root_ctx(root_context)

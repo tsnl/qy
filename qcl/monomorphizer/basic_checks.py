@@ -2,12 +2,12 @@
 This module handles several checks that do not require the VM but that guarantee fitness
 to interpret code.
 
-- TODO: checking closures: computing all non-local IDs
+- TODO: checking closures: computing all non-local IDs (CANCELLED-- moved to typer)
     - using an explicit 'nonlocal' statement like Python is not only redundant 
       (since all bound constants are read-only), but would make currying ugly.
     - thus, each LambdaExp must store a list of enclosed variables & initializer Definition
       records
-- TODO: validate `push` expressions
+- TODO: validate `push` expressions (CANCELLED-- moved to typer)
     - when these DefRec objects are ENCLOSED or RETURNED, their lifetime gets 'promoted'
     - objects with a promoted lifetime must be allocated using `heap` rather than `push`
         - this is a basic form of escape-analysis
@@ -45,4 +45,4 @@ SES = type.side_effects.SES
 def run(project: frontend.Project):
     # TODO: implement each above pass...
     # print("INFO: PTCC: basic_checks OK")
-    print("INFO: PTCC: basic_checks WIP...")
+    print("INFO: monomorphizer: basic_checks WIP...")

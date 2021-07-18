@@ -34,6 +34,10 @@ size_t get_elem_count_of_adt_rttid(RttiManager* rm, RtTypeID container_tid);
 RtTypeID get_arg_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid);
 RtTypeID get_ret_tid_of_fn_rttid(RttiManager* rm, RtTypeID fn_tid);
 
+// todo: add get_var_rttid(RttiManager* rm, DefID def_id)
+//  - mapped for type args
+//  - substituted out upon instantiation
+
 //
 // comparison:
 //

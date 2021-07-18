@@ -1,27 +1,28 @@
+"""
+This module verifies polymorphic code (in the form of a type-annotated AST),
+and generates monomorphic IR.
+"""
+
 from qcl import ast
 from qcl import typer
 
 from . import basic_checks
+from . import logic_checks
 from . import interp_checks
 
 
 def run(project):
-    # 
     # Basic checks (pre-interpretation)
-    #
-
     basic_checks.run(project)
 
-    #
-    # Interpreted checks
-    #
+    # Polymorphic logic checks (pre-interpretation)
+    logic_checks.run(project)
 
-    # TODO: check that `TOT`-assignment not misused, i.e.
-    #   - check that pointer contents can never be non-local
-    #   - rather than SMT analysis, consider logical CFA
+    # Interpreted checks
 
     # TODO: implement 'init_order' checks and other passes involving VM interpretation
     #   here...
+    #   - can use Z3 and theory of Partial Orders within First Order Logic to resolve this
 
     # REJECT: for each value_def_rec, must store def recs of any VIDs used in the RHS/initializer expression.
     #       these def recs are 'dependency value def recs' and must be initialized before this def rec.

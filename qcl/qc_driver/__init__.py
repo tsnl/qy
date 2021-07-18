@@ -6,7 +6,7 @@ from qcl import ast
 from qcl import excepts
 from qcl import frontend
 from qcl import typer
-from qcl import ptc_checks
+from qcl import monomorphizer
 
 
 def main():
@@ -45,15 +45,18 @@ def main():
             # DEBUG:
             print(f"INFO: Typer successful.")
 
-        # run post-type-check checks (PTC checks)
+        # run post-type-check checks (PTC checks) and monomorphise output:
+        #   - performs checks on polymorphic source code
+        #   - using `vm` module to evaluate template args and instantiate templates (copy&sub)
         try:
-            ptc_checks.run(project)
+            monomorphizer.run(project)
         except excepts.PtcCheckCompilationError as e:
             # TODO: fold exception data into feedback. Print, then exit elegantly.
             raise e from e
 
-        # todo: perform SMT analysis: no de-referencing `nullptr`, pointer escape analysis with `push`
+        # todo: perform SMT analysis:
         #   - using Z3 library
+        #   - cf. `monomorphic_logic`
         print("WARNING: skipping SMT checks")
 
         # todo: emit LLVM IR from Qy and C/C++ source code in `frontend` (using `libclang`).

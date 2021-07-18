@@ -89,7 +89,7 @@ def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: "ast.node.FileMod
 def seed_import(ctx: context.Context, loc, import_name: str, import_source: frontend.FileModuleSource):
     imported_mod_exp = import_source.ast_file_mod_exp_from_frontend
     imported_tid = mod_exp_tid_map[imported_mod_exp]
-    def_obj = definition.ModRecord(import_name, loc, scheme.Scheme(imported_tid), imported_mod_exp)
+    def_obj = definition.ModRecord(ctx.project, import_name, loc, scheme.Scheme(imported_tid), imported_mod_exp)
     def_ok = ctx.try_define(import_name, def_obj)
     if not def_ok:
         msg_suffix = f"import name {import_name} clashes with existing definition in this file-module"
@@ -107,7 +107,12 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
     # - NOTE: all value template args do not need a polymorphic type variable.
     template_type_arg_names, template_val_arg_names = names.sift_type_from_val(sub_mod_exp.template_arg_names)
     sub_mod_scheme = scheme.Scheme(sub_mod_tid, template_type_arg_names)
-    sub_mod_def_obj = definition.ModRecord(sub_mod_name, sub_mod_exp.loc, sub_mod_scheme, sub_mod_exp)
+    sub_mod_def_obj = definition.ModRecord(
+        ctx.project,
+        sub_mod_name,
+        sub_mod_exp.loc, sub_mod_scheme,
+        sub_mod_exp
+    )
     def_ok = ctx.try_define(sub_mod_name, sub_mod_def_obj)
     if not def_ok:
         msg_suffix = f"sub-module {sub_mod_name} conflicts with another definition in a file-module scope"
@@ -148,7 +153,13 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
 
 def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, template_val_arg_name: str):
     value_tid = type.new_free_var(f"seed.template_val_arg.{template_val_arg_name}")
-    def_obj = definition.ValueRecord(template_val_arg_name, loc, value_tid, opt_func=None)
+    def_obj = definition.ValueRecord(
+        sub_mod_ctx.project,
+        template_val_arg_name,
+        loc,
+        value_tid,
+        opt_func=None
+    )
     def_ok = sub_mod_ctx.try_define(template_val_arg_name, def_obj)
     if not def_ok:
         msg_suffix = (
@@ -161,7 +172,13 @@ def seed_template_type_arg(
         sub_mod_ctx: context.Context, loc: feedback.ILoc,
         template_type_arg_name: str, bound_var_tid: type.identity.TID
 ):
-    def_obj = definition.TypeRecord(template_type_arg_name, loc, bound_var_tid, opt_func=None)
+    def_obj = definition.TypeRecord(
+        sub_mod_ctx.project,
+        template_type_arg_name,
+        loc,
+        bound_var_tid,
+        opt_func=None
+    )
     def_ok = sub_mod_ctx.try_define(template_type_arg_name, def_obj)
     if not def_ok:
         msg_suffix = (
@@ -178,9 +195,21 @@ def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: "ast.node.BaseBind
     # creating an appropriate definition object `def_obj`:
     def_universe = names.infer_def_universe_of(def_name)
     if def_universe == definition.Universe.Value:
-        def_obj = definition.ValueRecord(def_name, bind1_elem.loc, defined_tid, opt_func=None)
+        def_obj = definition.ValueRecord(
+            sub_mod_ctx.project,
+            def_name,
+            bind1_elem.loc,
+            defined_tid,
+            opt_func=None
+        )
     elif def_universe == definition.Universe.Type:
-        def_obj = definition.TypeRecord(def_name, bind1_elem.loc, defined_tid, opt_func=None)
+        def_obj = definition.TypeRecord(
+            sub_mod_ctx.project,
+            def_name,
+            bind1_elem.loc,
+            defined_tid,
+            opt_func=None
+        )
     else:
         raise NotImplementedError("Unknown universe for Bind1?Elem")
 

@@ -5,19 +5,15 @@ import typing as t
 from qcl import feedback
 from qcl import type
 from qcl import ast
+from qcl import frontend
 
 from . import scheme
 
 
 class BaseRecord(object, metaclass=abc.ABCMeta):
-    name: str
-    loc: feedback.ILoc
-    scheme: scheme.Scheme
-    universe: "Universe"
-    opt_container_func: t.Optional["ast.node.LambdaExp"]
-
     def __init__(
             self,
+            project: "frontend.Project",
             name: str, loc: "feedback.ILoc",
             new_scheme: "scheme.Scheme", universe: "Universe",
             opt_func: t.Optional["ast.node.LambdaExp"],
@@ -25,12 +21,13 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
     ):
         assert isinstance(new_scheme, scheme.Scheme)
         super().__init__()
-        self.name = name
-        self.loc = loc
-        self.scheme = new_scheme
-        self.universe = universe
-        self.opt_container_func = opt_func
-        self.is_protected_from_global_scope = is_protected_from_global_scope
+        self.project: "frontend.Project" = project
+        self.name: str = name
+        self.loc: feedback.ILoc = loc
+        self.scheme: scheme.Scheme = new_scheme
+        self.universe: "Universe" = universe
+        self.opt_container_func: t.Optional["ast.node.LambdaExp"] = opt_func
+        self.is_protected_from_global_scope: bool = is_protected_from_global_scope
 
     @property
     def is_globally_visible(self):
@@ -40,11 +37,15 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
 class ValueRecord(BaseRecord):
     def __init__(
             self,
-            name: str, loc: feedback.ILoc, value_tid: type.identity.TID,
+            project: "frontend.Project",
+            name: str,
+            loc: feedback.ILoc,
+            value_tid: type.identity.TID,
             opt_func,
             is_protected_from_global_scope=True
     ):
         super().__init__(
+            project,
             name, loc,
             scheme.Scheme(value_tid), Universe.Value,
             opt_func, is_protected_from_global_scope
@@ -53,23 +54,34 @@ class ValueRecord(BaseRecord):
         if self.is_globally_visible:
             all_global_value_recs.append(self)
 
+        self.val_def_id = self.project.allocate_val_def_id(self)
+
 
 class TypeRecord(BaseRecord):
     def __init__(
             self,
+            project: "frontend.Project",
             name: str, loc: feedback.ILoc, type_tid: type.identity.TID,
             opt_func,
             is_protected_from_global_scope=True
     ):
-        super().__init__(name, loc, scheme.Scheme(type_tid), Universe.Type, opt_func, is_protected_from_global_scope)
+        super().__init__(
+            project,
+            name, loc,
+            scheme.Scheme(type_tid),
+            Universe.Type,
+            opt_func,
+            is_protected_from_global_scope
+        )
 
         if self.is_globally_visible:
             all_global_type_recs.append(self)
 
 
 class ModRecord(BaseRecord):
-    def __init__(self, name: str, loc: feedback.ILoc, mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp"):
+    def __init__(self, project: "frontend.Project", name: str, loc: feedback.ILoc, mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp"):
         super().__init__(
+            project,
             name, loc,
             mod_scheme, Universe.Module,
             opt_func=None,
