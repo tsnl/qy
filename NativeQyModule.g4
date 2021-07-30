@@ -229,8 +229,8 @@ binaryTypeSpec
     | lt=unaryTypeSpec '->' ses=effectsSpec? rt=binaryTypeSpec      #fnSgnTypeSpec
     ;
 bulkyTypeSpec
-    : through=binaryTypeSpec                       #throughBulkyTypeSpec
-    | 'ClosureBan' '{' nested=binaryTypeSpec '}'   #noClosureTypeSpec
+    : through=binaryTypeSpec                        #throughBulkyTypeSpec
+    | 'NoCtxPtr' '{' nested=binaryTypeSpec '}'      #noClosureTypeSpec
     ;
 
 //

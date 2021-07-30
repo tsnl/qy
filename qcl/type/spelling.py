@@ -57,8 +57,8 @@ def of(tid: identity.TID):
 
         opt_prefix, opt_suffix = {
             closure_spec.CS.Yes: ("", ""),
-            closure_spec.CS.No: ("ClosureBan { ", " }"),
-            closure_spec.CS.Maybe: ("EmptyClosure { ", " }")
+            closure_spec.CS.No: ("NoCtxPtr { ", " }"),
+            closure_spec.CS.Maybe: ("OptCtxPtr { ", " }")
         }[closure_spec.of(tid)]
 
         return f"{opt_prefix}{lhs_spelling} -> {ses_spelling} {rhs_spelling}{opt_suffix}"
