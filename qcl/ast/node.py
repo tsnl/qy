@@ -412,10 +412,6 @@ class BaseTypeSpec(TypedBaseNode):
     pass
 
 
-class SelfTypeSpec(BaseTypeSpec):
-    pass
-
-
 class UnitTypeSpec(BaseTypeSpec):
     pass
 

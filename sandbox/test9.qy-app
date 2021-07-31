@@ -1,6 +1,6 @@
 dm howdy {
     x := (v) -> (p) -> ST {
-        # v--- violates the closure ban
+        # v--- violates the context pointer ban
         # do p <- v;
 
         do p <- 42f;

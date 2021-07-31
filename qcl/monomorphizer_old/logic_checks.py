@@ -5,6 +5,8 @@ TODO: check that `TOT`-assignment not misused, i.e.
     - then, try to eliminate `TOT` specifier syntax for assign expression-- can just be inferred.
     - check that pointer contents can never be non-local
     - rather than SMT analysis, consider logical CFA
+
+TODO: run this AFTER monomorphization
 """
 
 import abc
@@ -93,7 +95,7 @@ class UnitValueModel(BaseValueModel):
     ):
         super().__init__(loc, type.get_unit_type())
 
-    def assign_from_impl(self, loc, src_value_model: "BaseValueModel", for_fn_call: bool) -> UnitValueModel:
+    def assign_from_impl(self, loc, src_value_model: "BaseValueModel", for_fn_call: bool) -> "UnitValueModel":
         return UnitValueModel(loc)
 
     @classmethod

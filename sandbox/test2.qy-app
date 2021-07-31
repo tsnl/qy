@@ -14,7 +14,7 @@ dm test2 {
     l4f := Vec4f(0, 0, 0, 1);
 
     hello := (x, y) -> TOT {
-        w = x;
+        w := x;
         (x, y, w)
     };
 
