@@ -11,6 +11,9 @@ def main():
                     ["./mast.pyx"]
                 )
             ],
+            compiler_directives={
+                'language_level': '3'
+            }
         ),
         requires=['setuptools',
                   'Cython']
