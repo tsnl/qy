@@ -1,4 +1,5 @@
 from . import mast
+from . import copier
 
 
 def run(project):

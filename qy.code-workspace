@@ -17,7 +17,9 @@
 			"xtree": "c",
 			"xutility": "c",
 			"tuple": "c",
-			"utility": "c"
+			"utility": "c",
+			"vector": "cpp",
+			"cstddef": "cpp"
 		}
 	}
 }
