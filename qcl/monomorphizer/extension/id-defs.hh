@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
-typedef size_t DefID;
-typedef DefID ExpDefID;
-typedef DefID TsDefID;
+namespace monomorphizer {
+
+    using DefID = size_t;
+    using ExpDefID = DefID;
+    using TsDefID = DefID;
+
+}

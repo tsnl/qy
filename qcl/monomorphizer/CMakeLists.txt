@@ -11,8 +11,13 @@ include_directories(
 )
 add_library(
     ExtensionLib SHARED
-    "extension/copier.cc"
-    "extension/mast.cc"
     "extension/defs.cc"
-    "extension/eval.cc"
+    "extension/defs.hh"
+    "extension/modules.cc"
+    "extension/modules.hh"
+    "extension/id-modules.hh"
+    "extension/id-defs.hh"
+    "extension/id-mast.hh"
+    "extension/mast.cc"
+    "extension/mast.hh"
 )

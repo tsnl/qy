@@ -7,7 +7,9 @@
 #include "id-defs.hh"
 #include "id-mast.hh"
 
-namespace defs {
+namespace monomorphizer::defs {
+
+    extern DefID const NULL_DEF_ID;
 
     enum DefKind {
         BV_EXP,
@@ -16,31 +18,34 @@ namespace defs {
         CONST_TS
     };
 
-    void init(size_t init_def_capacity);
+    void ensure_init();
+    void drop();
 
     //
     // Definitions:
     //
 
-    DefID define_const_exp(
+    // constant definitions: 
+    DefID define_const(
         char const* mod_name,
         char const* def_name,
-        NodeID node_id,
+        NodeID bound_node_id,
         bool is_global
-    );
-    DefID define_const_ts(
-        char const* mod_name,
-        char const* def_name,
-        NodeID node_id,
-        bool is_global
-    );
-    DefID define_bound_var(
-        char const* mod_name,
-        char const* formal_var_name,
-        bool is_exp_not_ts
     );
 
+    // bound var definitions:
+    // - monomorphization is just subbing these with `const-def`s in a new copy
+    DefID define_bound_var_ts(
+        char const* mod_name,
+        char const* formal_var_name
+    );
+    DefID define_bound_var_exp(
+        char const* mod_name,
+        char const* formal_var_name
+    );
+
+    // query definition info:
+    bool get_def_is_bv(DefID def_id);
     DefKind get_def_kind(DefID def_id);
 
-    // TODO: cache substitutions for bound vars (for use in `eval.cc`)
 }

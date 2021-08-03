@@ -11,10 +11,9 @@
 
 #include "id-mast.hh"
 #include "id-defs.hh"
+#include "id-modules.hh"
 
-#define DEFAULT_NODE_MGR_CAPACITY (1024 * 16)
-
-namespace mast {
+namespace monomorphizer::mast {
 
     //
     // Shared enums:
@@ -65,6 +64,8 @@ namespace mast {
         TS_TUPLE,
         TS_STRUCT,
         TS_UNION,
+        TS_GET_POLY_MODULE_FIELD,
+        TS_GET_MONO_MODULE_FIELD,
 
         // expressions:
         EXP_UNIT,
@@ -77,6 +78,8 @@ namespace mast {
         EXP_BINARY_OP,
         EXP_IF_THEN_ELSE,
         EXP_GET_TUPLE_FIELD_BY_INDEX,
+        EXP_GET_POLY_MODULE_FIELD,
+        EXP_GET_MONO_MODULE_FIELD,
         EXP_LAMBDA,
         EXP_ALLOCATE_ONE,
         EXP_ALLOCATE_MANY,
@@ -84,7 +87,7 @@ namespace mast {
 
         // chain elements:
         ELEM_BIND1V,
-        ELEM_DO
+        ELEM_DO,
     };
 
     //
@@ -94,15 +97,6 @@ namespace mast {
     struct NameNodeRelation {
         DefID name;
         NodeID node;
-    };
-
-    //
-    // Mod Node Infos:
-    //
-
-    struct SubModNodeInfo {
-        NameNodeRelation* ordered_pair_array;
-        size_t ordered_pair_count;
     };
 
     //
@@ -143,6 +137,18 @@ namespace mast {
     struct CompoundTypeSpecNodeInfo {
         NameNodeRelation* elem_ts_array;
         size_t elem_ts_count;
+    };
+
+    struct GetPolyModuleFieldTypeSpecNodeInfo {
+        size_t args_count;
+        NodeID* args_array;
+        PolyModID template_id;
+        DefID polymorphic_def_id;
+    };
+
+    struct GetMonoModuleFieldTypeSpecNodeInfo {
+        MonoModID template_id;
+        DefID def_id;
     };
 
     //
@@ -191,7 +197,6 @@ namespace mast {
         ExpID else_exp;
     };
 
-
     struct GetTupleFieldByIndexExpNodeInfo {
         ExpID tuple_exp_id;
         ExpID index_exp_id;
@@ -220,6 +225,18 @@ namespace mast {
         ElemID* prefix_elem_array;
         size_t prefix_elem_count;
         ExpID ret_exp_id;
+    };
+
+    struct GetPolyModuleFieldExpNodeInfo {
+        size_t arg_count;
+        NodeID* arg_array;
+        PolyModID template_id;
+        DefID def_id;
+    };
+
+    struct GetMonoModuleFieldExpNodeInfo {
+        MonoModID template_id;
+        DefID def_id;
     };
 
     //
@@ -251,9 +268,6 @@ namespace mast {
     //
 
     union NodeInfo {
-        // modules:
-        SubModNodeInfo mod_sub_mod;
-
         // type-specs:
         IdTypeSpecNodeInfo ts_id;
         PtrTypeSpecNodeInfo ts_ptr;
@@ -262,6 +276,8 @@ namespace mast {
         FuncSgnTypeSpecNodeInfo ts_func_sgn;
         TupleTypeSpecNodeInfo ts_tuple;
         CompoundTypeSpecNodeInfo ts_compound;
+        GetMonoModuleFieldTypeSpecNodeInfo ts_get_mono_module_field;
+        GetPolyModuleFieldTypeSpecNodeInfo ts_get_poly_module_field;
 
         // expressions:
         IntExpNodeInfo exp_int;
@@ -277,6 +293,8 @@ namespace mast {
         AllocateOneExpNodeInfo exp_allocate_one;
         AllocateManyExpNodeInfo exp_allocate_many;
         ChainExpNodeInfo exp_chain;
+        GetMonoModuleFieldExpNodeInfo exp_get_mono_module_field;
+        GetPolyModuleFieldExpNodeInfo exp_get_poly_module_field;
 
         // elements:
         Bind1VElemNodeInfo elem_bind1v;
@@ -287,7 +305,7 @@ namespace mast {
     // Managing nodes:
     //
 
-    void init(size_t node_capacity = DEFAULT_NODE_MGR_CAPACITY);
+    void ensure_init();
     void drop();
 
     //
@@ -327,6 +345,7 @@ namespace mast {
         size_t elem_ts_count,
         NameNodeRelation* elem_ts_array
     );
+    // todo: add constructors for Get{Mono|Poly}ModuleFieldTypeSpec
 
     // Expressions:
     ExpID get_unit_exp();
@@ -389,6 +408,7 @@ namespace mast {
         ElemID* prefix_elem_id_array,
         ExpID ret_exp_id
     );
+    // todo: add constructors for Get{Mono|Poly}ModuleFieldExp
 
     // Element creation methods:
     ElemID new_bind1v_elem(

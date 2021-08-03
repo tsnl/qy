@@ -6,10 +6,14 @@
 // Nodes are IDed by 64-bit handles
 //
 
-typedef size_t NodeID;
-typedef NodeID ModID;
-typedef NodeID ExpID;
-typedef NodeID TypeSpecID;
-typedef NodeID ElemID;
+namespace monomorphizer {
 
-extern NodeID const NULL_NODE_ID;
+    using NodeID = size_t;
+    using ModID = NodeID;
+    using ExpID = NodeID;
+    using TypeSpecID = NodeID;
+    using ElemID = NodeID;
+
+    extern NodeID const NULL_NODE_ID;
+
+}

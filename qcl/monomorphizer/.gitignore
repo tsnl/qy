@@ -13,3 +13,5 @@ libExtensionLib.a
 Makefile
 CMakeFiles/
 build/
+
+libExtensionLib.dylib

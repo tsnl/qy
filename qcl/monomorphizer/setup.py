@@ -6,7 +6,7 @@ from Cython.Build import cythonize
 
 def get_extension_lib_path():
     possible_shared_lib_name_list = [
-        "./libExtensionLib.dylib"
+        "./libExtensionLib.dylib",
     ]
 
     for possible_shared_lib_name in possible_shared_lib_name_list:

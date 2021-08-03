@@ -1,11 +1,14 @@
 #include "mast.hh"
+#include "defs.hh"
 
 #include <vector>
 
-namespace mast {
+namespace monomorphizer::mast {
 
-    NodeID const NULL_NODE_ID = -1;
-
+    extern NodeID const NULL_NODE_ID = -1;
+    
+    size_t const DEFAULT_NODE_MGR_CAPACITY = 16 * 1024;
+    
     class NodeMgr {
         // The NodeMgr class manages parallel arrays that store attributes for
         // each node.
@@ -64,7 +67,8 @@ namespace mast {
 
     static NodeMgr* s_mgr = nullptr;
 
-    void init(size_t capacity) {
+    void ensure_init() {
+        size_t capacity = DEFAULT_NODE_MGR_CAPACITY;
         if (!s_mgr) {
             s_mgr = new NodeMgr(capacity);
         }
