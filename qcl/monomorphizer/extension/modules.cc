@@ -8,6 +8,9 @@
 
 #include "mast.hh"
 #include "defs.hh"
+#include "mtype.hh"
+#include "panic.hh"
+#include "mval.hh"
 
 //
 // Implementation: Compile-time constants
@@ -19,220 +22,59 @@ namespace monomorphizer::modules {
 }
 
 //
-// Implementation: values
-// NOTE: values are serializable intermediates used for computation.
-// NOTE: serialization => easy hashing
-// NOTE: ValueID is NOT unique to each value!!
-//  - vid1 = vid2 => vid1 == vid2   (by identity)
-//  - vid1 != vid2 =/=> vid1 !== vid2   (diff identity may still be equal)
-//
-
-namespace monomorphizer::modules {
-
-    using ValueID = size_t;
-
-    enum class ValueKind {
-        Unit,
-        U1, U8, U16, U32, U64,
-        S8, S16, S32, S64,
-        F32, F64,
-        String,
-        Tuple
-    };
-
-    union ValueInfo {
-        bool u1;
-        uint8_t u8;
-        uint16_t u16;
-        uint32_t u32;
-        uint64_t u64;
-        int8_t s8;
-        int16_t s16;
-        int32_t s32;
-        int64_t s64;
-        float f32;
-        double f64;
-        size_t string_info_index;
-        size_t tuple_info_index;
-    };
-
-    struct StringInfo {
-        size_t code_point_count;
-        int* code_point_array;
-
-        inline
-        StringInfo(size_t code_point_count, int* mv_code_point_array)
-        :   code_point_count(code_point_count),
-            code_point_array(mv_code_point_array)
-        {}
-    };
-    struct TupleInfo {
-        size_t elem_id_count;
-        ValueID* elem_id_array;
-
-        inline
-        TupleInfo(size_t elem_id_count, ValueID* mv_elem_id_array)
-        :   elem_id_count{elem_id_count},
-            elem_id_array{mv_elem_id_array}
-        {}
-    };
-
-    struct Value {
-        ValueKind kind;
-        ValueInfo info;
-    };
-
-    static std::deque<ValueKind> s_value_kind_table;
-    static std::deque<ValueInfo> s_value_info_table;
-    static std::deque<StringInfo> s_value_string_info_table;
-    static std::deque<TupleInfo> s_value_tuple_info_table;
-
-    // value creation:
-    ValueID get_next_val_id() {
-        assert(s_value_kind_table.size() == s_value_info_table.size());
-        return s_value_kind_table.size();
-    }
-    ValueID push_val_u1(bool v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.u1 = v;
-        s_value_kind_table.push_back(ValueKind::U1);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_u8(uint8_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.u8 = v;
-        s_value_kind_table.push_back(ValueKind::U8);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_u16(uint16_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.u16 = v;
-        s_value_kind_table.push_back(ValueKind::U16);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_u32(uint32_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.u32 = v;
-        s_value_kind_table.push_back(ValueKind::U32);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_u64(uint64_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.u64 = v;
-        s_value_kind_table.push_back(ValueKind::U64);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_s8(int8_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.s8 = v;
-        s_value_kind_table.push_back(ValueKind::S8);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_s16(int16_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.s16 = v;
-        s_value_kind_table.push_back(ValueKind::S16);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_s32(int32_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.s32 = v;
-        s_value_kind_table.push_back(ValueKind::S32);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_s64(int64_t v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.s64 = v;
-        s_value_kind_table.push_back(ValueKind::S64);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_f32(float v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.f32 = v;
-        s_value_kind_table.push_back(ValueKind::F32);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_f64(double v) {
-        auto id = get_next_val_id();
-        ValueInfo vi; vi.f64 = v;
-        s_value_kind_table.push_back(ValueKind::F64);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_str(size_t code_point_count, int* mv_code_point_array) {
-        auto id = get_next_val_id();
-
-        auto string_info_index = s_value_string_info_table.size();
-        s_value_string_info_table.emplace_back(
-            code_point_count,
-            mv_code_point_array
-        );
-
-        ValueInfo vi; vi.string_info_index = string_info_index;
-        s_value_kind_table.push_back(ValueKind::S8);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-    ValueID push_val_tuple(size_t elem_id_count, ValueID* mv_elem_id_array) {
-        auto id = get_next_val_id();
-
-        auto string_info_index = s_value_string_info_table.size();
-        s_value_tuple_info_table.emplace_back(
-            elem_id_count,
-            mv_elem_id_array
-        );
-
-        ValueInfo vi; vi.string_info_index = string_info_index;
-        s_value_kind_table.push_back(ValueKind::S8);
-        s_value_info_table.push_back(vi);
-        return id;
-    }
-
-    // property accessors:
-    ValueKind value_kind(ValueID value_id) {
-        return s_value_kind_table[value_id];
-    }
-    ValueInfo value_info(ValueID value_id) {
-        return s_value_info_table[value_id];
-    }
-
-    // serialization:
-    // TODO: write a method that recursively emits a byte-sequence that we can
-    //       run a string hash function on.
-}
-
-//
 // Implementation: arg-list tries:
 //
 
 namespace monomorphizer::modules {
 
-    using TrieNodeID = size_t;
-    using ArgListID = TrieNodeID;
+    using ArgTrieNodeID = size_t;
+    
+    ArgTrieNodeID const NULL_ATN_ID = -1;
+    
+    struct ArgTrieNode;
+    struct ArgTrieEdge;
 
-    struct TrieNode;
-    struct TrieEdge;
+    struct ArgTrieNode {
+        std::vector<ArgTrieEdge> m_forward_type_edges;
+        std::vector<ArgTrieEdge> m_forward_value_edges;
+        ArgTrieNodeID m_parent_node_id;
 
-    struct TrieNode {
-        std::vector<TrieEdge> m_edges;    
+        ArgTrieNode(
+            ArgTrieNodeID parent_node_id
+        );
     };
-    // struct TrieEdge {
-    //     ValueID value;
-    //     TrieNodeID next;
-    // };
+    struct ArgTrieEdge {
+        size_t m_appended_id;
+        ArgTrieNodeID m_dst;
 
-    // TODO: need a way to ID values uniquely/hash them into keys (cf above)
-    // TODO: need to pass TID to MAST type-specifiers
+        ArgTrieEdge(
+            size_t appended_id,
+            ArgTrieNodeID dst_node_id
+        );
+    };
+
+    static std::deque<ArgTrieNode> s_atn_table = {};
+    static std::vector<ArgTrieEdge> s_atn_root_type_edges;
+    static std::vector<ArgTrieEdge> s_atn_root_value_edges;
+
+    ArgTrieNodeID new_atn(ArgTrieNodeID parent_node_id) {
+        ArgTrieNodeID new_id = s_atn_table.size();
+        s_atn_table.emplace_back(parent_node_id);
+        return new_id;
+    }
+
+    ArgTrieNodeID get_atn_with_value_appended(
+        ArgTrieNodeID root, 
+        mval::ValueID appended_value_id
+    );
+    ArgTrieNodeID get_atn_with_type_appended(
+        ArgTrieNodeID root, 
+        mtype::MTypeID appended_type_id
+    );
+
+    // need a way to ID values uniquely/hash them into keys (cf above)
+    //   - can use `val_equals`
+    // need to pass TID to MAST type-specifiers
     //   - guaranteed to be unique by typer
     //   - can use these TIDs as keys
 
@@ -240,6 +82,99 @@ namespace monomorphizer::modules {
     // hash-map to build a trie.
 
     // Then, each Trie node represents a unique, non-negative list of args.
+
+    ArgTrieNode::ArgTrieNode(
+        ArgTrieNodeID parent_node_id
+    )
+    :   m_parent_node_id(parent_node_id),
+        m_forward_type_edges(),
+        m_forward_value_edges()
+    {}
+
+    ArgTrieEdge::ArgTrieEdge(
+        size_t appended_id,
+        ArgTrieNodeID dst_node_id
+    )
+    :   m_appended_id(appended_id),
+        m_dst(dst_node_id)
+    {}
+
+    ArgTrieNodeID get_cached_dst(
+        std::vector<ArgTrieEdge> const& edges_vec,
+        size_t const appended_id,
+        bool const check_id_val_equality
+    ) {
+        for (auto edge: edges_vec) {
+            auto edge_id = edge.m_appended_id;
+            auto dst_id = edge.m_dst;
+
+            if (check_id_val_equality) {
+                if (mval::equals(edge_id, appended_id)) {
+                    return dst_id;
+                }
+            } else {
+                if (edge_id == appended_id) {
+                    return dst_id;
+                }
+            }
+        }
+        return NULL_ATN_ID;
+    }
+    ArgTrieNodeID help_get_atn_with_id_appended(
+        ArgTrieNodeID root,
+        size_t appended_id,
+        bool appended_id_is_value_not_type_id
+    ) {
+        std::vector<ArgTrieEdge>* edges_vec_p = (
+            (root == NULL_ATN_ID) ? 
+            (
+                appended_id_is_value_not_type_id ?
+                    &s_atn_root_type_edges : 
+                    &s_atn_root_value_edges
+            ) 
+            :
+            (
+                appended_id_is_value_not_type_id ?
+                    &s_atn_table[root].m_forward_type_edges :
+                    &s_atn_table[root].m_forward_value_edges
+            )
+        );
+        ArgTrieNodeID cached_dst_node_id = get_cached_dst(
+            *edges_vec_p,
+            appended_id,
+            appended_id_is_value_not_type_id
+        );
+        if (cached_dst_node_id != NULL_ATN_ID) {
+            return cached_dst_node_id;
+        } else {
+            ArgTrieNodeID fresh_dst_id = new_atn(root);
+            edges_vec_p->emplace_back(
+                appended_id,
+                fresh_dst_id
+            );
+            return fresh_dst_id;
+        }
+    }
+    ArgTrieNodeID get_atn_with_value_appended(
+        ArgTrieNodeID root, 
+        mval::ValueID appended_value_id
+    ) {
+        return help_get_atn_with_id_appended(
+            root,
+            appended_value_id,
+            true
+        );
+    }
+    ArgTrieNodeID get_atn_with_type_appended(
+        ArgTrieNodeID root, 
+        mtype::MTypeID appended_type_id
+    ) {
+        return help_get_atn_with_id_appended(
+            root,
+            appended_type_id,
+            false
+        );
+    }
 
 }
 
@@ -364,6 +299,8 @@ namespace monomorphizer::modules {
 
     void monomorphize_subgraph(MonoModID first_mono_template_id) {
         // todo: scan for GetFieldInPolyMod, get monomorph, and execute
+        // todo: use the ArgTrieNode data-structure to make each actual arg list
+        //       a unique ID, resilient to value equality. 
     }
 
 }

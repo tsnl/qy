@@ -20,4 +20,6 @@ add_library(
     "extension/id-mast.hh"
     "extension/mast.cc"
     "extension/mast.hh"
+    "extension/mval.cc"
+    "extension/mval.hh"
 )

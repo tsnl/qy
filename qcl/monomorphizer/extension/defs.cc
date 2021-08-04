@@ -53,7 +53,10 @@ namespace monomorphizer::defs {
     //
 
     struct ConstDefInfo {
-
+        char const* mod_name;
+        char const* def_name;
+        NodeID bound_node_id;
+        bool is_global;
     };
 
     //
@@ -85,6 +88,7 @@ namespace monomorphizer::defs {
         char const* formal_var_name
     ) {
         // todo: implement me!
+        return NULL_DEF_ID;
     }
 
     // query definition info:
