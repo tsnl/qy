@@ -6,6 +6,8 @@
 
 #include "id-defs.hh"
 #include "id-mast.hh"
+#include "id-mval.hh"
+#include "id-mtype.hh"
 
 namespace monomorphizer::defs {
 
@@ -15,7 +17,9 @@ namespace monomorphizer::defs {
         BV_EXP,
         BV_TS,
         CONST_EXP,
-        CONST_TS
+        CONST_TS,
+        CONST_TOT_VAL,
+        CONST_TOT_TID
     };
 
     void ensure_init();
@@ -26,10 +30,22 @@ namespace monomorphizer::defs {
     //
 
     // constant definitions: 
-    DefID define_const(
+    DefID define_const_mast_node(
         char const* mod_name,
         char const* def_name,
         NodeID bound_node_id,
+        bool is_global
+    );
+    DefID define_total_const_value(
+        char const* mod_name,
+        char const* def_name,
+        mval::ValueID value_id,
+        bool is_global
+    );
+    DefID define_total_const_type(
+        char const* mod_name,
+        char const* def_name,
+        mtype::MTypeID type_id,
         bool is_global
     );
 
@@ -47,5 +63,6 @@ namespace monomorphizer::defs {
     // query definition info:
     bool get_def_is_bv(DefID def_id);
     DefKind get_def_kind(DefID def_id);
+    char const* get_def_name(DefID def_id);
 
 }

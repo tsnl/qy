@@ -1,6 +1,7 @@
 #include "defs.hh"
 
 #include <vector>
+#include <string>
 
 #include "id-defs.hh"
 
@@ -17,6 +18,7 @@ namespace monomorphizer::defs {
     static bool s_is_already_init = false;
     static std::vector<bool> s_def_is_const_not_var_table;
     static std::vector<DefKind> s_def_kind_table;
+    static std::vector<std::string> s_def_name_table;
     static std::vector<size_t> s_def_index_table;
     static std::vector<ConstDefInfo> s_const_def_info_table;
     static std::vector<VarDefInfo> s_var_def_info_table;
@@ -67,13 +69,32 @@ namespace monomorphizer::defs {
 
     };
 
-    DefID define_const(
+    DefID define_const_mast_node(
         char const* mod_name,
         char const* def_name,
         NodeID node_id,
         bool is_global
     ) {
-        return 0;
+        // TODO: implement me
+        return NULL_DEF_ID;
+    }
+
+    DefID define_total_const_value(
+        char const* mod_name,
+        char const* def_name,
+        mval::ValueID value_id,
+        bool is_global
+    ) {
+
+    }
+
+    DefID define_total_const_type(
+        char const* mod_name,
+        char const* def_name,
+        mtype::MTypeID type_id,
+        bool is_global
+    ) {
+        return NULL_DEF_ID;
     }
 
     DefID define_bound_var_ts(
@@ -97,6 +118,9 @@ namespace monomorphizer::defs {
     }
     DefKind get_def_kind(DefID def_id) {
         return s_def_kind_table[def_id];
+    }
+    char const* get_def_name(DefID def_id) {
+        return s_def_name_table[def_id].c_str();
     }
 
 }

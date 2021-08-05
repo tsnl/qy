@@ -3,10 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "id-mval.hh"
+
 namespace monomorphizer::mval {
 
-    using ValueID = size_t;
-    
     enum class ValueKind {
         Unit,
         U1, U8, U16, U32, U64,

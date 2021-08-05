@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "vector": "cpp",
-        "deque": "cpp"
+        "deque": "cpp",
+        "iosfwd": "cpp"
     }
 }
