@@ -423,6 +423,7 @@ namespace monomorphizer::mast {
     // Data Accessors:
     //
 
+    NodeKind get_node_kind(NodeID node_id);
     NodeInfo* get_info_ptr(NodeID node_id);
 
 }

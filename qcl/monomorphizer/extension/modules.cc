@@ -341,25 +341,26 @@ namespace monomorphizer::modules {
         size_t bound_id
     ) {
         defs::DefKind bv_def_kind = defs::get_def_kind(bv_def_id);
-        char const* def_name = defs::get_def_name(bv_def_id);
+        char* def_name = strdup(defs::get_def_name(bv_def_id));
         switch (bv_def_kind) {
             case defs::DefKind::BV_EXP: {
                 mval::ValueID val_id = bound_id;
                 return defs::define_total_const_value(
-                    mod_name, def_name,
+                    def_name,
                     val_id, true
                 );
             } break;
             case defs::DefKind::BV_TS: {
                 mtype::MTypeID type_id = bound_id;
                 return defs::define_total_const_type(
-                    mod_name, def_name,
+                    def_name,
                     type_id, true
                 );
             } break;
             default: {
-                assert(0 && "Invalid Def Kind in bv_def_id_array");
-                return defs::NULL_DEF_ID;
+                throw new Panic(
+                    "Invalid Def Kind in bv_def_id_array"
+                );
             } break;
         };
     }
@@ -422,11 +423,5 @@ namespace monomorphizer::modules {
         // todo: return the fresh mono ID
         return NULL_MONO_MOD_ID;
     }
-
-    void monomorphize_subgraph(MonoModID first_mono_module_id) {
-        // todo: scan for GetFieldInPolyMod, get monomorph, and execute
-        // todo: use the ArgTrieNode data-structure to make each actual arg list
-        //       a unique ID, resilient to value equality.
-    }
-
+    
 }

@@ -55,7 +55,7 @@ and prevents odd behavior when global variables are cloned.
 
 ## Scratch TODO
 
-- first, finish implementing DefID
+- ~~first, finish implementing DefID~~
 - next, implement substitution objects
   - these must be mutable, since we can use it as a cache to store partially
     evaluated polymorphs to substitute IDs over several instantiations
@@ -65,3 +65,20 @@ and prevents odd behavior when global variables are cloned.
   - in fact, evaluate each field into a TOT_CONST such that its unique value is
     known at compile-time
   - when an ID is encountered, try to replace its DefID with one in the sub map.
+- finally, implement MAST building from Python (see below)
+
+## Interface
+
+In `typer.definition.BaseRec`, there is a `def_id` field that is generated for 
+each definition.
+
+This can be accessed by a direct reference from 
+`ast.{IdExp|IdTypeSpec}` to the `BaseRec` it references 
+(as determined in typer).
+
+When building MAST code from AST, we can query this `PyDefID` which is different
+than the extension's native `DefID`.
+
+TODO: 
+implement `PyDefID` and `DefID` separation such that `std::map`s act as scoped 
+symbol tables/frames for evaluation.

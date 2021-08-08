@@ -72,9 +72,4 @@ namespace monomorphizer::modules {
         ArgListID arg_list_id
     );
 
-    // TODO evaluation:
-    // accept a non-TOT def + an optional substitution map for all BV_DEF_ID
-    // output a TOT def, suitable for mono mod fields
-    
-
 }

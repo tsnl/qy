@@ -13,6 +13,8 @@ add_library(
     ExtensionLib SHARED
     "extension/defs.cc"
     "extension/defs.hh"
+    "extension/eval.cc"
+    "extension/eval.hh"
     "extension/id-defs.hh"
     "extension/id-mast.hh"
     "extension/id-modules.hh"
@@ -26,4 +28,6 @@ add_library(
     "extension/mval.cc"
     "extension/mval.hh"
     "extension/panic.hh"
+    "extension/sub.cc"
+    "extension/sub.hh"
 )

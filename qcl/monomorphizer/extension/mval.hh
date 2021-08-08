@@ -16,6 +16,9 @@ namespace monomorphizer::mval {
         Tuple,
         Array,
         Slice
+
+        // todo: add functions
+        // todo: add pointers
     };
 
     union ValueInfo {

@@ -36,6 +36,10 @@ namespace monomorphizer::mast {
             m_info_table.emplace_back();
         }
 
+        inline NodeKind kind_of(size_t index) {
+            return m_kind_table[index];
+        }
+
         inline NodeInfo* tmp_info_ptr(size_t index) {
             return &m_info_table[index];
         }
@@ -79,6 +83,9 @@ namespace monomorphizer::mast {
         s_mgr = nullptr;
     }
 
+    NodeKind get_node_kind(NodeID node_id) {
+        return s_mgr->kind_of(node_id);
+    }
     NodeInfo* get_info_ptr(NodeID node_id) {
         assert(node_id < s_mgr->node_count());
         auto node_index = static_cast<size_t>(node_id);
