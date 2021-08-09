@@ -103,7 +103,7 @@ namespace monomorphizer::defs {
     // Constructor helpers:
     //
 
-    bool is_mast_node_exp_not_ts(NodeID node_id) {
+    bool is_mast_node_exp_not_ts(mast::NodeID node_id) {
         mast::NodeKind nk = mast::get_node_kind(node_id);
         switch (nk) {
             // type specs:
@@ -114,8 +114,6 @@ namespace monomorphizer::defs {
             case mast::NodeKind::TS_SLICE:
             case mast::NodeKind::TS_FUNC_SGN:
             case mast::NodeKind::TS_TUPLE:
-            case mast::NodeKind::TS_STRUCT:
-            case mast::NodeKind::TS_UNION:
             case mast::NodeKind::TS_GET_POLY_MODULE_FIELD:
             case mast::NodeKind::TS_GET_MONO_MODULE_FIELD: {
                 return false;
@@ -131,7 +129,7 @@ namespace monomorphizer::defs {
             case mast::NodeKind::EXP_UNARY_OP:
             case mast::NodeKind::EXP_BINARY_OP:
             case mast::NodeKind::EXP_IF_THEN_ELSE:
-            case mast::NodeKind::EXP_GET_TUPLE_FIELD_BY_INDEX:
+            case mast::NodeKind::EXP_GET_TUPLE_FIELD:
             case mast::NodeKind::EXP_GET_POLY_MODULE_FIELD:
             case mast::NodeKind::EXP_GET_MONO_MODULE_FIELD:
             case mast::NodeKind::EXP_LAMBDA:
@@ -181,7 +179,7 @@ namespace monomorphizer::defs {
 
     DefID help_emplace_const_mast_def(
         char* mv_def_name,
-        NodeID node_id,
+        mast::NodeID node_id,
         bool is_global
     ) {
         bool bound_node_id_is_exp_not_ts = is_mast_node_exp_not_ts(node_id);
@@ -237,7 +235,7 @@ namespace monomorphizer::defs {
 
     DefID define_const_mast_node(
         char* mv_def_name,
-        NodeID node_id,
+        mast::NodeID node_id,
         bool is_global
     ) {
         return help_emplace_const_mast_def(

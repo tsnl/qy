@@ -56,18 +56,25 @@ and prevents odd behavior when global variables are cloned.
 ## Scratch TODO
 
 - ~~first, finish implementing DefID~~
-- next, implement substitution objects
+- ~~next, implement substitution objects~~
   - these must be mutable, since we can use it as a cache to store partially
     evaluated polymorphs to substitute IDs over several instantiations
   - these just map DefIDs to TOT_CONST DefIDs
+- ~~next, implement `mtype`~~
+  - skipped this earlier, can be done now
 - next, implement `rewrite` (aka sub&copy)
   - copy polymorphic body AST nodes into the polymorph
   - in fact, evaluate each field into a TOT_CONST such that its unique value is
     known at compile-time
   - when an ID is encountered, try to replace its DefID with one in the sub map.
+  - **WIP**: `monomorphize` ready, `eval` in progress.
 - finally, implement MAST building from Python (see below)
 
 ## Interface
+
+The core conceit is that we create monomorphic modules, and then apply 
+substitutions to rewrite polymorphic bodies until they are truly monomorphic.
+- every ID reference is assumed to be monomorphic
 
 In `typer.definition.BaseRec`, there is a `def_id` field that is generated for 
 each definition.

@@ -32,7 +32,7 @@ namespace monomorphizer::defs {
     // constant definitions: 
     DefID define_const_mast_node(
         char* mv_def_name,
-        NodeID bound_node_id,
+        mast::NodeID bound_node_id,
         bool is_global
     );
     DefID define_total_const_value(

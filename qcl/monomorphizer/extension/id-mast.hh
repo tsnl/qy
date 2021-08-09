@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cstdint>
+#include <cstddef>
 
 //
 // Nodes are IDed by 64-bit handles
 //
 
-namespace monomorphizer {
+namespace monomorphizer::mast {
 
     using NodeID = size_t;
     using ModID = NodeID;

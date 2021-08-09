@@ -37,7 +37,7 @@
 namespace monomorphizer::eval {
 
     // NOTE: these functions could throw errors 
-    mtype::MTypeID eval_type(TypeSpecID ts_id);
-    mval::ValueID eval_exp(ExpID exp_id);
+    mtype::MTypeID eval_type(mast::TypeSpecID ts_id);
+    mval::ValueID eval_exp(mast::ExpID exp_id);
 
 }

@@ -12,6 +12,7 @@
 #include "mtype.hh"
 #include "panic.hh"
 #include "mval.hh"
+#include "arg-list.hh"
 
 //
 // Implementation: Compile-time constants
@@ -20,199 +21,6 @@
 namespace monomorphizer::modules {
     extern MonoModID const NULL_MONO_MOD_ID = -1;
     extern PolyModID const NULL_POLY_MOD_ID = -1;
-}
-
-//
-// Implementation: arg-list tries:
-//
-
-namespace monomorphizer::modules {
-
-    using ArgTrieNodeID = size_t;
-    
-    ArgTrieNodeID const NULL_ATN_ID = -1;
-    
-    struct ArgTrieNode;
-    struct ArgTrieEdge;
-
-    struct ArgTrieNode {
-        std::vector<ArgTrieEdge> m_forward_type_edges;
-        std::vector<ArgTrieEdge> m_forward_value_edges;
-        ArgTrieNodeID m_parent_node_id;
-        size_t m_incoming_edge_appended_id;
-
-        ArgTrieNode(
-            ArgTrieNodeID parent_node_id,
-            size_t incoming_edge_appended_id
-        );
-    };
-    struct ArgTrieEdge {
-        size_t m_appended_id;
-        ArgTrieNodeID m_dst;
-
-        ArgTrieEdge(
-            size_t appended_id,
-            ArgTrieNodeID dst_node_id
-        );
-    };
-
-    static std::deque<ArgTrieNode> s_atn_table = {};
-    static std::vector<ArgTrieEdge> s_atn_root_type_edges;
-    static std::vector<ArgTrieEdge> s_atn_root_value_edges;
-
-    ArgTrieNodeID new_atn(
-        ArgTrieNodeID parent_node_id, 
-        size_t incoming_edge_appended_id
-    ) {
-        ArgTrieNodeID new_id = s_atn_table.size();
-        s_atn_table.emplace_back(parent_node_id, incoming_edge_appended_id);
-        return new_id;
-    }
-
-    ArgTrieNodeID get_atn_with_value_prepended(
-        ArgTrieNodeID root, 
-        mval::ValueID appended_value_id
-    );
-    ArgTrieNodeID get_atn_with_type_prepended(
-        ArgTrieNodeID root, 
-        mtype::MTypeID appended_type_id
-    );
-
-    ArgTrieNode::ArgTrieNode(
-        ArgTrieNodeID parent_node_id,
-        size_t incoming_edge_appended_id
-    )
-    :   m_parent_node_id(parent_node_id),
-        m_forward_type_edges(),
-        m_forward_value_edges(),
-        m_incoming_edge_appended_id(incoming_edge_appended_id)
-    {}
-
-    ArgTrieEdge::ArgTrieEdge(
-        size_t appended_id,
-        ArgTrieNodeID dst_node_id
-    )
-    :   m_appended_id(appended_id),
-        m_dst(dst_node_id)
-    {}
-
-    ArgTrieNodeID get_cached_dst(
-        std::vector<ArgTrieEdge> const& edges_vec,
-        size_t const appended_id,
-        bool const check_id_val_equality
-    ) {
-        for (auto edge: edges_vec) {
-            auto edge_id = edge.m_appended_id;
-            auto dst_id = edge.m_dst;
-
-            if (check_id_val_equality) {
-                if (mval::equals(edge_id, appended_id)) {
-                    return dst_id;
-                }
-            } else {
-                if (edge_id == appended_id) {
-                    return dst_id;
-                }
-            }
-        }
-        return NULL_ATN_ID;
-    }
-    ArgTrieNodeID help_get_atn_with_id_appended(
-        ArgTrieNodeID root,
-        size_t appended_id,
-        bool appended_id_is_value_not_type_id
-    ) {
-        std::vector<ArgTrieEdge>* edges_vec_p = (
-            (root == NULL_ATN_ID) ? 
-            (
-                appended_id_is_value_not_type_id ?
-                    &s_atn_root_type_edges : 
-                    &s_atn_root_value_edges
-            ) 
-            :
-            (
-                appended_id_is_value_not_type_id ?
-                    &s_atn_table[root].m_forward_type_edges :
-                    &s_atn_table[root].m_forward_value_edges
-            )
-        );
-        ArgTrieNodeID cached_dst_node_id = get_cached_dst(
-            *edges_vec_p,
-            appended_id,
-            appended_id_is_value_not_type_id
-        );
-        if (cached_dst_node_id != NULL_ATN_ID) {
-            return cached_dst_node_id;
-        } else {
-            ArgTrieNodeID fresh_dst_id = new_atn(root, appended_id);
-            edges_vec_p->emplace_back(
-                appended_id,
-                fresh_dst_id
-            );
-            return fresh_dst_id;
-        }
-    }
-    ArgTrieNodeID get_atn_with_value_prepended(
-        ArgTrieNodeID root, 
-        mval::ValueID appended_value_id
-    ) {
-        return help_get_atn_with_id_appended(
-            root,
-            appended_value_id,
-            true
-        );
-    }
-    ArgTrieNodeID get_atn_with_type_prepended(
-        ArgTrieNodeID root, 
-        mtype::MTypeID appended_type_id
-    ) {
-        return help_get_atn_with_id_appended(
-            root,
-            appended_type_id,
-            false
-        );
-    }
-
-    size_t atn_last_inserted_id(
-        ArgTrieNodeID node
-    ) {
-        return s_atn_table[node].m_incoming_edge_appended_id;
-    }
-
-}
-
-//
-// Interface: ArgListID
-//
-
-namespace monomorphizer::modules {
-
-    extern ArgListID const EMPTY_ARG_LIST_ID = NULL_ATN_ID;
-
-    ArgListID get_arg_list_with_type_id_prepended(
-        ArgListID list,
-        mtype::MTypeID type_id
-    ) {
-        return static_cast<ArgListID>(
-            get_atn_with_type_prepended(
-                static_cast<ArgTrieNodeID>(list), 
-                type_id
-            )
-        );
-    }
-
-    ArgListID get_arg_list_with_value_id_prepended(
-        ArgListID list,
-        mval::ValueID value_id
-    ) {
-        return static_cast<ArgListID>(
-            get_atn_with_value_prepended(
-                static_cast<ArgTrieNodeID>(list),
-                value_id
-            )
-        );
-    }
-
 }
 
 //
@@ -233,7 +41,7 @@ namespace monomorphizer::modules {
     struct PolyModInfo {
         size_t bv_count;
         DefID* bv_def_id_array;
-        std::map<ArgListID, MonoModID> instantiated_mono_mods_cache;
+        std::map<arg_list::ArgListID, MonoModID> instantiated_mono_mods_cache;
     };
 
     static std::vector<CommonModInfo> s_mono_common_info_table;
@@ -272,7 +80,7 @@ namespace monomorphizer::modules {
         s_mono_mod_info_table.push_back({opt_parent_mod_id});
         return id;
     }
-    void add_mono_module_ts_field(
+    size_t add_mono_module_field(
         MonoModID template_id,
         DefID field_def_id
     ) {
@@ -281,13 +89,11 @@ namespace monomorphizer::modules {
             def_kind == defs::DefKind::CONST_TOT_TID ||
             def_kind == defs::DefKind::CONST_TOT_VAL
         ) && "Cannot bind fields in mono-modules without first evaluating.");
-        s_mono_common_info_table[template_id].fields.push_back(field_def_id);
-    }
-    void add_mono_module_exp_field(
-        MonoModID template_id,
-        DefID field_def_id
-    ) {
-        s_mono_common_info_table[template_id].fields.push_back(field_def_id);
+        
+        auto& fields = s_mono_common_info_table[template_id].fields;
+        size_t index = fields.size();
+        fields.push_back(field_def_id);
+        return index;
     }
 
     // Polymorphic template construction:
@@ -303,20 +109,36 @@ namespace monomorphizer::modules {
         );
         return id;
     }
-    void add_poly_module_ts_field(
+    size_t add_poly_module_field(
         PolyModID template_id,
         DefID field_def_id
     ) {
-        s_poly_common_info_table[template_id].fields.push_back(field_def_id);
+        auto& fields = s_poly_common_info_table[template_id].fields;
+        size_t index = fields.size();
+        fields.push_back(field_def_id);
+        return index;
     }
-    void add_poly_module_exp_field(
-        PolyModID template_id,
-        DefID subbed_polymorphic_field_const_def_id,
-        ExpID bound_exp_id
+
+}
+
+//
+// Interface: getting fields at an index
+//
+
+namespace monomorphizer::modules {
+
+    DefID get_mono_mod_field_at(
+        MonoModID mono_mod_id,
+        size_t field_index
     ) {
-        s_poly_common_info_table[template_id].fields.push_back(
-            subbed_polymorphic_field_const_def_id
-        );
+        return s_mono_common_info_table[mono_mod_id].fields[field_index];
+    }
+
+    DefID get_poly_mod_field_at(
+        PolyModID poly_mod_id,
+        size_t field_index
+    ) {
+        return s_poly_common_info_table[poly_mod_id].fields[field_index];
     }
 
 }
@@ -380,7 +202,7 @@ namespace monomorphizer::modules {
 
     MonoModID instantiate_poly_mod(
         PolyModID poly_mod_id,
-        ArgListID arg_list_id
+        arg_list::ArgListID arg_list_id
     ) {
         CommonModInfo const* base = &s_poly_common_info_table[poly_mod_id];
         PolyModInfo const* info = &s_poly_custom_info_table[poly_mod_id];
@@ -394,17 +216,19 @@ namespace monomorphizer::modules {
 
         // instantiating this module with these args by creating a fresh
         // MonoModID
-        ArgTrieNodeID atn_head_id = arg_list_id;
+        arg_list::ArgListID arg_list_it = arg_list_id;
         for (int i = 0; i < info->bv_count; i++) {
             // iterating in reverse order to efficiently traverse the ArgList
             int arg_index = (info->bv_count - 1) - i;
-            assert(atn_head_id != NULL_ATN_ID && "ERROR: ArgList too short");
-            ArgTrieNode const* atn_info = &s_atn_table[atn_head_id];
-
+            assert(
+                (arg_list_it != arg_list::EMPTY) && 
+                "ERROR: ArgList too short"
+            );
+            
             // todo: generate a substitution
             //  - replace `bv_def_id` with `replacement_def_id`
             DefID bv_def_id = info->bv_def_id_array[arg_index];
-            size_t bound_id = atn_last_inserted_id(atn_head_id);
+            size_t bound_id = arg_list::head(arg_list_it);
             DefID replacement_def_id = def_new_total_const_val_for_bv_sub(
                 mod_name,
                 bv_def_id, bound_id
@@ -412,16 +236,17 @@ namespace monomorphizer::modules {
             
             // updating for the next iteration:
             // - `i` will update second, after this loop body is run.
-            // - updating `atn_head_id`:
-            atn_head_id = atn_info->m_parent_node_id;
+            // - updating `arg_list_it`:
+            arg_list_it = arg_list::tail(arg_list_it);
         }
-        assert(atn_head_id == NULL_ATN_ID && "ERROR: ArgList too long");
+        assert(arg_list_it == arg_list::EMPTY && "ERROR: ArgList too long");
 
-        // todo: copy this module's contents with substitutions applied
+        // copy this module's contents with substitutions applied
         
+
         // todo: REMEMBER TO CACHE THE FRESH MONO ID
         // todo: return the fresh mono ID
         return NULL_MONO_MOD_ID;
     }
-    
+
 }

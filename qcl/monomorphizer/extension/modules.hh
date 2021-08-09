@@ -13,6 +13,7 @@
 #include "id-mast.hh"
 #include "id-mval.hh"
 #include "id-mtype.hh"
+#include "id-arg-list.hh"
 
 namespace monomorphizer::modules {
 
@@ -29,26 +30,10 @@ namespace monomorphizer::modules {
         char* mv_template_name,
         PolyModID opt_parent_template_id
     );
-    void add_mono_module_ts_field(
+    // add_field pushes a field and returns its unique index.
+    size_t add_mono_module_field(
         MonoModID template_id,
         DefID field_def_id
-    );
-    void add_mono_module_exp_field(
-        MonoModID template_id,
-        DefID field_def_id
-    );
-
-    // ArgListID: unique IDs for actual argument tuples.
-    // ID equality <=> tuple equality (val_equals for value IDs, 
-    // type_equals for type IDs)
-    extern ArgListID const EMPTY_ARG_LIST_ID;
-    ArgListID get_arg_list_with_type_id_prepended(
-        ArgListID list,
-        mtype::MTypeID type_id
-    );
-    ArgListID get_arg_list_with_value_id_prepended(
-        ArgListID list,
-        mval::ValueID value_id
     );
 
     // Polymorphic template construction:
@@ -57,19 +42,30 @@ namespace monomorphizer::modules {
         size_t bv_def_id_count,
         DefID* mv_bv_def_id_array
     );
-    void add_poly_module_ts_field(
+    // add_field pushes a field and returns the field's unique index.
+    size_t add_poly_module_field(
         PolyModID template_id,
         DefID field_def_id
     );
-    void add_poly_module_exp_field(
-        PolyModID template_id,
-        DefID field_def_id
+    
+    // Module fields are accessed by an index that is determined by the order
+    // in which symbols are added.
+    // By convention, this should be the order in which source nodes are written 
+    // in source code.
+    DefID get_mono_mod_field_at(
+        MonoModID mono_mod_id,
+        size_t field_index
+    );
+    DefID get_poly_mod_field_at(
+        PolyModID poly_mod_id,
+        size_t field_index
     );
 
-    // instantiation:
+    // instantiation: 
+    // turn a PolyModID into a MonoModID using some template arguments.
     MonoModID instantiate_poly_mod(
         PolyModID poly_mod_id,
-        ArgListID arg_list_id
+        arg_list::ArgListID arg_list_id
     );
 
 }
