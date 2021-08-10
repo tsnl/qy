@@ -173,7 +173,7 @@ namespace monomorphizer::modules {
                 );
             } break;
             case defs::DefKind::BV_TS: {
-                mtype::MTypeID type_id = bound_id;
+                mtype::TID type_id = bound_id;
                 return defs::define_total_const_type(
                     def_name,
                     type_id, true

@@ -42,7 +42,7 @@ namespace monomorphizer::defs {
     );
     DefID define_total_const_type(
         char* mv_def_name,
-        mtype::MTypeID type_id,
+        mtype::TID type_id,
         bool is_global
     );
 
@@ -61,5 +61,7 @@ namespace monomorphizer::defs {
     DefKind get_def_kind(DefID def_id);
     char const* get_mod_name(DefID def_id);
     char const* get_def_name(DefID def_id);
+    void store_id_at_def_id(DefID def_id, size_t id);
+    size_t load_id_from_def_id(DefID def_id);
 
 }

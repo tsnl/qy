@@ -1,13 +1,13 @@
 dm xyz [n] {
-    n :: I32;
+    n I32;
 };
 
 dm abc {
-    abc := (x) -> TOT {
-        a := 2*x + 1;
-        b := 42^a;
+    abc = (x) -> TOT {
+        a = 2*x + 1;
+        b = 42^a;
         a + b
     };
 
-    truth := 7*7 = xyz[abc(24)]:n;
+    truth = 7*7 == xyz[abc(24)]::n;
 };

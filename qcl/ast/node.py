@@ -117,12 +117,26 @@ class NumberExp(BaseExp):
         self.digits = self.digits.replace('_', '')
 
         # checking coarse 'kind' based on suffix:
-        assert self.suffix is None or self.suffix in 'bBhHiIlLqQnNefd'
-        self.is_explicitly_float = (self.suffix in ('e', 'f', 'd')) or ('.' in self.digits)
-        self.is_explicitly_unsigned_int = self.suffix in ('B', 'H', 'I', 'L', 'Q', 'N')
-        self.is_explicitly_signed_int = self.suffix in ('b', 'h', 'i', 'l', 'q', 'n') or (
-            not self.is_explicitly_float and
-            not self.is_explicitly_unsigned_int
+        unsigned_int_suffix_iterable = ('t', 'B', 'H', 'I', 'L', 'Q', 'N')
+        signed_int_suffix_iterable = ('b', 'h', 'i', 'l', 'q', 'n')
+        float_suffix_iterable = ('f', 'd')
+        all_suffices = (
+            unsigned_int_suffix_iterable + 
+            signed_int_suffix_iterable + 
+            float_suffix_iterable
+        )
+        assert self.suffix is None or self.suffix in all_suffices
+        self.is_float = (
+            self.suffix in float_suffix_iterable or
+            ('.' in self.digits)
+        )
+        self.is_unsigned_int = (
+            self.suffix in unsigned_int_suffix_iterable
+        )
+        self.is_signed_int = (
+            self.suffix in signed_int_suffix_iterable
+        ) or (
+            not (self.is_float or self.is_unsigned_int)
         )
         self.is_implicitly_typed = self.suffix is None
 
@@ -130,6 +144,7 @@ class NumberExp(BaseExp):
         # TODO: acquire pointer-size in bytes based on target; currently hard-coded for 64-bit.
         pointer_size_in_bytes = 8
         self.width_in_bits = {
+            't': 1,
             'b': 8, 'B': 8,
             'h': 16, 'H': 16,
             'i': 32, 'I': 32,
@@ -461,7 +476,8 @@ class FnSignatureTypeSpec(BaseTypeSpec):
         self.return_type_spec = return_type_spec
         self.opt_ses = opt_ses
 
-        # by default, the closure spec is `Yes`, since our language uses fat pointers internally.
+        # by default, the closure spec is `Yes`, since our language uses fat 
+        # pointers internally.
         self.closure_spec = type.closure_spec.CS.Yes
 
 

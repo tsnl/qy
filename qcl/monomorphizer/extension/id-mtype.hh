@@ -4,6 +4,6 @@
 
 namespace monomorphizer::mtype {
 
-    using MTypeID = size_t;
+    using TID = size_t;
 
 }

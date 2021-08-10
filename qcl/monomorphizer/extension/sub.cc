@@ -103,6 +103,14 @@ namespace monomorphizer::sub {
 
 namespace monomorphizer::sub {
 
+    Substitution* create() {
+        return new sub::Substitution();
+    }
+
+    void destroy(Substitution* s) {
+        delete s;
+    }
+
     void add_monomorphizing_replacement(
         Substitution* sub, 
         DefID original_def_id, DefID replacement_def_id

@@ -4,5 +4,5 @@ imports {
 
 def about2 {
     count2 = 2;
-    count3_copy = t3:about3:count3;
+    count3_copy = t3::about3::count3;
 };

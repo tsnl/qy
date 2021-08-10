@@ -36,4 +36,13 @@ namespace monomorphizer {
         Heap
     };
 
+    enum class IntegerSuffix {
+        U1, U8, U16, U32, U64,
+        S8, S16, S32, S64
+    };
+
+    enum class FloatSuffix {
+        F32, F64
+    };
+
 }

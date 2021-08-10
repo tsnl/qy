@@ -1,21 +1,21 @@
 dm howdy {
-    x := (v) -> (p) -> ST {
+    x = (v) -> (p) -> ST {
         # v--- violates the context pointer ban
-        # do p <- v;
+        # do p := v;
 
-        do p <- 42f;
-        @!p
+        do p := 42f;
+        @p
     };
-    y := (b) -> ML {
+    y = (b) -> ML {
         x(0f)!(b)
     };
-    x :: NoCtxPtr { F32 -> ![F32] -> ST F32 };
-    y :: NoCtxPtr { ![F32] -> ML F32 };
+    x: NoCtxPtr { F32 -> ![F32] -> ST F32 };
+    y: NoCtxPtr { ![F32] -> ML F32 };
 };
 
 # dm henlo {
 #     q = (ip) -> {
-#         @!ip
+#         @ip
 #     };
 #
 #     w = () -> ML {
@@ -23,5 +23,5 @@ dm howdy {
 #         q(x)
 #     };
 #
-#     q :: (![I64]) -> I64;
+#     q: (![I64]) -> I64;
 # };

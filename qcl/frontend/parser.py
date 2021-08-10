@@ -490,7 +490,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     #
 
     def visitAssignExp(self, ctx):
-        is_tot = ctx.is_tot is not None
+        is_tot = ctx.is_st is None
         return ast.node.AssignExp(
             self.ctx_loc(ctx),
             self.visit(ctx.dst),

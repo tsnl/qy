@@ -14,20 +14,14 @@ namespace monomorphizer::defs {
     // Constants:
     extern DefID const NULL_DEF_ID = -1;
 
-    // Definitions are stored in 2 different-sized tables.
-    // We store a common table of kinds and indices into respective lists.
-    struct CommonDefInfo;
-    struct ConstDefInfo;
-    struct VarDefInfo;
-
+    struct DefInfo;
+    
     // Pre-reserved vectors => stable slabs of memory (for AoS pattern)
     static bool s_is_already_init = false;
     static std::vector<bool> s_def_is_const_not_var_table;
     static std::vector<bool> s_def_is_global_table;
     static std::vector<DefKind> s_def_kind_table;
-    static std::vector<CommonDefInfo> s_def_common_info_table;
-    static std::vector<ConstDefInfo> s_const_mast_def_info_table;
-    static std::vector<ConstDefInfo> s_tot_const_def_info;
+    static std::vector<DefInfo> s_def_info_table;
     // static std::vector<VarDefInfo> s_var_def_info_table;
     
     void ensure_init() {
@@ -38,12 +32,8 @@ namespace monomorphizer::defs {
             s_def_is_const_not_var_table.reserve(init_def_capacity);
             s_def_is_global_table.resize(init_def_capacity);
             s_def_kind_table.reserve(init_def_capacity);
-            s_def_common_info_table.reserve(init_def_capacity);
-            // reserving against the worst-case: all of one kind:
-            s_const_mast_def_info_table.reserve(init_def_capacity);
-            s_tot_const_def_info.reserve(init_def_capacity);
-            // s_var_def_info_table.reserve(init_def_capacity);
-
+            s_def_info_table.reserve(init_def_capacity);
+            
             // finally, marking `init` as complete:
             s_is_already_init = true;
         }
@@ -54,100 +44,29 @@ namespace monomorphizer::defs {
             s_def_is_const_not_var_table.clear();
             s_def_is_global_table.clear();
             s_def_kind_table.clear();
-            s_def_common_info_table.clear();
-            s_const_mast_def_info_table.clear();
-            s_tot_const_def_info.clear();
-            // s_var_def_info_table.clear();
+            s_def_info_table.clear();
             s_is_already_init = false;
         }
     }
 
     //
-    // CommonInfo:
+    // DefInfo:
     //
 
-    struct CommonDefInfo {
+    struct DefInfo {
         char* const def_name;
-        size_t const info_index;
+        size_t opt_target_id;
 
-        inline
-        CommonDefInfo(char* mv_def_name, size_t init_info_index)
+        inline DefInfo(char* mv_def_name)
         :   def_name(mv_def_name),
-            info_index(init_info_index)
+            opt_target_id()
+        {}
+
+        inline DefInfo(char* mv_def_name, size_t target_id)
+        :   def_name(mv_def_name),
+            opt_target_id(target_id)
         {}
     };
-
-    //
-    // Const definitions:
-    //
-
-    struct ConstDefInfo {
-        size_t const target_id;
-
-        inline
-        ConstDefInfo(size_t init_target_id)
-        : target_id(init_target_id)
-        {}
-    };
-
-    //
-    // Bound Variable definitions:
-    //
-
-    // struct VarDefInfo {
-    //     // it seems like this space is not required
-    //     int dummy;
-    // };
-
-    //
-    // Constructor helpers:
-    //
-
-    bool is_mast_node_exp_not_ts(mast::NodeID node_id) {
-        mast::NodeKind nk = mast::get_node_kind(node_id);
-        switch (nk) {
-            // type specs:
-            case mast::NodeKind::TS_UNIT:
-            case mast::NodeKind::TS_ID:
-            case mast::NodeKind::TS_PTR:
-            case mast::NodeKind::TS_ARRAY:
-            case mast::NodeKind::TS_SLICE:
-            case mast::NodeKind::TS_FUNC_SGN:
-            case mast::NodeKind::TS_TUPLE:
-            case mast::NodeKind::TS_GET_POLY_MODULE_FIELD:
-            case mast::NodeKind::TS_GET_MONO_MODULE_FIELD: {
-                return false;
-            } break;
-            
-            // expressions:
-            case mast::NodeKind::EXP_UNIT:
-            case mast::NodeKind::EXP_INT:
-            case mast::NodeKind::EXP_FLOAT:
-            case mast::NodeKind::EXP_STRING:
-            case mast::NodeKind::EXP_ID:
-            case mast::NodeKind::EXP_FUNC_CALL:
-            case mast::NodeKind::EXP_UNARY_OP:
-            case mast::NodeKind::EXP_BINARY_OP:
-            case mast::NodeKind::EXP_IF_THEN_ELSE:
-            case mast::NodeKind::EXP_GET_TUPLE_FIELD:
-            case mast::NodeKind::EXP_GET_POLY_MODULE_FIELD:
-            case mast::NodeKind::EXP_GET_MONO_MODULE_FIELD:
-            case mast::NodeKind::EXP_LAMBDA:
-            case mast::NodeKind::EXP_ALLOCATE_ONE:
-            case mast::NodeKind::EXP_ALLOCATE_MANY:
-            case mast::NodeKind::EXP_CHAIN: {
-                return true;
-            }
-
-            // otherwise, error
-            default: {
-                throw new Panic(
-                    "Tried binding invalid AST node kind: "
-                    "expected TypeSpec or Exp only"
-                );
-            }
-        }
-    }
 
     //
     // Constructors:
@@ -156,21 +75,19 @@ namespace monomorphizer::defs {
     DefID help_emplace_common_def_info(
         DefKind kind,
         char* mv_def_name,
-        size_t info_index,
+        size_t target_id,
         bool is_global,
         bool kind_is_const_not_bv
     ) {
         size_t pa_size = s_def_kind_table.size();
         assert(
-            pa_size == s_def_common_info_table.size() &&
-            pa_size == s_def_is_global_table.size() &&
-            pa_size == s_def_is_const_not_var_table.size() &&
+            pa_size == s_def_info_table.size() &&
             "Parallel arrays out of sync"
         );
         size_t def_id = s_def_kind_table.size();
         
         s_def_kind_table.push_back(kind);
-        s_def_common_info_table.emplace_back(mv_def_name, info_index);
+        s_def_info_table.emplace_back(mv_def_name, target_id);
         s_def_is_global_table.push_back(is_global);
         s_def_is_const_not_var_table.push_back(kind_is_const_not_bv);
         
@@ -182,21 +99,17 @@ namespace monomorphizer::defs {
         mast::NodeID node_id,
         bool is_global
     ) {
-        bool bound_node_id_is_exp_not_ts = is_mast_node_exp_not_ts(node_id);
+        bool bound_node_id_is_exp_not_ts = mast::is_node_exp_not_ts(node_id);
         DefKind def_kind = (
             bound_node_id_is_exp_not_ts ?
                 DefKind::CONST_EXP :
                 DefKind::CONST_TS
         );
 
-        size_t target_id = node_id;
-        size_t info_index = s_const_mast_def_info_table.size();
-        s_const_mast_def_info_table.emplace_back(target_id);
-
         return help_emplace_common_def_info(
             def_kind,
             mv_def_name,
-            info_index,
+            node_id,
             is_global,
             true
         );
@@ -208,13 +121,10 @@ namespace monomorphizer::defs {
         size_t bound_id,
         bool is_global
     ) {
-        size_t info_index = s_const_mast_def_info_table.size();
-        s_const_mast_def_info_table.emplace_back(bound_id);
-
         return help_emplace_common_def_info(
             def_kind,
             mv_def_name,
-            info_index,
+            bound_id,
             is_global,
             true
         );
@@ -260,7 +170,7 @@ namespace monomorphizer::defs {
 
     DefID define_total_const_type(
         char* mv_def_name,
-        mtype::MTypeID type_id,
+        mtype::TID type_id,
         bool is_global
     ) {
         return help_emplace_tot_const_def(
@@ -297,10 +207,16 @@ namespace monomorphizer::defs {
         return s_def_kind_table[def_id];
     }
     char const* get_mod_name(DefID def_id) {
-        return s_def_common_info_table[def_id].def_name;
+        return s_def_info_table[def_id].def_name;
     }
     char const* get_def_name(DefID def_id) {
-        return s_def_common_info_table[def_id].def_name;
+        return s_def_info_table[def_id].def_name;
+    }
+    void store_id_at_def_id(DefID def_id, size_t v) {
+        s_def_info_table[def_id].opt_target_id = v;
+    }
+    size_t load_id_from_def_id(DefID def_id) {
+        return s_def_info_table[def_id].opt_target_id;
     }
 
 }

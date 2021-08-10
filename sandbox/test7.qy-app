@@ -3,28 +3,28 @@ exports {
 };
 
 dm vec [T] {
-    Vec2 = impl[T,2]:Vector;
-    Vec3 = impl[T,3]:Vector;
-    add2 = impl[T,2]:add;
-    add3 = impl[T,3]:add;
+    Vec2 = impl[T,2]::Vector;
+    Vec3 = impl[T,3]::Vector;
+    add2 = impl[T,2]::add;
+    add3 = impl[T,3]::add;
 };
 
 dm impl [T, n] {
-    n :: U32;
-    help_apply_piecewise_bin_op :: (Vector, Vector, BinOpFn) -> TOT Vector;
+    n U32;
+    help_apply_piecewise_bin_op (Vector, Vector, BinOpFn) -> TOT Vector;
 
-    Vector := [T * n];
-    BinOpFn := (T, T) -> TOT T;
+    Vector = [T * n];
+    BinOpFn = (T, T) -> TOT T;
 
-    help_apply_piecewise_bin_op := (v1, v2, bin_op_fn) -> {
-        results := push[T*n];
-        for i := push(0); @i < n; TOT i <- @i + 1 {
-            TOT results[i] <- bin_op_fn(@v1[i], @v2[i]);
+    help_apply_piecewise_bin_op = (v1, v2, bin_op_fn) -> {
+        results = push[T*n];
+        for i = push(0); @i < n; i := @i + 1 {
+            results[i] := bin_op_fn(@v1[i], @v2[i]);
         };
         Vector(results)
     };
 
-    add := (v1, v2) -> {
+    add = (v1, v2) -> {
         help_apply_piecewise_bin_op(v1, v2, (x, y) -> x + y)
     };
 };

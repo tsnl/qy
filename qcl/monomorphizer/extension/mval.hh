@@ -2,10 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include "id-mval.hh"
 
 namespace monomorphizer::mval {
+
+    extern ValueID const NULL_VID;
 
     enum class ValueKind {
         Unit,
@@ -17,7 +20,7 @@ namespace monomorphizer::mval {
         Array,
         Slice
 
-        // todo: add functions
+        // todo: add functions: body is just MAST code
         // todo: add pointers
     };
 
@@ -44,23 +47,25 @@ namespace monomorphizer::mval {
     extern size_t const MAX_VAL_HASH_BYTE_COUNT;
 
     // value constructors:
-    ValueID push_val_u1(bool v);
-    ValueID push_val_u8(uint8_t v);
-    ValueID push_val_u16(uint16_t v);
-    ValueID push_val_u32(uint32_t v);
-    ValueID push_val_u64(uint64_t v);
-    ValueID push_val_s8(int8_t v);
-    ValueID push_val_s16(int16_t v);
-    ValueID push_val_s32(int32_t v);
-    ValueID push_val_s64(int64_t v);
-    ValueID push_val_f32(float v);
-    ValueID push_val_f64(double v);
-    ValueID push_val_str(size_t code_point_count, int* code_point_array);
-    ValueID push_val_tuple(size_t elem_id_count, ValueID* mv_elem_id_array);
+    ValueID get_unit();
+    ValueID push_u1(bool v);
+    ValueID push_u8(uint8_t v);
+    ValueID push_u16(uint16_t v);
+    ValueID push_u32(uint32_t v);
+    ValueID push_u64(uint64_t v);
+    ValueID push_s8(int8_t v);
+    ValueID push_s16(int16_t v);
+    ValueID push_s32(int32_t v);
+    ValueID push_s64(int64_t v);
+    ValueID push_f32(float v);
+    ValueID push_f64(double v);
+    ValueID push_str(size_t code_point_count, int* mv_code_point_array);
+    ValueID push_tuple(size_t elem_id_count, ValueID* mv_elem_id_array);
 
     // property accessors:
     ValueKind value_kind(ValueID value_id);
     ValueInfo value_info(ValueID value_id);
+    std::optional<ValueID> get_seq_elem(size_t sequence_info_index, size_t index);
 
     // equality:
     bool equals(ValueID v1, ValueID v2);

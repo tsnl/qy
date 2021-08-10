@@ -1,25 +1,25 @@
 dm test2 {
-    Vec3f := Struct { x :: Float32; y :: Float32; z :: Float32; };
-    Vec4f := Struct { x :: Float32; y :: Float32; z :: Float32; w :: Float32; };
+    Vec3f = Struct { x Float32; y Float32; z Float32; };
+    Vec4f = Struct { x Float32; y Float32; z Float32; w Float32; };
 
-    zero_v3f := Vec3f(0, 0, 0);
+    zero_v3f = Vec3f(0, 0, 0);
 
-    i3f := Vec3f(1, 0, 0);
-    j3f := Vec3f(0, 1, 0);
-    k3f := Vec3f(0, 0, 1);
+    i3f = Vec3f(1, 0, 0);
+    j3f = Vec3f(0, 1, 0);
+    k3f = Vec3f(0, 0, 1);
 
-    i4f := Vec4f(1, 0, 0, 0);
-    j4f := Vec4f(0, 1, 0, 0);
-    k4f := Vec4f(0, 0, 1, 0);
-    l4f := Vec4f(0, 0, 0, 1);
+    i4f = Vec4f(1, 0, 0, 0);
+    j4f = Vec4f(0, 1, 0, 0);
+    k4f = Vec4f(0, 0, 1, 0);
+    l4f = Vec4f(0, 0, 0, 1);
 
-    hello := (x, y) -> TOT {
-        w := x;
+    hello = (x, y) -> TOT {
+        let w x;
         (x, y, w)
     };
 
-    zero := (0, 0, 0);
-    x := zero;
-    # y = x + x;
-    z := hello(0f, 0f);
+    zero = (0, 0, 0);
+    x = zero;
+    # let y x + x;
+    z = hello(0f, 0f);
 };

@@ -59,7 +59,7 @@ namespace monomorphizer::arg_list {
     );
     ArgTrieNodeID get_atn_with_type_prepended(
         ArgTrieNodeID root, 
-        mtype::MTypeID appended_type_id
+        mtype::TID appended_type_id
     );
 
     ArgTrieNode::ArgTrieNode(
@@ -148,7 +148,7 @@ namespace monomorphizer::arg_list {
     }
     ArgTrieNodeID get_atn_with_type_prepended(
         ArgTrieNodeID root, 
-        mtype::MTypeID appended_type_id
+        mtype::TID appended_type_id
     ) {
         return help_get_atn_with_id_appended(
             root,
@@ -175,7 +175,7 @@ namespace monomorphizer::arg_list {
 
     ArgListID cons_tid(
         ArgListID list,
-        mtype::MTypeID type_id
+        mtype::TID type_id
     ) {
         return static_cast<ArgListID>(
             get_atn_with_type_prepended(

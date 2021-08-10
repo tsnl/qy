@@ -4,6 +4,7 @@
 
 #include "id-arg-list.hh"
 #include "id-mtype.hh"
+#include "id-mval.hh"
 #include "shared-enums.hh"
 
 namespace monomorphizer::mtype {
@@ -32,23 +33,41 @@ namespace monomorphizer::mtype {
         Function
     };
 
-    MTypeID get_unit_tid();
-    MTypeID get_u1_tid();
-    MTypeID get_u8_tid();
-    MTypeID get_u16_tid();
-    MTypeID get_u32_tid();
-    MTypeID get_u64_tid();
-    MTypeID get_s8_tid();
-    MTypeID get_s16_tid();
-    MTypeID get_s32_tid();
-    MTypeID get_s64_tid();
-    MTypeID get_f32_tid();
-    MTypeID get_f64_tid();
-    MTypeID get_str_tid();
-    MTypeID get_tuple_tid(arg_list::ArgListID arg_list_id);
-    MTypeID get_ptr_tid(MTypeID ptd_tid, bool contents_is_mut);
-    MTypeID get_array_tid(MTypeID ptd_tid, bool contents_is_mut);
-    MTypeID get_slice_tid(MTypeID ptd_tid, bool contents_is_mut);
-    MTypeID get_function_tid(MTypeID arg_tid, MTypeID ret_tid, SES ses);
+    TID get_unit_tid();
+    TID get_u1_tid();
+    TID get_u8_tid();
+    TID get_u16_tid();
+    TID get_u32_tid();
+    TID get_u64_tid();
+    TID get_s8_tid();
+    TID get_s16_tid();
+    TID get_s32_tid();
+    TID get_s64_tid();
+    TID get_f32_tid();
+    TID get_f64_tid();
+    TID get_string_tid();
+    TID get_tuple_tid(
+        arg_list::ArgListID arg_list_id
+    );
+    TID get_ptr_tid(
+        TID ptd_tid, 
+        bool contents_is_mut
+    );
+    TID get_array_tid(
+        TID ptd_tid, 
+        mval::ValueID count_val_id, 
+        bool contents_is_mut
+    );
+    TID get_slice_tid(
+        TID ptd_tid, 
+        bool contents_is_mut
+    );
+    TID get_function_tid(
+        TID arg_tid, 
+        TID ret_tid, 
+        SES ses
+    );
+
+    TypeKind kind_of_tid(TID tid);
 
 }

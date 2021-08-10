@@ -16,14 +16,14 @@ namespace monomorphizer::sub {
     class Substitution;
 
     Substitution* create();
-    void destroy(Substitution* sub);
+    void destroy(Substitution* s);
 
     void add_monomorphizing_replacement(
-        Substitution* sub, 
+        Substitution* s, 
         DefID original_def_id, DefID replacement_def_id
     );
     DefID rw_def_id(
-        Substitution* sub, 
+        Substitution* s, 
         DefID def_id
     );
 

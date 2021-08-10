@@ -3,5 +3,5 @@ imports {
 };
 
 def about {
-    count3 = t2:about2:count2;
+    count3 = t2::about2::count2;
 };

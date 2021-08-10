@@ -542,7 +542,7 @@ def help_infer_exp_tid(
         else:
             width_in_bits = exp.width_in_bits
 
-        if exp.is_explicitly_float:
+        if exp.is_float:
             return (
                 substitution.empty,
                 type.get_float_type(width_in_bits),
@@ -550,7 +550,7 @@ def help_infer_exp_tid(
                 CS.No
             )
 
-        elif exp.is_explicitly_unsigned_int:
+        elif exp.is_unsigned_int:
             return (
                 substitution.empty,
                 type.get_int_type(width_in_bits, is_unsigned=True),
@@ -558,7 +558,7 @@ def help_infer_exp_tid(
                 CS.No
             )
         else:
-            assert exp.is_explicitly_signed_int
+            assert exp.is_signed_int
             return (
                 substitution.empty,
                 type.get_int_type(width_in_bits, is_unsigned=False),

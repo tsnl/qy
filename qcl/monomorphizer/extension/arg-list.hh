@@ -15,7 +15,7 @@ namespace monomorphizer::arg_list {
 
     ArgListID cons_tid(
         ArgListID list,
-        mtype::MTypeID type_id
+        mtype::TID type_id
     );
     ArgListID cons_val(
         ArgListID list,

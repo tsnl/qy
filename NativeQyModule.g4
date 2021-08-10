@@ -23,7 +23,7 @@ moduleExports
     : 'exports' '{' lines+=exportLine (',' lines+=exportLine)* '}'
     ;
 exportLine
-    : name=VID ':' '*'
+    : name=VID '::' '*'
     ;
 
 moduleDef
@@ -36,9 +36,9 @@ moduleDef
 
 
 tableElement
-    : lhs_id=VID '::' ts=typeSpec        #typeValIdElement
-    | lhs_id=VID ':=' init_exp=expr      #bindValIdElement
-    | lhs_id=TID ':=' init_ts=typeSpec   #bindTypeIdElement
+    : lhs_id=VID ts=typeSpec             #typeValIdElement
+    | lhs_id=VID '=' init_exp=expr       #bindValIdElement
+    | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
     | 'do' eval_exp=expr                 #forceEvalChainElement
     ;
 tableWrapper
@@ -54,8 +54,8 @@ chainTableWrapper
 //
 
 moduleAddressPrefix
-    :                                mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
-    | opt_prefix=moduleAddressPrefix mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
+    :                                mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? '::'
+    | opt_prefix=moduleAddressPrefix mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? '::'
     ;
 actualTemplateArg
     : e=expr
@@ -161,8 +161,8 @@ cmpBinaryExp
     ;
 eqBinaryExp
     : through=cmpBinaryExp
-    | lt=eqBinaryExp op='=' rt=cmpBinaryExp
-    | lt=eqBinaryExp op='<>' rt=cmpBinaryExp
+    | lt=eqBinaryExp op='==' rt=cmpBinaryExp
+    | lt=eqBinaryExp op='!=' rt=cmpBinaryExp
     ;
 logicalAndBinaryExp
     : through=eqBinaryExp
@@ -196,7 +196,7 @@ allocateExp
     ;
 allocatorHint: 'make' | 'push' ;
 assignExp
-    : (is_tot='TOT')? dst=binaryExp '<-' src=bulkyExp
+    : (is_st='ST')? dst=binaryExp ':=' src=bulkyExp
     ;
 
 //
@@ -264,8 +264,8 @@ fragment L: [a-z] ;
 fragment U: [A-Z] ;
 fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
-fragment INT_SUFFIX: (FLOAT_SUFFIX|[bBhHiIlLqQnN]) ;
-fragment FLOAT_SUFFIX: [efd] ;
+fragment INT_SUFFIX: (FLOAT_SUFFIX|[tbBhHiIlLqQnN]) ;
+fragment FLOAT_SUFFIX: [fd] ;
 
 fragment ANY_ESC: (
     ('\\' ('\\' | 'n' | 'r' | 't')) |

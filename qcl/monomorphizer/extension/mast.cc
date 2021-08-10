@@ -2,6 +2,7 @@
 #include "defs.hh"
 
 #include <vector>
+#include "panic.hh"
 
 namespace monomorphizer::mast {
 
@@ -175,7 +176,7 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
-    mast::TypeSpecID new_get_mono_module_field_exp(
+    mast::TypeSpecID new_get_mono_module_field_ts(
         MonoModID mono_mod_id,
         size_t field_index
     ) {
@@ -187,7 +188,7 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
-    mast::TypeSpecID new_get_poly_module_field_exp(
+    mast::TypeSpecID new_get_poly_module_field_ts(
         PolyModID poly_mod_id,
         size_t field_index,
         size_t actual_arg_count,
@@ -213,23 +214,27 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_int_exp(
         size_t mantissa,
+        IntegerSuffix typing_suffix,
         bool is_neg
     ) {
         auto new_node_id = help_alloc_node(NodeKind::EXP_INT);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_int;
 
         info_ptr->mantissa = mantissa;
+        info_ptr->suffix = typing_suffix;
         info_ptr->is_neg = is_neg;
-
+        
         return new_node_id;
     }
     mast::ExpID new_float_exp(
-        double value
+        double value,
+        FloatSuffix typing_suffix
     ) {
         auto new_node_id = help_alloc_node(NodeKind::EXP_FLOAT);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_float;
 
         info_ptr->value = value;
+        info_ptr->suffix = typing_suffix;
 
         return new_node_id;
     }
@@ -386,6 +391,35 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
+    mast::ExpID new_get_mono_module_field_exp(
+        MonoModID mono_mod_id,
+        size_t field_index
+    ) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_MONO_MODULE_FIELD);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_get_mono_module_field;
+        
+        info_ptr->template_id = mono_mod_id;
+        info_ptr->field_index = field_index;
+
+        return new_node_id;
+    }
+    mast::ExpID new_get_poly_module_field_exp(
+        PolyModID poly_mod_id,
+        size_t field_index,
+        size_t actual_arg_count,
+        mast::NodeID* mv_actual_arg_array
+    ) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_POLY_MODULE_FIELD);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_get_poly_module_field;
+
+        info_ptr->template_id = poly_mod_id;
+        info_ptr->field_index = field_index;
+        info_ptr->arg_count = actual_arg_count;
+        info_ptr->arg_array = mv_actual_arg_array;
+
+        return new_node_id;
+    }
+
     mast::ElemID new_bind1v_elem(
         DefID bound_def_id, 
         mast::ExpID init_exp_id
@@ -407,6 +441,56 @@ namespace monomorphizer::mast {
         info_ptr->eval_exp_id = eval_exp_id;
 
         return new_node_id;
+    }
+
+}
+
+namespace monomorphizer::mast {
+
+    bool is_node_exp_not_ts(mast::NodeID node_id) {
+        mast::NodeKind nk = mast::get_node_kind(node_id);
+        switch (nk) {
+            // type specs:
+            case mast::NodeKind::TS_UNIT:
+            case mast::NodeKind::TS_ID:
+            case mast::NodeKind::TS_PTR:
+            case mast::NodeKind::TS_ARRAY:
+            case mast::NodeKind::TS_SLICE:
+            case mast::NodeKind::TS_FUNC_SGN:
+            case mast::NodeKind::TS_TUPLE:
+            case mast::NodeKind::TS_GET_POLY_MODULE_FIELD:
+            case mast::NodeKind::TS_GET_MONO_MODULE_FIELD: {
+                return false;
+            } break;
+            
+            // expressions:
+            case mast::NodeKind::EXP_UNIT:
+            case mast::NodeKind::EXP_INT:
+            case mast::NodeKind::EXP_FLOAT:
+            case mast::NodeKind::EXP_STRING:
+            case mast::NodeKind::EXP_ID:
+            case mast::NodeKind::EXP_FUNC_CALL:
+            case mast::NodeKind::EXP_UNARY_OP:
+            case mast::NodeKind::EXP_BINARY_OP:
+            case mast::NodeKind::EXP_IF_THEN_ELSE:
+            case mast::NodeKind::EXP_GET_TUPLE_FIELD:
+            case mast::NodeKind::EXP_GET_POLY_MODULE_FIELD:
+            case mast::NodeKind::EXP_GET_MONO_MODULE_FIELD:
+            case mast::NodeKind::EXP_LAMBDA:
+            case mast::NodeKind::EXP_ALLOCATE_ONE:
+            case mast::NodeKind::EXP_ALLOCATE_MANY:
+            case mast::NodeKind::EXP_CHAIN: {
+                return true;
+            }
+
+            // otherwise, error
+            default: {
+                throw new Panic(
+                    "Tried binding invalid AST node kind: "
+                    "expected TypeSpec or Exp only"
+                );
+            }
+        }
     }
 
 }

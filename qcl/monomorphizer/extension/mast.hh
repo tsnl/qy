@@ -108,11 +108,13 @@ namespace monomorphizer::mast {
 
     struct IntExpNodeInfo {
         size_t mantissa;
+        IntegerSuffix suffix;
         int is_neg;
     };
 
     struct FloatExpNodeInfo {
         double value;
+        FloatSuffix suffix;
     };
 
     struct StringExpNodeInfo {
@@ -301,10 +303,12 @@ namespace monomorphizer::mast {
     mast::ExpID get_unit_exp();
     mast::ExpID new_int_exp(
         size_t mantissa,
+        IntegerSuffix typing_suffix,
         bool is_neg
     );
     mast::ExpID new_float_exp(
-        double value
+        double value,
+        FloatSuffix typing_suffix
     );
     mast::ExpID new_string_exp(
         size_t code_point_count,
@@ -381,5 +385,6 @@ namespace monomorphizer::mast {
 
     NodeKind get_node_kind(mast::NodeID node_id);
     NodeInfo* get_info_ptr(mast::NodeID node_id);
+    bool is_node_exp_not_ts(mast::NodeID node_id);
 
 }
