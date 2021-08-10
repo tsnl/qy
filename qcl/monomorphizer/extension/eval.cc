@@ -1000,8 +1000,12 @@ namespace monomorphizer::eval {
             throw new Panic("ERROR: sequence index out of bounds");
         }
     }
+    static mval::ValueID eval_mono_get_module_field(mast::ExpID exp_id) {
+        auto info = &mast::get_info_ptr(exp_id)->exp_get_mono_module_field;
+        DefID field_def_id = modules::get_poly_mod_field_at(info->template_id, info->field_index);
+        return eval_def_v(field_def_id);
+    }
     mval::ValueID eval_mono_exp(mast::ExpID exp_id) {
-        // todo: implement me
         mast::NodeKind exp_kind = mast::get_node_kind(exp_id);
         switch (exp_kind) {
             case mast::NodeKind::EXP_UNIT: {
@@ -1037,14 +1041,25 @@ namespace monomorphizer::eval {
             case mast::NodeKind::EXP_GET_TUPLE_FIELD: {
                 return eval_mono_get_tuple_field(exp_id);
             } break;
-            case mast::NodeKind::EXP_GET_POLY_MODULE_FIELD: {} break;
-            case mast::NodeKind::EXP_GET_MONO_MODULE_FIELD: {} break;
-            case mast::NodeKind::EXP_LAMBDA: {} break;
-            case mast::NodeKind::EXP_ALLOCATE_ONE: {} break;
-            case mast::NodeKind::EXP_ALLOCATE_MANY: {} break;
-            case mast::NodeKind::EXP_CHAIN: {} break;
-
-            default: {
+            case mast::NodeKind::EXP_GET_MONO_MODULE_FIELD: {
+                return eval_mono_get_module_field(exp_id);
+            } break;
+            case mast::NodeKind::EXP_LAMBDA: {
+                throw new Panic("NotImplemented: eval for EXP_LAMBDA");
+            } break;
+            case mast::NodeKind::EXP_ALLOCATE_ONE: {
+                throw new Panic("NotImplemented: eval_mono EXP_ALLOCATE_ONE");
+            } break;
+            case mast::NodeKind::EXP_ALLOCATE_MANY: {
+                throw new Panic("NotImplemented: eval_mono EXP_ALLOCATE_MANY");
+            } break;
+            case mast::NodeKind::EXP_CHAIN: {
+                throw new Panic("NotImplemented: eval_mono EXP_CHAIN");
+            } break;
+            
+            case mast::NodeKind::EXP_GET_POLY_MODULE_FIELD:
+            default: 
+            {
                 throw new Panic("Invalid arg exp to eval_mono_exp");
             }
         }

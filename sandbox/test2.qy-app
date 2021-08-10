@@ -20,6 +20,5 @@ dm test2 {
 
     zero = (0, 0, 0);
     x = zero;
-    # let y x + x;
     z = hello(0f, 0f);
 };

@@ -9,8 +9,8 @@ dm howdy {
     y = (b) -> ML {
         x(0f)!(b)
     };
-    x: NoCtxPtr { F32 -> ![F32] -> ST F32 };
-    y: NoCtxPtr { ![F32] -> ML F32 };
+    x NoCtxPtr { F32 -> ![F32] -> ST F32 };
+    y NoCtxPtr { ![F32] -> ML F32 };
 };
 
 # dm henlo {
