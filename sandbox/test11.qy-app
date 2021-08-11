@@ -1,13 +1,12 @@
-dm xyz [n] {
-    n I32;
-};
+--- xyz[n] submod ---
 
-dm abc {
-    abc = (x) -> TOT {
-        a = 2*x + 1;
-        b = 42^a;
-        a + b
-    };
+n: I32;
 
-    truth = 7*7 == xyz[abc(24)]::n;
+--- abc submod ---
+
+abc = (x) -> TOT {
+    a = 2*x + 1;
+    b = 42^a;
+    a + b
 };
+truth = 7*7 == xyz[abc(24)]::n;

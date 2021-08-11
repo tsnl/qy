@@ -9,7 +9,7 @@ options {
 //
 
 fileModule
-    : (imports=moduleImports ';')? (exports=moduleExports ';')? (moduleDefs+=moduleDef ';')*
+    : (imports=moduleImports ';')? (exports=moduleExports ';')? (moduleDefs+=moduleDef)*
     ;
 
 moduleImports
@@ -27,7 +27,10 @@ exportLine
     ;
 
 moduleDef
-    : 'dm' name=VID ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')? body=tableWrapper
+    : '---' name=VID 'submod'
+        ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')?
+      '---'
+      body=moduleTableWrapper
     ;
 
 //
@@ -36,10 +39,13 @@ moduleDef
 
 
 tableElement
-    : lhs_id=VID ts=typeSpec             #typeValIdElement
+    : lhs_id=VID ':' ts=typeSpec         #typeValIdElement
     | lhs_id=VID '=' init_exp=expr       #bindValIdElement
     | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
     | 'do' eval_exp=expr                 #forceEvalChainElement
+    ;
+moduleTableWrapper
+    : (elements+=tableElement ';')*
     ;
 tableWrapper
     : '{' (elements+=tableElement ';')* '}'
@@ -279,4 +285,5 @@ fragment ANY_ESC: (
 
 WS: (' '|'\t'|'\n') -> skip;
 
-LINE_COMMENT: ('#' ~('\n')*) -> skip;
+LINE_COMMENT: ('//' ~('\n')*) -> channel(HIDDEN);
+BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> channel(HIDDEN);

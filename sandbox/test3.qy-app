@@ -1,15 +1,16 @@
-dm test3 {
-    fake_predecessor = (x) -> TOT {x};
+--- test3 submod ---
 
-    fake_multiply = (i, j) -> TOT {j};
+fake_predecessor = (x) -> TOT {x};
 
-    factorial = (x) -> TOT {
-    #   if (x = 0) {
-            fake_multiply(x, fake_predecessor(x))
-    #   } else {
-    #       fake_predecessor(0)
-    #   }
-    };
+fake_multiply = (i, j) -> TOT {j};
 
-    w = fake_multiply(0, 1f);
+factorial = (x) -> TOT {
+//  if (x = 0) {
+        fake_multiply(x, fake_predecessor(x))
+//  } else {
+//      fake_predecessor(0)
+//  }
 };
+
+w = fake_multiply(0, 1f);
+

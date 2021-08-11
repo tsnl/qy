@@ -1,49 +1,48 @@
-#dm alphabet_soup [T, u] {
-#    a = "hello";
-#    # x = T(0);
-#    x = u;
-#    z = 2;
-#};
-#
-#dm modernism {
-#    a = 0x42;
-#    another_x = alphabet_soup[String, 42Q]:u;
-#};
-#
-#dm postmodernism {
-#    a_re_examined = modernism:a;
-#};
-#
-#dm effing {
-#    # f is for function
-#
-#    f1 = (x) -> {p = x; p};
-#    f2 = (y) -> {y};
-#    f3 = (z) -> {42f};
-#
-#    z = f3(2q);
-#
-#    w = f1(f2(z));
-#};
-#
-#dm recursion {
-#    g = (Float32) -> Float32;
-#
-#    g = (x) -> {
-#        w = g(x);
-#        0f
-#    };
-#};
+--- alphabet_soup[T, u] submod ---
 
-dm linAlg [T] {
-    Vec2 = Struct {
-        x T;
-        y T;
-    };
-    Vec2i = linAlg[I32]::Vec2;
-    Vec2f = linAlg[F32]::Vec2;
+a = "hello";
+// x = T(0);
+x = u;
+z = 2;
+
+--- modernism submod ---
+
+a = 0x42;
+another_x = alphabet_soup[String, 42Q]:u;
+
+--- postmodernism submod ---
+
+a_re_examined = modernism:a;
+
+--- functions submod ---
+
+f1 = (x) -> {p = x; p};
+f2 = (y) -> {y};
+f3 = (z) -> {42f};
+
+z = f3(2q);
+
+w = f1(f2(z));
+
+--- recursion submod ---
+
+g = (Float32) -> Float32;
+
+g = (x) -> {
+    w = g(x);
+    0f
 };
-dm hello {
-    Vec2i = linAlg::Vec2i;
-    Vec2f = linAlg::Vec2f;
+
+--- linAlg[T] submod ---
+
+Vec2 = Struct {
+    x: T;
+    y: T;
 };
+Vec2i = linAlg[I32]::Vec2;
+Vec2f = linAlg[F32]::Vec2;
+
+--- hello submod ---
+
+Vec2i = linAlg::Vec2i;
+Vec2f = linAlg::Vec2f;

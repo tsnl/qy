@@ -37,8 +37,7 @@ def main():
     setup(
         ext_modules=cythonize(
             module_list=[
-                qy_cpp_extension("copier", "copier.pyx"),
-                qy_cpp_extension("mast", "mast.pyx")
+                qy_cpp_extension("nexus", "nexus.pyx")
             ],
             compiler_directives={
                 'language_level': '3'

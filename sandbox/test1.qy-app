@@ -1,63 +1,73 @@
+// Line-comments begin with `//`.
+// Each Qy source file starts with a header, followed by 0 or more sub-module definitions.
+// These collective contents are known as a 'module'.
+// This is a `qy-app` file and cannot be imported.
+
+//
+// Header:
+//
+
+// `imports` specifies which source files to load, and the name under which to load them.
 imports {
-    helper from "./helper.astro";
+    helper from "./helper.qy";
 };
 
-dm vec [Scalar] {
+//
+// Sub-module definitions:
+//
 
-    Vector3 = Struct {
-        x Scalar;
-        y Scalar;
-        z Scalar;
-    };
+// Every module is made of a sequence of immutable 'bindings'.
 
-    add = (v, w) -> {
-        v Vector3;
-        w Vector3;
+--- vec[Scalar] submod ---
 
-        Vector3 (
-            v.x + w.x,
-            v.y + w.y,
-            v.z + w.z
-        )
-    };
-
+Vector3 = Struct {
+    x: Scalar;
+    y: Scalar;
+    z: Scalar;
 };
 
-#
-# Immutable bound elements:
-#
+add = (v, w) -> {
+    v: Vector3;
+    w: Vector3;
 
-dm test1 {
-    a1 = I16;
-    a2 = I16;
-    a3 = I16;
-    a4 = I16;
-
-    a1 = 42;
-    a2 = 43;
-    a3 = 44;
-    a4 = "Hello, world!\n";
-
-    a5 = ( 
-        """
-        #version 330
-
-        layout(location=0) in vec3f model_pos;
-        layout(location=1) in mat4  mvp_matrix;
-
-        void main() {
-            gl_Position = vec4f(mvp_matrix * model_pos)
-        }
-        """
-    );
-
-    omega = (
-        if (0b) Tot {
-            1
-        } else if (1b) Tot {
-            0
-        } else Tot {
-            2
-        }
-    );
+    Vector3 (
+        v.x + w.x,
+        v.y + w.y,
+        v.z + w.z
+    )
 };
+
+--- test1 submod ---
+
+a1 = I16;
+a2 = I16;
+a3 = I16;
+a4 = I16;
+
+a1 = 42;
+a2 = 43;
+a3 = 44;
+a4 = "Hello, world!\n";
+
+a5 = (
+    """
+    #version 330
+
+    layout(location=0) in vec3f model_pos;
+    layout(location=1) in mat4  mvp_matrix;
+
+    void main() {
+        gl_Position = vec4f(mvp_matrix * model_pos)
+    }
+    """
+);
+
+omega = (
+    if (0b) Tot {
+        1
+    } else if (1b) Tot {
+        0
+    } else Tot {
+        2
+    }
+);

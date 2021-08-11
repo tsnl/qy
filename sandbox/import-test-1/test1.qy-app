@@ -2,6 +2,6 @@ imports {
     t2 from "test2.qy";
 };
 
-def about1 {
-    count1 = t2::about2::count2;
-};
+--- submod about1 ---
+
+count1 = t2::about2::count2;

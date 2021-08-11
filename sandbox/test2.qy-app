@@ -1,24 +1,24 @@
-dm test2 {
-    Vec3f = Struct { x Float32; y Float32; z Float32; };
-    Vec4f = Struct { x Float32; y Float32; z Float32; w Float32; };
+--- test2 submod ---
 
-    zero_v3f = Vec3f(0, 0, 0);
+Vec3f = Struct { x: Float32; y: Float32; z: Float32; };
+Vec4f = Struct { x: Float32; y: Float32; z: Float32; w: Float32; };
 
-    i3f = Vec3f(1, 0, 0);
-    j3f = Vec3f(0, 1, 0);
-    k3f = Vec3f(0, 0, 1);
+zero_v3f = Vec3f(0, 0, 0);
 
-    i4f = Vec4f(1, 0, 0, 0);
-    j4f = Vec4f(0, 1, 0, 0);
-    k4f = Vec4f(0, 0, 1, 0);
-    l4f = Vec4f(0, 0, 0, 1);
+i3f = Vec3f(1, 0, 0);
+j3f = Vec3f(0, 1, 0);
+k3f = Vec3f(0, 0, 1);
 
-    hello = (x, y) -> TOT {
-        let w x;
-        (x, y, w)
-    };
+i4f = Vec4f(1, 0, 0, 0);
+j4f = Vec4f(0, 1, 0, 0);
+k4f = Vec4f(0, 0, 1, 0);
+l4f = Vec4f(0, 0, 0, 1);
 
-    zero = (0, 0, 0);
-    x = zero;
-    z = hello(0f, 0f);
+hello = (x, y) -> TOT {
+    w = x;
+    (x, y, w)
 };
+
+zero = (0, 0, 0);
+x = zero;
+z = hello(0f, 0f);

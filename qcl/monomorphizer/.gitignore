@@ -1,9 +1,9 @@
+nexus.cpp
+nexus.*.pyd
+nexus.*.so
 mast.cpp
 mast.*.pyd
 mast.*.so
-copier.cpp
-copier.*.pyd
-copier.*.so
 
 build/
 

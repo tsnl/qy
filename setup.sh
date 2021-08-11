@@ -5,5 +5,7 @@
 # popd || exit 1
 
 pushd qcl/monomorphizer/ || exit 1
+cmake .
+cmake --build .
 python3.9 setup.py build_ext --inplace
 popd || exit 1

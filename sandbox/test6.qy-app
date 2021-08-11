@@ -1,10 +1,11 @@
-dm test6 {
-    Vector3f = Struct {
-        x F32;
-        y F32;
-        z F32;
-    };
-    new_vec3f = (x, y, z) -> TOT Vector3f {
-        (x, y, z)
-    };
+--- test6 submod ---
+
+Vector3f = Struct {
+    x: F32;
+    y: F32;
+    z: F32;
+};
+
+new_vec3f = (x, y, z) -> TOT Vector3f {
+    (x, y, z)
 };
