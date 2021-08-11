@@ -1,8 +1,6 @@
-# NOTE: we use CMake to build a static library that `setup.py` links against.
-
 cmake_minimum_required(VERSION 3.0)
 
-project(Extension)
+project(CppMonomorphizerExt)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -10,7 +8,7 @@ include_directories(
     extension/
 )
 add_library(
-    ExtensionLib SHARED
+    CppMonomorphizerExt STATIC
     "extension/arg-list.cc"
     "extension/arg-list.hh"
     "extension/debug.hh"

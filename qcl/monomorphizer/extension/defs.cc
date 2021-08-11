@@ -24,7 +24,7 @@ namespace monomorphizer::defs {
     static std::vector<DefInfo> s_def_info_table;
     // static std::vector<VarDefInfo> s_var_def_info_table;
     
-    void ensure_init() {
+    void ensure_defs_init() {
         if (!s_is_already_init) {
             size_t init_def_capacity = 16 * 1024;
 
@@ -39,7 +39,7 @@ namespace monomorphizer::defs {
         }
     }
 
-    void drop() {
+    void drop_defs() {
         if (s_is_already_init) {
             s_def_is_const_not_var_table.clear();
             s_def_is_global_table.clear();

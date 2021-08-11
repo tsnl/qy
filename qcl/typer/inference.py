@@ -51,7 +51,7 @@ def infer_project_types(
     this pass uses `unify` to generate substitutions that, once all applied, eliminate all free type variables from the
     system.
     :param project: the project whose modules to perform type inference on
-    :para, root_ctx: the root context used by this project
+    :param root_ctx: the root context used by this project
     :param all_file_module_list: a list of all discovered FileModuleExp nodes.
     """
 

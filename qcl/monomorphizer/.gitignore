@@ -1,18 +1,17 @@
-nexus.cpp
-nexus.*.pyd
-nexus.*.so
-mast.cpp
-mast.*.pyd
-mast.*.so
+wrapper.cpp
+wrapper.*.pyd
+wrapper.*.so
+copier.cpp
+copier.*.pyd
+copier.*.so
 
 build/
 
 cmake_install.cmake
 CMakeCache.txt
-libExtensionLib.a
+libCppMonomorphizerExt.a
+libCppMonomorphizerExt.dylib
 Makefile
 CMakeFiles/
 .ninja*
 *.ninja
-
-libExtensionLib.dylib

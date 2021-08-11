@@ -75,8 +75,8 @@ def of(tid: identity.TID):
 
         if elem_count > 0:
             field_text_iterator = (
-                f"{elem.field_name_at_ix(tid, i)} "
-                f"{'=' if elem.is_type_field_at_field_ix(tid, i) else '::'} "
+                f"{elem.field_name_at_ix(tid, i)}"
+                f"{' = ' if elem.is_type_field_at_field_ix(tid, i) else ': '}"
                 f"{of(elem.tid_of_field_ix(tid, i))}"
                 for i in range(elem_count)
             )

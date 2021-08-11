@@ -219,6 +219,9 @@ class LambdaExp(BaseExp):
         self.ret_ses = ses
 
     def add_non_local(self, non_local_id_name, non_local_id_def_rec):
+        # TODO: if the non-local def rec is global, it need not be added to the closure table.
+        #   - if `(non_local_id_def_rec.opt_container_func is None)`
+        # TODO: if the non-local def rec is a TID, it need not be added to the closure table.
         existing_non_local = self.non_local_name_map.get(non_local_id_name, None)
         if existing_non_local is None:
             self.non_local_name_map[non_local_id_name] = non_local_id_def_rec

@@ -21,10 +21,6 @@ namespace monomorphizer::modules {
     extern MonoModID const NULL_MONO_MOD_ID;
     extern PolyModID const NULL_POLY_MOD_ID;
 
-    // module management:
-    void ensure_init();
-    void drop();
-
     // Monomorphic template construction:
     MonoModID new_monomorphic_module(
         char* mv_template_name,

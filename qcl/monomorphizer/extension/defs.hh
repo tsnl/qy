@@ -22,14 +22,14 @@ namespace monomorphizer::defs {
         CONST_TOT_TID
     };
 
-    void ensure_init();
-    void drop();
+    void ensure_defs_init();
+    void drop_defs();
 
     //
     // Definitions:
     //
 
-    // constant definitions: 
+    // constant definitions:
     DefID define_const_mast_node(
         char* mv_def_name,
         mast::NodeID bound_node_id,

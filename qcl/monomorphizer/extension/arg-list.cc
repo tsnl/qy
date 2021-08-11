@@ -66,9 +66,9 @@ namespace monomorphizer::arg_list {
         ArgTrieNodeID parent_node_id,
         size_t incoming_edge_appended_id
     )
-    :   m_parent_node_id(parent_node_id),
-        m_forward_type_edges(),
+    :   m_forward_type_edges(),
         m_forward_value_edges(),
+        m_parent_node_id(parent_node_id),
         m_incoming_edge_appended_id(incoming_edge_appended_id)
     {}
 

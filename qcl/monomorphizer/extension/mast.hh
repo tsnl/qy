@@ -256,8 +256,8 @@ namespace monomorphizer::mast {
     // Managing nodes:
     //
 
-    void ensure_init();
-    void drop();
+    void ensure_mast_init();
+    void drop_mast();
 
     //
     // Node Constructors
@@ -367,7 +367,9 @@ namespace monomorphizer::mast {
     );
     mast::ExpID new_get_poly_module_field_exp(
         PolyModID poly_mod_id,
-        size_t exp_field_ix
+        size_t exp_field_ix,
+        size_t actual_arg_count,
+        mast::NodeID* actual_arg_array
     );
     
     // Element creation methods:

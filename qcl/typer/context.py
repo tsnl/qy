@@ -136,11 +136,11 @@ class Context(object):
         print(f"{indent_text}+ {self.purpose} @ {hex(id(self))}")
         for name, def_obj in self.symbol_table.items():
             if def_obj.universe in (definition.Universe.Value, definition.Universe.Module):
-                sep = "::"
+                sep = ": "
             else:
-                sep = ":="
+                sep = " = "
 
-            print(f"{indent_text}  - {name} {sep} {def_obj.scheme.spell()}")
+            print(f"{indent_text}  - {name}{sep}{def_obj.scheme.spell()}")
 
         for child_context in self.child_context_list:
             child_context.print(indent_count=indent_count+2)

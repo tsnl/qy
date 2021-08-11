@@ -1,13 +1,9 @@
 --- currying_in_c submod ---
 
-// f: NoCtxPtr { F32 -> ![F32] -> ST () };
-
-/*
+f: NoCtxPtr { F32 -> ![F32] -> ST () };
 
 f = (value) -> (ptr) -> ST {
     a = 42;
     b = 13;
     do ptr := 42f;
 };
-
-*/

@@ -19,6 +19,8 @@ namespace monomorphizer::mast {
       private:
         std::vector<NodeKind> m_kind_table;
         std::vector<NodeInfo> m_info_table;
+
+      public:
         SingletonNodeCache m_singleton_cache;
 
       public:
@@ -64,22 +66,23 @@ namespace monomorphizer::mast {
         // reserving vectors:
         m_kind_table.reserve(capacity);
         m_info_table.reserve(capacity);
-        
-        // initializing singleton cache:
-        m_singleton_cache.ts_unit = new_unit_ts();
-        m_singleton_cache.exp_unit = new_unit_exp();
     }
 
     static NodeMgr* s_mgr = nullptr;
 
-    void ensure_init() {
+    void ensure_mast_init() {
         size_t capacity = DEFAULT_NODE_MGR_CAPACITY;
         if (!s_mgr) {
+            // allocating:
             s_mgr = new NodeMgr(capacity);
+
+            // initializing singleton cache:
+            s_mgr->m_singleton_cache.ts_unit = new_unit_ts();
+            s_mgr->m_singleton_cache.exp_unit = new_unit_exp();
         }
     }
 
-    void drop() {
+    void drop_mast() {
         delete s_mgr;
         s_mgr = nullptr;
     }
@@ -92,11 +95,13 @@ namespace monomorphizer::mast {
         auto node_index = static_cast<size_t>(node_id);
         return s_mgr->tmp_info_ptr(node_index);
     }
+
     mast::NodeID help_alloc_node(NodeKind kind) {
         auto node_id = s_mgr->node_count();
         s_mgr->push(kind);
         return node_id;
     }
+
     mast::TypeSpecID new_unit_ts() {
         auto new_node_id = help_alloc_node(NodeKind::TS_UNIT);
         return new_node_id;

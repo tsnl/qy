@@ -1,5 +1,5 @@
-from . import nexus
+from . import copier
 
 
 def run(project):
-    nexus.monomorphize_project(project)
+    copier.monomorphize_project(project)

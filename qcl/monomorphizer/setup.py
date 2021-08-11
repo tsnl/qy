@@ -1,34 +1,44 @@
+#!/usr/bin/env python3.9
+
 import os.path
 
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
 
-def get_extension_lib_path():
-    possible_shared_lib_name_list = [
-        "./libExtensionLib.dylib",
-    ]
-
-    for possible_shared_lib_name in possible_shared_lib_name_list:
-        if os.path.isfile(possible_shared_lib_name):
-            return possible_shared_lib_name
-
-    raise RuntimeError("Shared 'extension' lib not found: is it built?")
-
-
-extension_lib_path = get_extension_lib_path()
-
-
-def qy_cpp_extension(name, pyx_wrapper_file):
+def mk_wrapper_extension():
     return Extension(
-        name,
+        "wrapper",
         sources=[
-            pyx_wrapper_file
+            "wrapper.pyx",
+            # "extension/arg-list.cc",
+            # "extension/defs.cc",
+            # "extension/eval.cc",
+            # "extension/mast.cc",
+            # "extension/modules.cc",
+            # "extension/mtype.cc",
+            # "extension/mval.cc",
+            # "extension/sub.cc"
         ],
-        libraries=[
-            extension_lib_path
+        extra_objects=[
+            "libCppMonomorphizerExt.a"
         ],
-        extra_compile_args=['-std=c++17'],
+        extra_compile_args=[
+            "-std=c++17",
+        ],
+        language='c++'
+    )
+
+
+def mk_copier_extension():
+    return Extension(
+        "copier",
+        sources=[
+            "copier.pyx"
+        ],
+        extra_compile_args=[
+            '-std=c++17'
+        ],
         language='c++'
     )
 
@@ -37,14 +47,18 @@ def main():
     setup(
         ext_modules=cythonize(
             module_list=[
-                qy_cpp_extension("nexus", "nexus.pyx")
+                mk_wrapper_extension(),
+                mk_copier_extension()
             ],
             compiler_directives={
                 'language_level': '3'
             }
         ),
-        requires=['setuptools',
-                  'Cython']
+        requires=[
+            'setuptools',
+            'Cython'
+        ],
+        include_dirs=["."]
     )
 
 

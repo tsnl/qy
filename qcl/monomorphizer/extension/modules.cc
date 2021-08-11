@@ -61,15 +61,6 @@ namespace monomorphizer::modules {
 
 namespace monomorphizer::modules {
 
-    void ensure_init() {
-        mast::ensure_init();
-        defs::ensure_init();
-    }
-    void drop() {
-        mast::drop();
-        defs::drop();
-    }
-
     // Monomorphic template construction:
     MonoModID new_monomorphic_module(
         char* mv_name,
@@ -217,7 +208,7 @@ namespace monomorphizer::modules {
         // instantiating this module with these args by creating a fresh
         // MonoModID
         arg_list::ArgListID arg_list_it = arg_list_id;
-        for (int i = 0; i < info->bv_count; i++) {
+        for (size_t i = 0; i < info->bv_count; i++) {
             // iterating in reverse order to efficiently traverse the ArgList
             int arg_index = (info->bv_count - 1) - i;
             assert(

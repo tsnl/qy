@@ -9,7 +9,6 @@
 namespace monomorphizer::mast {
 
     using NodeID = size_t;
-    using ModID = NodeID;
     using ExpID = NodeID;
     using TypeSpecID = NodeID;
     using ElemID = NodeID;

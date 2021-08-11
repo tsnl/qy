@@ -749,7 +749,7 @@ namespace monomorphizer::eval {
     template <typename T> 
     inline static T ipow(T base, T exponent) {
         T result = 1;
-        for (size_t i = 0; i < exponent; i++) {
+        for (T i = 0; i < exponent; i++) {
             result *= base;
         }
         return result;

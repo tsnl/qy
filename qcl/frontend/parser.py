@@ -137,6 +137,9 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
         return module_name, module_exp
 
+    def visitModuleTableWrapper(self, ctx):
+        return [self.visit(elem) for elem in ctx.elements]
+
     #
     #
     # Tables & elements:
