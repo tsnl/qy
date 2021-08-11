@@ -11,6 +11,10 @@ from libc.stddef cimport size_t
 #
 #
 
+# arg list:
+cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
+    const ArgListID EMPTY
+
 # defs:
 cdef extern from "extension/defs.hh" namespace "monomorphizer::defs":
     # init/drop:
@@ -35,6 +39,33 @@ cdef extern from "extension/defs.hh" namespace "monomorphizer::defs":
     const char* get_def_name(DefID def_id);
     void store_id_at_def_id(DefID def_id, size_t id);
     size_t load_id_from_def_id(DefID def_id);
+
+# modules:
+cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
+    # constants:
+    const MonoModID NULL_MONO_MOD_ID;
+    const PolyModID NULL_POLY_MOD_ID;
+
+    # Monomorphic template construction:
+    MonoModID new_monomorphic_module(char* mv_template_name, PolyModID opt_parent_template_id);
+    # add_field pushes a field and returns its unique index.
+    size_t add_mono_module_field(MonoModID template_id, DefID field_def_id);
+
+    # Polymorphic template construction:
+    PolyModID new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, DefID* mv_bv_def_id_array);
+    # add_field pushes a field and returns the field's unique index.
+    size_t add_poly_module_field(PolyModID template_id, DefID field_def_id);
+
+    # Module fields are accessed by an index that is determined by the order
+    # in which symbols are added.
+    # By convention, this should be the order in which source nodes are written
+    # in source code.
+    DefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
+    DefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
+
+    # instantiation:
+    # turn a PolyModID into a MonoModID using some template arguments.
+    MonoModID instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
 
 # mast:
 cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
@@ -108,31 +139,6 @@ cdef:
         drop_mast()
         drop_defs()
 
-
-# defs:
-cdef extern from "extension/defs.hh" namespace "monomorphizer::defs":
-    # init/drop:
-    void ensure_defs_init();
-    void drop_defs();
-
-    # constant definitions:
-    DefID define_const_mast_node(char* mv_def_name, NodeID bound_node_id, bint is_global);
-    DefID define_total_const_value(char* mv_def_name, ValueID value_id, bint is_global);
-    DefID define_total_const_type(char* mv_def_name, TID type_id, bint is_global);
-
-    # bound var definitions:
-    # monomorphization is just replacing references to these in polymorphic 
-    # modules with total const definitions, returning a monomorphic copy.
-    DefID define_bound_var_ts(char* mv_formal_var_name);
-    DefID define_bound_var_exp(char* mv_formal_var_name);
-
-    # query definition info:
-    bint get_def_is_bv(DefID def_id);
-    DefKind get_def_kind(DefID def_id);
-    const char* get_mod_name(DefID def_id);
-    const char* get_def_name(DefID def_id);
-    void store_id_at_def_id(DefID def_id, size_t id);
-    size_t load_id_from_def_id(DefID def_id);
 
 # mast: expressions:
 cdef:
@@ -223,9 +229,9 @@ cdef:
     ElemID w_mk_do_elem(ExpID eval_exp_id):
         return new_do_elem(eval_exp_id)
 
-# defs:
+# defs: global and unscoped
 cdef:
-    # constant definitions:
+    # functions to define constants:
     DefID w_define_const_mast_node(char* mv_def_name, NodeID bound_node_id, bint is_global):
         return define_const_mast_node(mv_def_name, bound_node_id, is_global)
     DefID w_define_total_const_value(char* mv_def_name, ValueID value_id, bint is_global):
@@ -233,7 +239,7 @@ cdef:
     DefID w_define_total_const_type(char* mv_def_name, TID type_id, bint is_global):
         return define_total_const_type(mv_def_name, type_id, is_global)
 
-    # bound var definitions:
+    # functions to define bound vars:
     # monomorphization is just replacing references to these in polymorphic 
     # modules with total const definitions, returning a monomorphic copy.
     DefID w_define_bound_var_ts(char* mv_formal_var_name):
@@ -241,7 +247,7 @@ cdef:
     DefID w_define_bound_var_exp(char* mv_formal_var_name):
         return define_bound_var_exp(mv_formal_var_name)
 
-    # query definition info:
+    # functions to query definition info:
     bint w_get_def_is_bv(DefID def_id):
         return get_def_is_bv(def_id)
     DefKind w_get_def_kind(DefID def_id):
@@ -254,3 +260,24 @@ cdef:
         store_id_at_def_id(def_id, id_)
     size_t w_load_id_from_def_id(DefID def_id):
         return load_id_from_def_id(def_id)
+
+# modules:
+cdef:
+    # Polymorphic template construction:
+    PolyModID w_new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, DefID* mv_bv_def_id_array):
+        return new_polymorphic_module(mv_template_name, bv_def_id_count, mv_bv_def_id_array)
+    # add_field pushes a field and returns the field's unique index.
+    size_t w_add_poly_module_field(PolyModID template_id, DefID field_def_id):
+        return add_poly_module_field(template_id, field_def_id)
+
+    # Module fields are accessed by an index that is determined by the order
+    # in which symbols are added.
+    # By convention, this should be the order in which source nodes are written
+    # in source code.
+    DefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index):
+        return get_mono_mod_field_at(mono_mod_id, field_index)
+
+    # instantiation:
+    # turn a PolyModID into a MonoModID using some template arguments.
+    MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id):
+        return instantiate_poly_mod(poly_mod_id, arg_list_id)

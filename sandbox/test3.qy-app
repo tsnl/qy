@@ -1,4 +1,4 @@
---- test3 submod ---
+--- sub test3 ---
 
 fake_predecessor = (x) -> TOT {x};
 

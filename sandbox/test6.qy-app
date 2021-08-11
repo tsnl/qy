@@ -1,4 +1,4 @@
---- test6 submod ---
+--- sub test6 ---
 
 Vector3f = Struct {
     x: F32;

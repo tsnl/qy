@@ -323,10 +323,9 @@ class IfExp(BaseExp):
 class BaseModExp(TypedBaseNode):
     module_id_counter = 0
 
-    def __init__(self, loc, template_arg_names: List[str]):
+    def __init__(self, loc):
         super().__init__(loc)
         self.module_id = self.generate_fresh_module_id()
-        self.template_arg_names = template_arg_names
 
     @staticmethod
     def generate_fresh_module_id():
@@ -341,7 +340,7 @@ class FileModExp(BaseModExp):
             imports_map: Dict[str, str], exports_list: List[str],
             sub_module_map: Dict[str, "SubModExp"]
     ):
-        super().__init__(loc, template_arg_names=[])
+        super().__init__(loc)
         self.source = source
         self.sub_module_map = sub_module_map
         self.imports_path_map = imports_map
@@ -362,7 +361,7 @@ class SubModExp(BaseModExp):
             self, loc: feedback.ILoc,
             template_arg_names: List[str], elements: List["BaseElem"]
     ):
-        super().__init__(loc, template_arg_names)
+        super().__init__(loc)
         self.table = Table(
             loc, "submodule",
             elements,
@@ -370,6 +369,10 @@ class SubModExp(BaseModExp):
             accepts_typing_elements=True,
             accepts_imperative_elements=False
         )
+        self.template_arg_names = template_arg_names
+        self.template_def_list_from_typer = None
+        self.bind1v_def_obj_list_from_typer = None
+        self.bind1t_def_obj_list_from_typer = None
 
 
 class ChainExp(BaseExp):

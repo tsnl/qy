@@ -18,7 +18,7 @@ imports {
 
 // Every module is made of a sequence of immutable 'bindings'.
 
---- vec[Scalar] submod ---
+--- sub vec[Scalar] ---
 
 Vector3 = Struct {
     x: Scalar;
@@ -37,12 +37,12 @@ add = (v, w) -> {
     )
 };
 
---- test1 submod ---
+--- sub test1 ---
 
-a1 = I16;
-a2 = I16;
-a3 = I16;
-a4 = I16;
+a1: I16;
+a2: I16;
+a3: I16;
+a4: I16;
 
 a1 = 42;
 a2 = 43;

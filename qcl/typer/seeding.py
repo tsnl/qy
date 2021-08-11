@@ -123,6 +123,7 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
     #   However, we still need to seed the module's contents.
 
     # Pushing a context for this sub-module's bound symbols:
+    # NOTE: we pass each template arg bound var here as an opt_type_arg_map
     sub_mod_ctx = ctx.push_context(
         f"sub_mod.{sub_mod_name}", sub_mod_exp.loc,
         opt_type_arg_map={
@@ -132,26 +133,50 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
     )
 
     # Defining each value template arg in this context:
-    for template_val_arg_name in template_val_arg_names:
-        seed_template_val_arg(sub_mod_ctx, sub_mod_exp.loc, template_val_arg_name)
+    val_arg_name_def_obj_map = {
+        template_val_arg_name: seed_template_val_arg(sub_mod_ctx, sub_mod_exp.loc, template_val_arg_name)
+        for template_val_arg_name in template_val_arg_names
+    }
 
-    # Defining each type template arg USING THE BoundVar INSTANCES in `sub_mod_scheme`
-    # for template_type_arg_name, bound_var in zip(template_type_arg_names, sub_mod_scheme.bound_vars):
-    #     seed_template_type_arg(sub_mod_ctx, sub_mod_exp.loc, template_type_arg_name, bound_var)
+    # Gathering all type definitions in this context:
+    type_arg_name_def_obj_map = dict(sub_mod_ctx.local_type_template_arg_def_map)
+
+    # Gathering all template definitions (type and value):
+    all_arg_name_def_obj_map = type_arg_name_def_obj_map | val_arg_name_def_obj_map
+    all_arg_name_def_obj_list = [
+        all_arg_name_def_obj_map[arg_name]
+        for arg_name in sub_mod_exp.template_arg_names
+    ]
 
     # Defining each bound ID in this context:
-    for elem in sub_mod_exp.table.ordered_value_imp_bind_elems:
-        assert isinstance(elem, ast.node.Bind1VElem)
+    bind1v_def_obj_list = [
         seed_bind1_elem(sub_mod_ctx, elem)
-    for elem in sub_mod_exp.table.ordered_type_bind_elems:
-        assert isinstance(elem, ast.node.Bind1TElem)
+        for elem in sub_mod_exp.table.ordered_value_imp_bind_elems
+    ]
+    bind1t_def_obj_list = [
         seed_bind1_elem(sub_mod_ctx, elem)
+        for elem in sub_mod_exp.table.ordered_type_bind_elems
+    ]
+    assert all(map(lambda it: isinstance(it, definition.ValueRecord), bind1v_def_obj_list))
+    assert all(map(lambda it: isinstance(it, definition.TypeRecord), bind1t_def_obj_list))
+
+    # Saving each template's BoundVar definition record on the sub-module:
+    assert sub_mod_exp.template_def_list_from_typer is None
+    assert sub_mod_exp.bind1v_def_obj_list_from_typer is None
+    assert sub_mod_exp.bind1t_def_obj_list_from_typer is None
+    sub_mod_exp.template_def_list_from_typer = all_arg_name_def_obj_list
+    sub_mod_exp.bind1v_def_obj_list_from_typer = bind1v_def_obj_list
+    sub_mod_exp.bind1t_def_obj_list_from_typer = bind1t_def_obj_list
 
     # Closing all define operations & storing the context in cache:
     mod_context_map[sub_mod_exp] = sub_mod_ctx
 
 
-def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, template_val_arg_name: str):
+def seed_template_val_arg(
+        sub_mod_ctx: context.Context,
+        loc: feedback.ILoc,
+        template_val_arg_name: str
+) -> definition.ValueRecord:
     value_tid = type.new_free_var(f"seed.template_val_arg.{template_val_arg_name}")
     def_obj = definition.ValueRecord(
         sub_mod_ctx.project,
@@ -166,28 +191,14 @@ def seed_template_val_arg(sub_mod_ctx: context.Context, loc: feedback.ILoc, temp
             f"template arg {template_val_arg_name} conflicts with another definition in this sub-module scope."
         )
         raise excepts.TyperCompilationError(msg_suffix)
+    else:
+        return def_obj
 
 
-def seed_template_type_arg(
-        sub_mod_ctx: context.Context, loc: feedback.ILoc,
-        template_type_arg_name: str, bound_var_tid: type.identity.TID
-):
-    def_obj = definition.TypeRecord(
-        sub_mod_ctx.project,
-        template_type_arg_name,
-        loc,
-        bound_var_tid,
-        opt_func=None
-    )
-    def_ok = sub_mod_ctx.try_define(template_type_arg_name, def_obj)
-    if not def_ok:
-        msg_suffix = (
-            f"template arg {template_type_arg_name} conflicts with another definition in this sub-module scope."
-        )
-        raise excepts.TyperCompilationError(msg_suffix)
-
-
-def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: "ast.node.BaseBindElem"):
+def seed_bind1_elem(
+        sub_mod_ctx: context.Context,
+        bind1_elem: "ast.node.BaseBindElem"
+) -> definition.BaseRecord:
     # creating a 'seed':
     def_name = bind1_elem.id_name
     defined_tid = type.new_free_var(f"seed.bind.{def_name}")
@@ -218,3 +229,5 @@ def seed_bind1_elem(sub_mod_ctx: context.Context, bind1_elem: "ast.node.BaseBind
     if not def_ok:
         msg_suffix = f"element {def_name} conflicts with another definition in this sub-module scope."
         raise excepts.TyperCompilationError(msg_suffix)
+
+    return def_obj

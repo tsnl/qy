@@ -28,7 +28,7 @@ class Context(object):
             purpose: str, loc: fb.ILoc,
             opt_parent_context: t.Optional["Context"],
             symbol_table: t.Dict[str, definition.BaseRecord] = None,
-            local_type_template_arg_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
+            local_type_template_arg_tid_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
             opt_func: t.Optional["ast.node.LambdaExp"] = None
     ):
         #
@@ -69,30 +69,33 @@ class Context(object):
         #
 
         # computing a map of all bound type variables in scope:
-        if local_type_template_arg_map is not None:
-            self.local_type_template_arg_map = local_type_template_arg_map
+        if local_type_template_arg_tid_map is not None:
+            self.local_type_template_arg_tid_map = local_type_template_arg_tid_map
 
             if self.opt_parent_context is not None:
-                gm = (self.opt_parent_context.global_type_template_arg_map | self.local_type_template_arg_map)
-                self.global_type_template_arg_map = gm
+                gm = (self.opt_parent_context.global_type_template_arg_tid_map | self.local_type_template_arg_tid_map)
+                self.global_type_template_arg_tid_map = gm
             else:
-                self.global_type_template_arg_map = self.local_type_template_arg_map
+                self.global_type_template_arg_tid_map = self.local_type_template_arg_tid_map
         else:
-            self.local_type_template_arg_map = {}
+            self.local_type_template_arg_tid_map = {}
 
             if self.opt_parent_context is not None:
-                self.global_type_template_arg_map = self.opt_parent_context.global_type_template_arg_map
+                self.global_type_template_arg_tid_map = self.opt_parent_context.global_type_template_arg_tid_map
             else:
-                self.global_type_template_arg_map = self.local_type_template_arg_map
+                self.global_type_template_arg_tid_map = self.local_type_template_arg_tid_map
 
         # defining each local type template argument in this context using the BoundVar types supplied:
-        for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_map.items():
+        self.local_type_template_arg_def_map = {}
+        for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_tid_map.items():
             def_record = definition.TypeRecord(
                 project,
                 type_template_arg_name,
                 self.loc, fresh_bound_var, self.opt_func
             )
-            assert self.try_define(type_template_arg_name, def_record)
+            def_ok = self.try_define(type_template_arg_name, def_record)
+            assert def_ok
+            self.local_type_template_arg_def_map[type_template_arg_name] = def_record
 
     def push_context(
             self,

@@ -1,4 +1,4 @@
---- test4 submod ---
+--- sub test4 ---
 
 Vec2f = Struct {
     x: F32;

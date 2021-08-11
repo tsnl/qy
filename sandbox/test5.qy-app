@@ -1,4 +1,4 @@
---- test5 submod ---
+--- sub test5 ---
 
 hello = (x, y) -> TOT {
     w = x;

@@ -46,6 +46,13 @@ cdef extern from "extension/shared-enums.hh" namespace "monomorphizer":
 
 
 #
+# Arg Lists:
+#
+
+cdef extern from "extension/id-arg-list.hh" namespace "monomorphizer::arg_list":
+    ctypedef size_t ArgListID
+
+#
 # Values:
 #
 
@@ -199,3 +206,25 @@ cdef:
     const char* w_get_def_name(DefID def_id);
     void w_store_id_at_def_id(DefID def_id, size_t id);
     size_t w_load_id_from_def_id(DefID def_id);
+
+#
+# Modules:
+#
+
+
+# modules:
+cdef:
+    # Polymorphic template construction:
+    PolyModID w_new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, DefID* mv_bv_def_id_array);
+    # add_field pushes a field and returns the field's unique index.
+    size_t w_add_poly_module_field(PolyModID template_id, DefID field_def_id);
+
+    # Module fields are accessed by an index that is determined by the order
+    # in which symbols are added.
+    # By convention, this should be the order in which source nodes are written
+    # in source code.
+    DefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
+
+    # instantiation:
+    # turn a PolyModID into a MonoModID using some template arguments.
+    MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);

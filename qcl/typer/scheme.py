@@ -106,4 +106,4 @@ class Scheme(object):
     def init_def_context(self, def_context):
         assert def_context is not None
         self.def_context = def_context
-        self.all_bound_var_map = self.bound_var_map | self.def_context.global_type_template_arg_map
+        self.all_bound_var_map = self.bound_var_map | self.def_context.global_type_template_arg_tid_map

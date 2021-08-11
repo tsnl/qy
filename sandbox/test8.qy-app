@@ -1,20 +1,20 @@
---- alphabet_soup[T, u] submod ---
+--- sub alphabet_soup[T, u] ---
 
 a = "hello";
 // x = T(0);
 x = u;
 z = 2;
 
---- modernism submod ---
+--- sub modernism ---
 
 a = 0x42;
-another_x = alphabet_soup[String, 42Q]:u;
+another_x = alphabet_soup[String, 42Q]::u;
 
---- postmodernism submod ---
+--- sub postmodernism ---
 
 a_re_examined = modernism:a;
 
---- functions submod ---
+--- sub functions ---
 
 f1 = (x) -> {p = x; p};
 f2 = (y) -> {y};
@@ -24,16 +24,16 @@ z = f3(2q);
 
 w = f1(f2(z));
 
---- recursion submod ---
+--- sub recursion ---
 
-g = (Float32) -> Float32;
+g: (Float32) -> Float32;
 
 g = (x) -> {
     w = g(x);
     0f
 };
 
---- linAlg[T] submod ---
+--- sub linAlg[T] ---
 
 Vec2 = Struct {
     x: T;
@@ -42,7 +42,7 @@ Vec2 = Struct {
 Vec2i = linAlg[I32]::Vec2;
 Vec2f = linAlg[F32]::Vec2;
 
---- hello submod ---
+--- sub hello ---
 
 Vec2i = linAlg::Vec2i;
 Vec2f = linAlg::Vec2f;

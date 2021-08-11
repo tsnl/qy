@@ -1,8 +1,8 @@
---- xyz[n] submod ---
+--- sub xyz[n] ---
 
 n: I32;
 
---- abc submod ---
+--- sub abc ---
 
 abc = (x) -> TOT {
     a = 2*x + 1;

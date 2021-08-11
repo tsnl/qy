@@ -27,8 +27,9 @@ exportLine
     ;
 
 moduleDef
-    : '---' name=VID 'submod'
-        ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')?
+    : '---'
+      'sub'
+      name=VID ('[' args+=(VID|TID) (',' args+=(VID|TID))* ']')?
       '---'
       body=moduleTableWrapper
     ;

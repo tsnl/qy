@@ -1,4 +1,4 @@
---- howdy submod ---
+--- sub howdy ---
 
 x = (v) -> (p) -> ST {
     // v--- violates the context pointer ban
@@ -10,8 +10,8 @@ x = (v) -> (p) -> ST {
 y = (b) -> ML {
     x(0f)!(b)
 };
-x NoCtxPtr { F32 -> ![F32] -> ST F32 };
-y NoCtxPtr { ![F32] -> ML F32 };
+x: NoCtxPtr { F32 -> ![F32] -> ST F32 };
+y: NoCtxPtr { ![F32] -> ML F32 };
 
 /*
 --- henlo submod ---
