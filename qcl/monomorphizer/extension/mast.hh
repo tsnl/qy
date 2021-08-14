@@ -9,10 +9,11 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "shared-enums.hh"
 #include "id-mast.hh"
 #include "id-defs.hh"
 #include "id-modules.hh"
-#include "shared-enums.hh"
+#include "id-intern.hh"
 
 namespace monomorphizer::mast {
 
@@ -23,7 +24,8 @@ namespace monomorphizer::mast {
     enum class NodeKind {
         // type-specifiers:
         TS_UNIT,
-        TS_ID,
+        TS_GID,
+        TS_LID,
         TS_PTR,
         TS_ARRAY,
         TS_SLICE,
@@ -37,7 +39,8 @@ namespace monomorphizer::mast {
         EXP_INT,
         EXP_FLOAT,
         EXP_STRING,
-        EXP_ID,
+        EXP_LID,
+        EXP_GID,
         EXP_FUNC_CALL,
         EXP_UNARY_OP,
         EXP_BINARY_OP,
@@ -59,8 +62,12 @@ namespace monomorphizer::mast {
     // Type Spec Node Infos:
     //
 
-    struct IdTypeSpecNodeInfo {
+    struct GlobalIdTypeSpecNodeInfo {
         DefID def_id;
+    };
+
+    struct LocalIdTypeSpecNodeInfo {
+        intern::IntStr int_str_id;
     };
 
     struct PtrTypeSpecNodeInfo {
@@ -122,8 +129,12 @@ namespace monomorphizer::mast {
         size_t code_point_count;
     };
 
-    struct IdExpNodeInfo {
+    struct GlobalIdExpNodeInfo {
         DefID def_id;
+    };
+
+    struct LocalIdExpNodeInfo {
+        intern::IntStr int_str_id;
     };
 
     struct FuncCallExpNodeInfo {
@@ -221,7 +232,8 @@ namespace monomorphizer::mast {
 
     union NodeInfo {
         // type-specs:
-        IdTypeSpecNodeInfo ts_id;
+        GlobalIdTypeSpecNodeInfo ts_gid;
+        LocalIdTypeSpecNodeInfo ts_lid;
         PtrTypeSpecNodeInfo ts_ptr;
         ArrayTypeSpecNodeInfo ts_array;
         SliceTypeSpecNodeInfo ts_slice;
@@ -234,7 +246,8 @@ namespace monomorphizer::mast {
         IntExpNodeInfo exp_int;
         FloatExpNodeInfo exp_float;
         StringExpNodeInfo exp_str;
-        IdExpNodeInfo exp_id;
+        GlobalIdExpNodeInfo exp_gid;
+        LocalIdExpNodeInfo exp_lid;
         FuncCallExpNodeInfo exp_call;
         UnaryOpExpNodeInfo exp_unary;
         BinaryOpExpNodeInfo exp_binary;
@@ -265,7 +278,8 @@ namespace monomorphizer::mast {
 
     // Type-specifiers:
     mast::TypeSpecID get_unit_ts();
-    mast::TypeSpecID new_id_ts(DefID def_id);
+    mast::TypeSpecID new_gid_ts(DefID def_id);
+    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id);
     mast::TypeSpecID new_ptr_ts(
         mast::TypeSpecID ptd_ts,
         bool contents_is_mut
@@ -301,22 +315,11 @@ namespace monomorphizer::mast {
     
     // Expressions:
     mast::ExpID get_unit_exp();
-    mast::ExpID new_int_exp(
-        size_t mantissa,
-        IntegerSuffix typing_suffix,
-        bool is_neg
-    );
-    mast::ExpID new_float_exp(
-        double value,
-        FloatSuffix typing_suffix
-    );
-    mast::ExpID new_string_exp(
-        size_t code_point_count,
-        int* code_point_array
-    );
-    mast::ExpID new_id_exp(
-        DefID def_id
-    );
+    mast::ExpID new_int_exp(size_t mantissa, IntegerSuffix typing_suffix, bool is_neg);
+    mast::ExpID new_float_exp(double value, FloatSuffix typing_suffix);
+    mast::ExpID new_string_exp(size_t code_point_count, int* code_point_array);
+    mast::ExpID new_gid_exp(DefID def_id);
+    mast::ExpID new_lid_exp(intern::IntStr int_str_id);
     mast::ExpID new_func_call_exp(
         mast::ExpID called_fn,
         mast::ExpID arg_exp,

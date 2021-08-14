@@ -48,14 +48,12 @@ namespace monomorphizer::modules {
     // in which symbols are added.
     // By convention, this should be the order in which source nodes are written 
     // in source code.
-    DefID get_mono_mod_field_at(
-        MonoModID mono_mod_id,
-        size_t field_index
-    );
-    DefID get_poly_mod_field_at(
-        PolyModID poly_mod_id,
-        size_t field_index
-    );
+    char const* get_mono_mod_name(MonoModID mono_mod_id);
+    char const* get_poly_mod_name(PolyModID poly_mod_id);
+    size_t get_mono_mod_field_count(PolyModID poly_mod_id);
+    DefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
+    size_t get_poly_mod_field_count(MonoModID mono_mod_id);
+    DefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
 
     // instantiation: 
     // turn a PolyModID into a MonoModID using some template arguments.

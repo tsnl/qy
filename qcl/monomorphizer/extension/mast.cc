@@ -109,11 +109,19 @@ namespace monomorphizer::mast {
     mast::TypeSpecID get_unit_ts() {
         return s_mgr->singleton_cache().ts_unit;
     }
-    mast::TypeSpecID new_id_ts(DefID def_id) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_ID);
-        auto info_ptr = &get_info_ptr(new_node_id)->ts_id;
+    mast::TypeSpecID new_gid_ts(DefID def_id) {
+        auto new_node_id = help_alloc_node(NodeKind::TS_GID);
+        auto info_ptr = &get_info_ptr(new_node_id)->ts_gid;
 
         info_ptr->def_id = def_id;
+
+        return new_node_id;
+    }
+    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id) {
+        auto new_node_id = help_alloc_node(NodeKind::TS_LID);
+        auto info_ptr = &get_info_ptr(new_node_id)->ts_lid;
+
+        info_ptr->int_str_id = int_str_id;
 
         return new_node_id;
     }
@@ -258,13 +266,19 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
-    mast::ExpID new_id_exp(
-        DefID def_id
-    ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_ID);
-        auto info_ptr = &get_info_ptr(new_node_id)->exp_id;
+    mast::ExpID new_gid_exp(DefID def_id) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GID);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_gid;
 
         info_ptr->def_id = def_id;
+
+        return new_node_id;
+    }
+    mast::ExpID new_lid_exp(intern::IntStr int_str_id) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_LID);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_lid;
+
+        info_ptr->int_str_id = int_str_id;
 
         return new_node_id;
     }
@@ -457,7 +471,7 @@ namespace monomorphizer::mast {
         switch (nk) {
             // type specs:
             case mast::NodeKind::TS_UNIT:
-            case mast::NodeKind::TS_ID:
+            case mast::NodeKind::TS_GID:
             case mast::NodeKind::TS_PTR:
             case mast::NodeKind::TS_ARRAY:
             case mast::NodeKind::TS_SLICE:
@@ -473,7 +487,7 @@ namespace monomorphizer::mast {
             case mast::NodeKind::EXP_INT:
             case mast::NodeKind::EXP_FLOAT:
             case mast::NodeKind::EXP_STRING:
-            case mast::NodeKind::EXP_ID:
+            case mast::NodeKind::EXP_GID:
             case mast::NodeKind::EXP_FUNC_CALL:
             case mast::NodeKind::EXP_UNARY_OP:
             case mast::NodeKind::EXP_BINARY_OP:

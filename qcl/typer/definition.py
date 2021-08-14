@@ -28,10 +28,18 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
         self.universe: "Universe" = universe
         self.opt_container_func: t.Optional["ast.node.LambdaExp"] = opt_func
         self.is_protected_from_global_scope: bool = is_protected_from_global_scope
+        self.opt_container_submodule: t.Optional["ast.node.SubModExp"] = None
 
     @property
     def is_globally_visible(self):
         return self.opt_container_func is None and not self.is_protected_from_global_scope
+
+    def init_def_context(self, def_context):
+        # storing the container sub-module:
+        self.opt_container_submodule = def_context.opt_container_submodule
+
+        # initializing the scheme:
+        self.scheme.init_def_context(def_context)
 
 
 class ValueRecord(BaseRecord):

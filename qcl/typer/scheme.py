@@ -104,6 +104,13 @@ class Scheme(object):
             return substitution.empty, self.body_tid
 
     def init_def_context(self, def_context):
+        """
+        This function is called when a definition is bound to a context.
+        It is a kind of 'lazy initialization' function.
+        :param def_context: the context in which this scheme is instantiated.
+        :return:
+        """
+
         assert def_context is not None
         self.def_context = def_context
         self.all_bound_var_map = self.bound_var_map | self.def_context.global_type_template_arg_tid_map

@@ -118,6 +118,20 @@ namespace monomorphizer::modules {
 
 namespace monomorphizer::modules {
 
+    size_t get_poly_mod_field_count(PolyModID poly_mod_id) {
+        return s_poly_common_info_table[poly_mod_id].fields.size();
+    }
+    size_t get_mono_mod_field_count(MonoModID mono_mod_id) {
+        return s_mono_common_info_table[mono_mod_id].fields.size();
+    }
+
+    char const* get_mono_mod_name(MonoModID mono_mod_id) {
+        return s_mono_common_info_table[mono_mod_id].name;
+    }
+    char const* get_poly_mod_name(PolyModID poly_mod_id) {
+        return s_poly_common_info_table[poly_mod_id].name;
+    }
+
     DefID get_mono_mod_field_at(
         MonoModID mono_mod_id,
         size_t field_index
@@ -158,22 +172,14 @@ namespace monomorphizer::modules {
         switch (bv_def_kind) {
             case defs::DefKind::BV_EXP: {
                 mval::ValueID val_id = bound_id;
-                return defs::define_total_const_value(
-                    def_name,
-                    val_id, true
-                );
+                return defs::define_total_const_value(def_name, val_id);
             } break;
             case defs::DefKind::BV_TS: {
                 mtype::TID type_id = bound_id;
-                return defs::define_total_const_type(
-                    def_name,
-                    type_id, true
-                );
+                return defs::define_total_const_type(def_name, type_id);
             } break;
             default: {
-                throw new Panic(
-                    "Invalid Def Kind in bv_def_id_array"
-                );
+                throw new Panic("Invalid Def Kind in bv_def_id_array");
             } break;
         };
     }

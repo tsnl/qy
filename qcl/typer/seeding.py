@@ -64,7 +64,8 @@ def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: "ast.node.FileMod
     # This means we MUST DEFINE SUB-MODULES IN A PER-FILE-MODULE CONTEXT.
     file_mod_ctx = root_ctx.push_context(
         f"seed.file_mod[{file_mod_exp.source.file_path_rel_cwd}](tid={file_mod_tid})",
-        file_mod_exp.loc
+        file_mod_exp.loc,
+        opt_container_submodule=None
     )
 
     # creating a seed free-var for each import that can be unified with an import later:
@@ -124,12 +125,15 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
 
     # Pushing a context for this sub-module's bound symbols:
     # NOTE: we pass each template arg bound var here as an opt_type_arg_map
+    # NOTE: this is the only place we supply `opt_container_submodule`;
+    #       this is automatically inherited for child scopes.
     sub_mod_ctx = ctx.push_context(
         f"sub_mod.{sub_mod_name}", sub_mod_exp.loc,
         opt_type_arg_map={
             template_type_arg_name: bound_var
             for template_type_arg_name, bound_var in zip(template_type_arg_names, sub_mod_scheme.bound_vars)
-        }
+        },
+        opt_container_submodule=sub_mod_exp
     )
 
     # Defining each value template arg in this context:

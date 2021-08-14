@@ -29,7 +29,8 @@ class Context(object):
             opt_parent_context: t.Optional["Context"],
             symbol_table: t.Dict[str, definition.BaseRecord] = None,
             local_type_template_arg_tid_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
-            opt_func: t.Optional["ast.node.LambdaExp"] = None
+            opt_func: t.Optional["ast.node.LambdaExp"] = None,
+            opt_container_submodule: t.Optional["ast.node.SubModExp"] = None
     ):
         #
         # Initialization:
@@ -48,12 +49,22 @@ class Context(object):
         if self.opt_parent_context is None:
             self.root_context = self
             self.opt_func = opt_func
+            self.opt_container_submodule = opt_container_submodule
         else:
             self.root_context = self.opt_parent_context.root_context
             self.opt_parent_context.child_context_list.append(self)
 
             # if `opt_func` is not provided (is None), we use the parent context's 'opt_func', which may be `None`
             self.opt_func = opt_func if opt_func is not None else self.opt_parent_context.opt_func
+
+            # inheriting the optional container submodule:
+            opt_parent_container_submodule = self.opt_parent_context.opt_container_submodule
+            if opt_parent_container_submodule is not None:
+                self.opt_container_submodule = opt_parent_container_submodule
+                if opt_container_submodule is not None:
+                    assert opt_container_submodule is self.opt_container_submodule
+            else:
+                self.opt_container_submodule = opt_container_submodule
 
         # initializing the symbol table:
         if symbol_table is None:
@@ -103,12 +114,17 @@ class Context(object):
             loc: fb.ILoc,
             opt_symbol_table=None,
             opt_type_arg_map=None,
-            opt_func=None
+            opt_func=None,
+            opt_container_submodule=None,
     ):
         return Context(
             self.project,
             purpose, loc,
-            self, opt_symbol_table, opt_type_arg_map, opt_func=opt_func
+            self,
+            symbol_table=opt_symbol_table,
+            local_type_template_arg_tid_map=opt_type_arg_map,
+            opt_func=opt_func,
+            opt_container_submodule=opt_container_submodule
         )
 
     def try_define(self, def_name: str, def_record: definition.BaseRecord) -> bool:
@@ -117,7 +133,7 @@ class Context(object):
         else:
             assert def_record is not None
             self.symbol_table[def_name] = def_record
-            def_record.scheme.init_def_context(self)
+            def_record.init_def_context(self)
             return True
 
     def lookup(self, def_name, shallow=False):

@@ -41,12 +41,15 @@ namespace monomorphizer::eval {
     ) {
         auto ts_kind = mast::get_node_kind(mast_ts_id);
         switch (ts_kind) {
-            case mast::NodeKind::TS_ID: {
+            case mast::NodeKind::TS_LID: {
+                return mast_ts_id;
+            }
+            case mast::NodeKind::TS_GID: {
                 // IDs accessed from within a monomorphic module are always
                 // monomorphic.
                 // However, this substitution may require us to rewrite this ID
                 // with another.
-                auto info = mast::get_info_ptr(mast_ts_id)->ts_id;
+                auto info = mast::get_info_ptr(mast_ts_id)->ts_gid;
                 DefID old_def_id = info.def_id;
                 defs::DefKind old_def_kind = defs::get_def_kind(old_def_id);
                 switch (old_def_kind) {
@@ -62,7 +65,7 @@ namespace monomorphizer::eval {
                         if (new_def_id == old_def_id) {
                             return mast_ts_id;
                         } else {
-                            return mast::new_id_ts(new_def_id);
+                            return mast::new_gid_ts(new_def_id);
                         }
                     }
                     default:
@@ -217,16 +220,17 @@ namespace monomorphizer::eval {
             case mast::NodeKind::EXP_INT:
             case mast::NodeKind::EXP_FLOAT: 
             case mast::NodeKind::EXP_STRING:
+            case mast::NodeKind::EXP_LID:
             {
                 return mast_exp_id;
             } break;
             
-            case mast::NodeKind::EXP_ID: {
+            case mast::NodeKind::EXP_GID: {
                 // IDs accessed from within a monomorphic module are always
                 // monomorphic.
                 // However, this substitution may require us to rewrite this ID
                 // with another.
-                auto info = &mast::get_info_ptr(mast_exp_id)->exp_id;
+                auto info = &mast::get_info_ptr(mast_exp_id)->exp_gid;
                 DefID old_def_id = info->def_id;
                 defs::DefKind old_def_kind = defs::get_def_kind(old_def_id);
                 switch (old_def_kind) {
@@ -243,7 +247,7 @@ namespace monomorphizer::eval {
                         if (new_def_id == old_def_id) {
                             return mast_exp_id;
                         } else {
-                            return mast::new_id_ts(new_def_id);
+                            return mast::new_gid_ts(new_def_id);
                         }
                     }
                     default:
@@ -463,10 +467,10 @@ namespace monomorphizer::eval {
             } break;
             case mast::NodeKind::EXP_CHAIN: {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_chain;
-                throw new Panic("NotImplemented: EXP_CHAIN");
+                throw new Panic("NotImplemented: p2m_exp for EXP_CHAIN");
             } break;
             default: {
-                throw new Panic("NotImplemented: unknown exp kind");
+                throw new Panic("NotImplemented: p2m_exp for unknown exp kind");
             } break;
         }
     }
@@ -548,8 +552,12 @@ namespace monomorphizer::eval {
                 return mtype::get_unit_tid();
             } break;
 
-            case mast::NodeKind::TS_ID: {
-                auto info = &mast::get_info_ptr(ts_id)->ts_id;
+            case mast::NodeKind::TS_LID: {
+                throw new Panic("NotImplemented: eval_mono_ts for an LID: need stack");
+            } break;
+
+            case mast::NodeKind::TS_GID: {
+                auto info = &mast::get_info_ptr(ts_id)->ts_gid;
                 DefID def_id = info->def_id;
                 return eval_def_t(def_id);
             } break;
@@ -1022,8 +1030,11 @@ namespace monomorphizer::eval {
             case mast::NodeKind::EXP_STRING: {
                 return eval_mono_string_exp(exp_id);
             } break;
-            case mast::NodeKind::EXP_ID: {
-                auto info = &mast::get_info_ptr(exp_id)->exp_id;
+            case mast::NodeKind::EXP_LID: {
+                throw new Panic("NotImplemented: eval_mono_exp for LID");
+            }
+            case mast::NodeKind::EXP_GID: {
+                auto info = &mast::get_info_ptr(exp_id)->exp_gid;
                 return eval_def_v(info->def_id);
             } break;
             case mast::NodeKind::EXP_FUNC_CALL: {
