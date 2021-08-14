@@ -3,7 +3,7 @@ The MAST Cython module is a target into which we copy the AST, substituting temp
 - MAST node = (AST node + computed properties (TID) - templates)
 - simply copy AST nodes while replacing formal arguments with their actual arguments
     - IdInModuleExp is replaced with IdExp
-- replace value binding IDs with ValDefIDs, such that no scoping is required.
+- replace value binding IDs with ValGDefIDs, such that no scoping is required.
 
 Evaluate while/by generating monomorphic IR = MASTICATION (heh heh)
 - masticate is a synonym for chewing

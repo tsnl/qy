@@ -11,7 +11,7 @@ typedef struct FormalTemplateTypeArg FormalTemplateTypeArg;
 typedef struct Instantiation Instantiation;
 
 struct Func {
-    DefID opt_def_id;
+    GDefID opt_def_id;
     ExprID base_body_expr_id;
 
     // template info:
@@ -34,11 +34,11 @@ struct Func {
 };
 
 struct FormalTemplateValArg {
-    DefID arg_name;
+    GDefID arg_name;
 };
 
 struct FormalTemplateTypeArg {
-    DefID arg_name;
+    GDefID arg_name;
     RtTypeID arg_rttid;
 };
 

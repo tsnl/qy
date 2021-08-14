@@ -289,14 +289,14 @@ def infer_binding_elem_types(
                     project,
                     id_name, elem.loc, def_tid,
                     opt_func=ctx.opt_func,
-                    is_protected_from_global_scope=(not is_bound_globally_visible)
+                    is_bound_globally_visible=is_bound_globally_visible
                 )
             elif du == definition.Universe.Type:
                 def_rec = definition.TypeRecord(
                     project,
                     id_name, elem.loc, def_tid,
                     opt_func=ctx.opt_func,
-                    is_protected_from_global_scope=(not is_bound_globally_visible)
+                    is_bound_globally_visible=is_bound_globally_visible
                 )
             else:
                 raise NotImplementedError("Unknown universe in binding")
@@ -651,7 +651,8 @@ def help_infer_exp_tid(
                 arg_def_obj = definition.ValueRecord(
                     project,
                     arg_name, exp.loc, formal_arg_tid,
-                    opt_func=exp
+                    opt_func=exp,
+                    is_bound_globally_visible=False
                 )
                 formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
                 if not formal_arg_def_ok:

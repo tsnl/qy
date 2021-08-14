@@ -1,5 +1,5 @@
 #include "mast.hh"
-#include "defs.hh"
+#include "gdef.hh"
 
 #include <vector>
 #include "panic.hh"
@@ -109,7 +109,7 @@ namespace monomorphizer::mast {
     mast::TypeSpecID get_unit_ts() {
         return s_mgr->singleton_cache().ts_unit;
     }
-    mast::TypeSpecID new_gid_ts(DefID def_id) {
+    mast::TypeSpecID new_gid_ts(GDefID def_id) {
         auto new_node_id = help_alloc_node(NodeKind::TS_GID);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_gid;
 
@@ -266,7 +266,7 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
-    mast::ExpID new_gid_exp(DefID def_id) {
+    mast::ExpID new_gid_exp(GDefID def_id) {
         auto new_node_id = help_alloc_node(NodeKind::EXP_GID);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_gid;
 
@@ -350,14 +350,14 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_lambda_exp(
         size_t arg_name_count,
-        DefID* arg_name_array,
+        GDefID* arg_name_array,
         mast::ExpID body_exp
     ) {
         auto new_node_id = help_alloc_node(NodeKind::EXP_LAMBDA);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_lambda;
 
         info_ptr->arg_name_count = arg_name_count;
-        info_ptr->arg_name_array = new DefID[arg_name_count];
+        info_ptr->arg_name_array = new GDefID[arg_name_count];
         for (size_t i = 0; i < arg_name_count; i++) {
             info_ptr->arg_name_array[i] = arg_name_array[i];
         }
@@ -440,7 +440,7 @@ namespace monomorphizer::mast {
     }
 
     mast::ElemID new_bind1v_elem(
-        DefID bound_def_id, 
+        GDefID bound_def_id,
         mast::ExpID init_exp_id
     ) {
         auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1V);

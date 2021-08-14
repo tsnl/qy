@@ -12,7 +12,7 @@ def mk_wrapper_extension():
         sources=[
             "wrapper.pyx",
             # "extension/arg-list.cc",
-            # "extension/defs.cc",
+            # "extension/gdef.cc",
             # "extension/eval.cc",
             # "extension/mast.cc",
             # "extension/modules.cc",

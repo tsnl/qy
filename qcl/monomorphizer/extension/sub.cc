@@ -2,7 +2,7 @@
 
 #include <map>
 
-#include "defs.hh"
+#include "gdef.hh"
 #include "debug.hh"
 
 namespace monomorphizer::sub {
@@ -11,23 +11,23 @@ namespace monomorphizer::sub {
 
     class Substitution {
       private:
-        std::map<DefID, DefID> m_subs;
+        std::map<GDefID, GDefID> m_subs;
 
       public:
         Substitution();
 
       public:
         void add_monomorphizing_replacement(
-            DefID original_def_id, 
-            DefID replacement_def_id
+            GDefID original_def_id,
+            GDefID replacement_def_id
         );
-        DefID rw_def_id(
-            DefID def_id
+        GDefID rw_def_id(
+            GDefID def_id
         );
       private:
         static bool validate_monomorphizing_replacement(
-            DefID original_def_id,
-            DefID replacement_def_id
+            GDefID original_def_id,
+            GDefID replacement_def_id
         );
     };
 
@@ -36,8 +36,8 @@ namespace monomorphizer::sub {
     {}
 
     void Substitution::add_monomorphizing_replacement(
-        DefID original_def_id,
-        DefID replacement_def_id
+        GDefID original_def_id,
+        GDefID replacement_def_id
     ) {
         // validation:
 #if (MONOMORPHIZER_DEBUG)
@@ -52,16 +52,16 @@ namespace monomorphizer::sub {
     }
 
     bool Substitution::validate_monomorphizing_replacement(
-        DefID original_def_id,
-        DefID replacement_def_id
+        GDefID original_def_id,
+        GDefID replacement_def_id
     ) { 
         // checking replacement def kind: no BV allowed or non-tot consts
-        defs::DefKind replacement_def_kind = defs::get_def_kind(
+        gdef::DefKind replacement_def_kind = gdef::get_def_kind(
             replacement_def_id
         );
         switch (replacement_def_kind) {
-            case defs::DefKind::CONST_TOT_TID: 
-            case defs::DefKind::CONST_TOT_VAL: {
+            case gdef::DefKind::CONST_TOT_TID:
+            case gdef::DefKind::CONST_TOT_VAL: {
                 // replacement must be a total constant so our replacement does
                 // not include any free variables.
             } break;
@@ -72,12 +72,12 @@ namespace monomorphizer::sub {
         }
 
         // checking original def kind: only BV allowed.
-        defs::DefKind original_def_kind = defs::get_def_kind(
+        gdef::DefKind original_def_kind = gdef::get_def_kind(
             original_def_id
         );
         switch (original_def_kind) {
-            case defs::DefKind::BV_EXP:
-            case defs::DefKind::BV_TS: {
+            case gdef::DefKind::BV_EXP:
+            case gdef::DefKind::BV_TS: {
                 // replacement must be a bound var
             } break;
 
@@ -90,7 +90,7 @@ namespace monomorphizer::sub {
         return true;
     }
 
-    DefID Substitution::rw_def_id(DefID def_id) {
+    GDefID Substitution::rw_def_id(GDefID def_id) {
         auto it = m_subs.find(def_id);
         if (it == m_subs.end()) {
             return def_id;
@@ -113,7 +113,7 @@ namespace monomorphizer::sub {
 
     void add_monomorphizing_replacement(
         Substitution* sub, 
-        DefID original_def_id, DefID replacement_def_id
+        GDefID original_def_id, GDefID replacement_def_id
     ) {
         sub->add_monomorphizing_replacement(
             original_def_id, 
@@ -121,7 +121,7 @@ namespace monomorphizer::sub {
         );
     }
 
-    DefID rw_def_id(Substitution* sub, DefID def_id) {
+    GDefID rw_def_id(Substitution* sub, GDefID def_id) {
         return sub->rw_def_id(def_id);
     }
 

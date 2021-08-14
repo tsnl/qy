@@ -10,12 +10,12 @@
 struct EvalFrame {
     EvalFrame* opt_parent_ef;
     int sym_count;
-    DefID* sym_names;
+    GDefID* sym_names;
     Const* sym_vals;
     uint8_t* sym_init_bitset;
 };
 
-int sym_index(EvalFrame* ef, DefID def_id) {
+int sym_index(EvalFrame* ef, GDefID def_id) {
     // todo: try storing definitions in a binary tree to make these lookups
     //       faster.
     for (int i = 0; i < ef->sym_count; i++) {
@@ -42,7 +42,7 @@ void set_sym_is_init(EvalFrame* ef, int sym_index) {
 // Interface:
 //
 
-EvalFrame* ef_new(EvalFrame* opt_parent_ef, int sym_count, DefID* mv_sym_names) {
+EvalFrame* ef_new(EvalFrame* opt_parent_ef, int sym_count, GDefID* mv_sym_names) {
     EvalFrame* efp = malloc(sizeof(EvalFrame));
     
     efp->sym_count = sym_count;
@@ -65,13 +65,13 @@ void ef_del(EvalFrame* efp) {
     free(efp);
 }
 
-void ef_init_symbol(EvalFrame* ef, DefID sym_name, Const constant) {
+void ef_init_symbol(EvalFrame* ef, GDefID sym_name, Const constant) {
     int si = sym_index(ef, sym_name);
     assert(si >= 0 && "symbol not found");
     set_sym_is_init(ef, si);
     ef->sym_vals[si] = constant;
 }
-Const const* ef_try_lookup_symbol(EvalFrame* ef, DefID sym_name) {
+Const const* ef_try_lookup_symbol(EvalFrame* ef, GDefID sym_name) {
     int si = sym_index(ef, sym_name);
     if (si >= 0) {
         return ef->sym_vals + si;        

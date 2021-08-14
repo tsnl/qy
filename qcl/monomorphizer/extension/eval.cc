@@ -5,7 +5,7 @@
 #include "mast.hh"
 #include "panic.hh"
 #include "sub.hh"
-#include "defs.hh"
+#include "gdef.hh"
 #include "mtype.hh"
 #include "mval.hh"
 #include "mtype.hh"
@@ -50,18 +50,18 @@ namespace monomorphizer::eval {
                 // However, this substitution may require us to rewrite this ID
                 // with another.
                 auto info = mast::get_info_ptr(mast_ts_id)->ts_gid;
-                DefID old_def_id = info.def_id;
-                defs::DefKind old_def_kind = defs::get_def_kind(old_def_id);
+                GDefID old_def_id = info.def_id;
+                gdef::DefKind old_def_kind = gdef::get_def_kind(old_def_id);
                 switch (old_def_kind) {
-                    case defs::DefKind::CONST_TOT_TID: 
+                    case gdef::DefKind::CONST_TOT_TID:
                     {
                         // no substitution/copying needed
                         return mast_ts_id;
                     }
-                    case defs::DefKind::CONST_TS:
-                    case defs::DefKind::BV_TS:
+                    case gdef::DefKind::CONST_TS:
+                    case gdef::DefKind::BV_TS:
                     {
-                        DefID new_def_id = sub::rw_def_id(s, old_def_id);
+                        GDefID new_def_id = sub::rw_def_id(s, old_def_id);
                         if (new_def_id == old_def_id) {
                             return mast_ts_id;
                         } else {
@@ -70,7 +70,7 @@ namespace monomorphizer::eval {
                     }
                     default:
                     {
-                        throw new Panic("Invalid DefID in TypeSpecID");
+                        throw new Panic("Invalid GDefID in TypeSpecID");
                     }
                 }
             } break;
@@ -231,19 +231,19 @@ namespace monomorphizer::eval {
                 // However, this substitution may require us to rewrite this ID
                 // with another.
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_gid;
-                DefID old_def_id = info->def_id;
-                defs::DefKind old_def_kind = defs::get_def_kind(old_def_id);
+                GDefID old_def_id = info->def_id;
+                gdef::DefKind old_def_kind = gdef::get_def_kind(old_def_id);
                 switch (old_def_kind) {
-                    case defs::DefKind::CONST_TOT_VAL: 
+                    case gdef::DefKind::CONST_TOT_VAL:
                     {
                         // no substitution/copying needed
                         return mast_exp_id;
                     }
-                    case defs::DefKind::CONST_EXP:
-                    case defs::DefKind::BV_EXP:
+                    case gdef::DefKind::CONST_EXP:
+                    case gdef::DefKind::BV_EXP:
                     {
                         // updating 
-                        DefID new_def_id = sub::rw_def_id(s, old_def_id);
+                        GDefID new_def_id = sub::rw_def_id(s, old_def_id);
                         if (new_def_id == old_def_id) {
                             return mast_exp_id;
                         } else {
@@ -252,7 +252,7 @@ namespace monomorphizer::eval {
                     }
                     default:
                     {
-                        throw new Panic("Invalid DefID in ExpID");
+                        throw new Panic("Invalid GDefID in ExpID");
                     }
                 }
             } break;
@@ -407,13 +407,13 @@ namespace monomorphizer::eval {
                 bool changed = (old_body_exp_id != new_body_exp_id);
                 if (changed) {
                     size_t arg_name_count = info->arg_name_count;
-                    DefID* new_arg_name_array = new DefID[arg_name_count];
+                    GDefID* new_arg_name_array = new GDefID[arg_name_count];
                     for (size_t i = 0; i < arg_name_count; i++) {
                         new_arg_name_array[i] = info->arg_name_array[i];
                         
                         // function args are never rewritten by monomorphization
                         // since they are bound, and hence never rewritten.
-                        // DefID repl_def_name = sub::rw_def_id(
+                        // GDefID repl_def_name = sub::rw_def_id(
                         //     s,
                         //     orig_def_name
                         // );
@@ -483,17 +483,17 @@ namespace monomorphizer::eval {
 
 namespace monomorphizer::eval {
 
-    mtype::TID eval_def_t(DefID def_id) {
-        defs::DefKind def_kind = defs::get_def_kind(def_id);
+    mtype::TID eval_def_t(GDefID def_id) {
+        gdef::DefKind def_kind = gdef::get_def_kind(def_id);
         switch (def_kind) {
-            case defs::DefKind::CONST_TOT_TID: {
-                return defs::load_id_from_def_id(def_id);
+            case gdef::DefKind::CONST_TOT_TID: {
+                return gdef::load_id_from_def_id(def_id);
             } break;
-            case defs::DefKind::CONST_TS: {
-                auto stored_ts_id = defs::load_id_from_def_id(def_id);
+            case gdef::DefKind::CONST_TS: {
+                auto stored_ts_id = gdef::load_id_from_def_id(def_id);
                 return eval_mono_ts(stored_ts_id);
             } break;
-            case defs::DefKind::BV_TS: {
+            case gdef::DefKind::BV_TS: {
                 throw new Panic(
                     "InputError: `eval_def_t` cannot eval a bound var"
                 );
@@ -506,25 +506,21 @@ namespace monomorphizer::eval {
         }
     }
 
-    mval::ValueID eval_def_v(DefID def_id) {
-        defs::DefKind def_kind = defs::get_def_kind(def_id);
+    mval::ValueID eval_def_v(GDefID def_id) {
+        gdef::DefKind def_kind = gdef::get_def_kind(def_id);
         switch (def_kind) {
-            case defs::DefKind::CONST_TOT_VAL: {
-                return defs::load_id_from_def_id(def_id);
+            case gdef::DefKind::CONST_TOT_VAL: {
+                return gdef::load_id_from_def_id(def_id);
             } break;
-            case defs::DefKind::CONST_EXP: {
-                auto stored_val_id = defs::load_id_from_def_id(def_id);
+            case gdef::DefKind::CONST_EXP: {
+                auto stored_val_id = gdef::load_id_from_def_id(def_id);
                 return eval_mono_exp(stored_val_id);
             } break;
-            case defs::DefKind::BV_EXP: {
-                throw new Panic(
-                    "InputError: `eval_def_v` cannot eval a bound var"
-                );
+            case gdef::DefKind::BV_EXP: {
+                throw new Panic("InputError: `eval_def_v` cannot eval a bound var");
             } break;
             default: {
-                throw new Panic(
-                    "InputError: unknown DefKind in `eval_def_v`"
-                );
+                throw new Panic("InputError: unknown DefKind in `eval_def_v`");
             }
         }
     }
@@ -558,7 +554,7 @@ namespace monomorphizer::eval {
 
             case mast::NodeKind::TS_GID: {
                 auto info = &mast::get_info_ptr(ts_id)->ts_gid;
-                DefID def_id = info->def_id;
+                GDefID def_id = info->def_id;
                 return eval_def_t(def_id);
             } break;
 
@@ -614,7 +610,7 @@ namespace monomorphizer::eval {
                 auto raw_info = mast::get_info_ptr(ts_id);
                 auto info = &raw_info->ts_get_mono_module_field;
 
-                DefID def_id = modules::get_mono_mod_field_at(
+                GDefID def_id = modules::get_mono_mod_field_at(
                     info->template_id,
                     info->ts_field_index
                 );
@@ -693,7 +689,7 @@ namespace monomorphizer::eval {
         auto info = &mast::get_info_ptr(exp_id)->exp_call;
         // todo: figure out how to evaluate function calls.
         //  - we need some 'stack' behavior, so must restore any
-        //    store-clobbered DefIDs when processing function return
+        //    store-clobbered GDefIDs when processing function return
         //  - consider writing a function that allocates space for the
         //    arguments, copies them, 
         // todo: ensure evaluated functions are strictly TOT 
@@ -1010,7 +1006,7 @@ namespace monomorphizer::eval {
     }
     static mval::ValueID eval_mono_get_module_field(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_get_mono_module_field;
-        DefID field_def_id = modules::get_poly_mod_field_at(info->template_id, info->field_index);
+        GDefID field_def_id = modules::get_poly_mod_field_at(info->template_id, info->field_index);
         return eval_def_v(field_def_id);
     }
     mval::ValueID eval_mono_exp(mast::ExpID exp_id) {

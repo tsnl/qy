@@ -1,18 +1,18 @@
-#include "defs.hh"
+#include "gdef.hh"
 
 #include <vector>
 #include <deque>
 #include <string>
 
-#include "id-defs.hh"
+#include "id-gdef.hh"
 #include "id-mast.hh"
 #include "mast.hh"
 #include "panic.hh"
 
-namespace monomorphizer::defs {
+namespace monomorphizer::gdef {
 
     // Constants:
-    extern DefID const NULL_DEF_ID = -1;
+    extern GDefID const NULL_GDEF_ID = -1;
 
     struct DefInfo;
     
@@ -69,7 +69,7 @@ namespace monomorphizer::defs {
     // Constructors:
     //
 
-    DefID help_emplace_common_def_info(
+    GDefID help_emplace_common_def_info(
         DefKind kind,
         char* mv_def_name,
         size_t target_id,
@@ -89,7 +89,7 @@ namespace monomorphizer::defs {
         return def_id;
     }
 
-    DefID help_emplace_const_mast_def(char* mv_def_name, bool is_t_not_v) {
+    GDefID help_emplace_const_mast_def(char* mv_def_name, bool is_t_not_v) {
         bool bound_node_id_is_exp_not_ts = !is_t_not_v;
         DefKind def_kind = (
             bound_node_id_is_exp_not_ts ?
@@ -104,7 +104,7 @@ namespace monomorphizer::defs {
         );
     }
 
-    DefID help_emplace_tot_const_def(
+    GDefID help_emplace_tot_const_def(
         DefKind def_kind,
         char* mv_def_name,
         size_t bound_id
@@ -117,7 +117,7 @@ namespace monomorphizer::defs {
         );
     }
 
-    DefID help_emplace_bv(
+    GDefID help_emplace_bv(
         DefKind def_kind,
         char* mv_def_name
     ) {
@@ -129,14 +129,14 @@ namespace monomorphizer::defs {
         );
     }
 
-    DefID declare_t_const_mast_node(char* mv_def_name) {
+    GDefID declare_t_const_mast_node(char* mv_def_name) {
         return help_emplace_const_mast_def(mv_def_name, false);
     }
-    DefID declare_v_const_mast_node(char* mv_def_name) {
+    GDefID declare_v_const_mast_node(char* mv_def_name) {
         return help_emplace_const_mast_def(mv_def_name, true);
     }
 
-    DefID define_total_const_value(
+    GDefID define_total_const_value(
         char* mv_def_name,
         mval::ValueID value_id
     ) {
@@ -147,7 +147,7 @@ namespace monomorphizer::defs {
         );
     }
 
-    DefID define_total_const_type(
+    GDefID define_total_const_type(
         char* mv_def_name,
         mtype::TID type_id
     ) {
@@ -158,19 +158,19 @@ namespace monomorphizer::defs {
         );
     }
 
-    void define_declared_t_const(DefID declared_def_id, mast::TypeSpecID ts_id) {
+    void define_declared_t_const(GDefID declared_def_id, mast::TypeSpecID ts_id) {
         auto info = &s_def_info_table[declared_def_id];
         assert(info->opt_target_id == mast::NULL_NODE_ID);
         info->opt_target_id = ts_id;
     }
 
-    void define_declared_v_const(DefID declared_def_id, mast::ExpID exp_id) {
+    void define_declared_v_const(GDefID declared_def_id, mast::ExpID exp_id) {
         auto info = &s_def_info_table[declared_def_id];
         assert(info->opt_target_id == mast::NULL_NODE_ID);
         info->opt_target_id = exp_id;
     }
 
-    DefID define_bound_var_ts(
+    GDefID define_bound_var_ts(
         char* mv_formal_var_name
     ) {
         return help_emplace_bv(
@@ -179,7 +179,7 @@ namespace monomorphizer::defs {
         );
     }
 
-    DefID define_bound_var_exp(
+    GDefID define_bound_var_exp(
         char* mv_formal_var_name
     ) {
         return help_emplace_bv(
@@ -189,19 +189,19 @@ namespace monomorphizer::defs {
     }
 
     // query definition info:
-    bool get_def_is_bv(DefID def_id) {
+    bool get_def_is_bv(GDefID def_id) {
         return !s_def_is_const_not_var_table[def_id];
     }
-    DefKind get_def_kind(DefID def_id) {
+    DefKind get_def_kind(GDefID def_id) {
         return s_def_kind_table[def_id];
     }
-    char const* get_def_name(DefID def_id) {
+    char const* get_def_name(GDefID def_id) {
         return s_def_info_table[def_id].def_name;
     }
-    void store_id_at_def_id(DefID def_id, size_t v) {
+    void store_id_at_def_id(GDefID def_id, size_t v) {
         s_def_info_table[def_id].opt_target_id = v;
     }
-    size_t load_id_from_def_id(DefID def_id) {
+    size_t load_id_from_def_id(GDefID def_id) {
         return s_def_info_table[def_id].opt_target_id;
     }
 

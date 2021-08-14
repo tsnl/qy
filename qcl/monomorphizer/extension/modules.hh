@@ -9,7 +9,7 @@
 #pragma once
 
 #include "id-modules.hh"
-#include "id-defs.hh"
+#include "id-gdef.hh"
 #include "id-mast.hh"
 #include "id-mval.hh"
 #include "id-mtype.hh"
@@ -29,19 +29,19 @@ namespace monomorphizer::modules {
     // add_field pushes a field and returns its unique index.
     size_t add_mono_module_field(
         MonoModID template_id,
-        DefID field_def_id
+        GDefID field_def_id
     );
 
     // Polymorphic template construction:
     PolyModID new_polymorphic_module(
         char* mv_template_name,
         size_t bv_def_id_count,
-        DefID* mv_bv_def_id_array
+        GDefID* mv_bv_def_id_array
     );
     // add_field pushes a field and returns the field's unique index.
     size_t add_poly_module_field(
         PolyModID template_id,
-        DefID field_def_id
+        GDefID field_def_id
     );
     
     // Module fields are accessed by an index that is determined by the order
@@ -51,9 +51,11 @@ namespace monomorphizer::modules {
     char const* get_mono_mod_name(MonoModID mono_mod_id);
     char const* get_poly_mod_name(PolyModID poly_mod_id);
     size_t get_mono_mod_field_count(PolyModID poly_mod_id);
-    DefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
+    GDefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
     size_t get_poly_mod_field_count(MonoModID mono_mod_id);
-    DefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
+    GDefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
+    size_t get_poly_mod_formal_arg_count(PolyModID poly_mod_id);
+    GDefID get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t arg_index);
 
     // instantiation: 
     // turn a PolyModID into a MonoModID using some template arguments.

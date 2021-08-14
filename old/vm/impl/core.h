@@ -10,11 +10,11 @@ typedef enum Allocator Allocator;
 typedef enum ValueKind ValueKind;
 
 typedef size_t FuncID;
-typedef size_t DefID;
+typedef size_t GDefID;
 typedef size_t ExprID;
 typedef size_t RtTypeID;
 
-#define NULL_DEF_ID ((DefID)0)
+#define NULL_GDEF_ID ((GDefID)0)
 
 
 enum BinaryArithmeticOperator {

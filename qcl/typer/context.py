@@ -96,13 +96,16 @@ class Context(object):
             else:
                 self.global_type_template_arg_tid_map = self.local_type_template_arg_tid_map
 
-        # defining each local type template argument in this context using the BoundVar types supplied:
+        # defining each local type template argument in this context using the BoundVar types supplied.
+        # NOTE: despite the term 'local', these symbols are always globally visible: they are 'local' to the
+        #       encapsulating scheme.
         self.local_type_template_arg_def_map = {}
         for type_template_arg_name, fresh_bound_var in self.local_type_template_arg_tid_map.items():
             def_record = definition.TypeRecord(
                 project,
                 type_template_arg_name,
-                self.loc, fresh_bound_var, self.opt_func
+                self.loc, fresh_bound_var, self.opt_func,
+                is_bound_globally_visible=True
             )
             def_ok = self.try_define(type_template_arg_name, def_record)
             assert def_ok
@@ -193,7 +196,13 @@ class Context(object):
 def make_default_root(project):
     def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeRecord:
         loc = fb.BuiltinLoc(def_name)
-        def_obj = definition.TypeRecord(project, def_name, loc, def_type_id, opt_func=None)
+        def_obj = definition.TypeRecord(
+            project,
+            def_name, loc,
+            def_type_id,
+            opt_func=None,
+            is_bound_globally_visible=True
+        )
         return def_obj
 
     return Context(

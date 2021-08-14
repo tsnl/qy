@@ -4,6 +4,6 @@
 
 namespace monomorphizer {
 
-    using DefID = size_t;
+    using GDefID = size_t;
 
 }

@@ -187,7 +187,8 @@ def seed_template_val_arg(
         template_val_arg_name,
         loc,
         value_tid,
-        opt_func=None
+        opt_func=None,
+        is_bound_globally_visible=True
     )
     def_ok = sub_mod_ctx.try_define(template_val_arg_name, def_obj)
     if not def_ok:
@@ -215,7 +216,8 @@ def seed_bind1_elem(
             def_name,
             bind1_elem.loc,
             defined_tid,
-            opt_func=None
+            opt_func=None,
+            is_bound_globally_visible=True
         )
     elif def_universe == definition.Universe.Type:
         def_obj = definition.TypeRecord(
@@ -223,7 +225,8 @@ def seed_bind1_elem(
             def_name,
             bind1_elem.loc,
             defined_tid,
-            opt_func=None
+            opt_func=None,
+            is_bound_globally_visible=True
         )
     else:
         raise NotImplementedError("Unknown universe for Bind1?Elem")

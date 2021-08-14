@@ -1,8 +1,12 @@
---- sub vec ---
+--- sub vec1[T] ---
 
-A = I32;
+A = T;
 B = I64;
 C = F32;
 D = F64;
 
 hello = 42;
+
+--- sub vec2 ---
+
+x = 666;

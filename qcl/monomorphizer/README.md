@@ -49,24 +49,24 @@ and prevents odd behavior when global variables are cloned.
   - then generate a MonoTemplateID by copy/sub
 
 - to perform substitution,
-  - for each `BoundVarDefID`, simply generate a new `ConstDefID` mapped to the
+  - for each `BoundVarGDefID`, simply generate a new `ConstGDefID` mapped to the
     argument value.
 
 
 ## Scratch TODO
 
-- ~~first, finish implementing DefID~~
+- ~~first, finish implementing GDefID~~
 - ~~next, implement substitution objects~~
   - these must be mutable, since we can use it as a cache to store partially
     evaluated polymorphs to substitute IDs over several instantiations
-  - these just map DefIDs to TOT_CONST DefIDs
+  - these just map GDefIDs to TOT_CONST GDefIDs
 - ~~next, implement `mtype`~~
   - skipped this earlier, can be done now
 - next, implement `rewrite` (aka sub&copy)
   - copy polymorphic body AST nodes into the polymorph
   - in fact, evaluate each field into a TOT_CONST such that its unique value is
     known at compile-time
-  - when an ID is encountered, try to replace its DefID with one in the sub map.
+  - when an ID is encountered, try to replace its GDefID with one in the sub map.
   - **WIP**: `monomorphize` ready, `eval` in progress.
 - finally, implement MAST building from Python (see below)
 
@@ -83,9 +83,9 @@ This can be accessed by a direct reference from
 `ast.{IdExp|IdTypeSpec}` to the `BaseRec` it references 
 (as determined in typer).
 
-When building MAST code from AST, we can query this `PyDefID` which is different
-than the extension's native `DefID`.
+When building MAST code from AST, we can query this `PyGDefID` which is different
+than the extension's native `GDefID`.
 
 TODO: 
-implement `PyDefID` and `DefID` separation such that `std::map`s act as scoped 
+implement `PyGDefID` and `GDefID` separation such that `std::map`s act as scoped 
 symbol tables/frames for evaluation.

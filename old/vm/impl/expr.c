@@ -34,7 +34,7 @@ ExprID mint_partial_expr(Table* table, ExprKind kind) {
     return 1 + new_ix;
 }
 
-ExprID expr_tab_new_id(Table* table, DefID def_id) {
+ExprID expr_tab_new_id(Table* table, GDefID def_id) {
     // todo: implement me
     assert(0 && "NotImplemented");
 }
@@ -185,7 +185,7 @@ ExprID expr_tab_new_gep(Table* table, ExprID container_expr_id, ExprID index_exp
     return eid;
 }
 
-ExprID expr_tab_new_let_in(Table* table, DefID def_id, ExprID init_expr_id, ExprID in_expr_id) {
+ExprID expr_tab_new_let_in(Table* table, GDefID def_id, ExprID init_expr_id, ExprID in_expr_id) {
     ExprID eid = mint_partial_expr(table, EXPR_DISCARD_IN);
     Expr* e = expr(table, eid);
     e->data.let_in.def_id = def_id;

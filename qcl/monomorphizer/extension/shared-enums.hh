@@ -4,9 +4,10 @@ namespace monomorphizer {
 
     //
     // Shared enums:
+    // FIXME: rename these like enums, not enum classes.
     //
 
-    enum class SES {
+    enum SES: size_t {
         Tot,
         Dv,
         ST,
@@ -14,14 +15,14 @@ namespace monomorphizer {
         ML
     };
 
-    enum class UnaryOp {
+    enum UnaryOp: size_t {
         LogicalNot,
         DeRef,
         Pos,
         Neg
     };
 
-    enum class BinaryOp {
+    enum BinaryOp: size_t {
         Pow,
         Mul, Div, Rem,
         Add, Sub,
@@ -31,17 +32,17 @@ namespace monomorphizer {
         LogicalOr
     };
 
-    enum class AllocationTarget {
+    enum AllocationTarget: size_t {
         Stack,
         Heap
     };
 
-    enum class IntegerSuffix {
+    enum IntegerSuffix: size_t {
         U1, U8, U16, U32, U64,
         S8, S16, S32, S64
     };
 
-    enum class FloatSuffix {
+    enum FloatSuffix: size_t {
         F32, F64
     };
 

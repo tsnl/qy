@@ -16,7 +16,7 @@ typedef struct Expr Expr;
 TABLE(Expr)* expr_tab_init();
 void expr_tab_destroy(TABLE(Expr)* table);
 
-ExprID expr_tab_new_id(TABLE(Expr)* table, DefID def_id);
+ExprID expr_tab_new_id(TABLE(Expr)* table, GDefID def_id);
 ExprID expr_tab_new_simplest(TABLE(Expr)* table, ExprKind kind);
 ExprID expr_tab_new_int_literal(TABLE(Expr)* table, uint64_t value, size_t width_in_bytes, bool is_signed);
 ExprID expr_tab_new_float_literal(TABLE(Expr)* table, double value, size_t width_in_bytes);
@@ -36,7 +36,7 @@ ExprID expr_tab_new_alloc_n(TABLE(Expr)* table, Allocator allocator, ExprID coun
 ExprID expr_tab_new_deref(TABLE(Expr)* table, ExprID pointer_expr_id);
 ExprID expr_tab_new_assign(TABLE(Expr)* table, ExprID dst_ptr_expr_id, ExprID src_expr_id);
 ExprID expr_tab_new_gep(TABLE(Expr)* table, ExprID container_expr_id, ExprID index_expr_id);
-ExprID expr_tab_new_let_in(TABLE(Expr)* table, DefID def_id, ExprID init_expr_id, ExprID in_expr_id);
+ExprID expr_tab_new_let_in(TABLE(Expr)* table, GDefID def_id, ExprID init_expr_id, ExprID in_expr_id);
 ExprID expr_tab_new_discard_in(TABLE(Expr)* table, ExprID init_expr_id, ExprID in_expr_id);
 
 Expr* expr(TABLE(Expr)* table, ExprID expr_id);
@@ -78,7 +78,7 @@ enum ExprKind {
 
 union ExprData {
     struct {
-        DefID def_id;
+        GDefID def_id;
     } id;
     
     struct {
@@ -163,7 +163,7 @@ union ExprData {
     } discard;
 
     struct {
-        DefID def_id;
+        GDefID def_id;
         ExprID init_expr_id;
         ExprID in_expr_id;
     } let_in;

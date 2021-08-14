@@ -38,7 +38,7 @@ void vm_destroy(VM* vm) {
 // VM function management
 //
 
-FuncID vm_declare_fn(VM* vm, DefID opt_def_id) {
+FuncID vm_declare_fn(VM* vm, GDefID opt_def_id) {
     
 }
 void vm_define_fn(VM* vm, FuncID func_id, ExprID expr_id) {
@@ -50,7 +50,7 @@ void vm_define_fn(VM* vm, FuncID func_id, ExprID expr_id) {
 // VM expr construction:
 //
 
-ExprID vm_mk_id_expr(VM* vm, DefID def_id) {
+ExprID vm_mk_id_expr(VM* vm, GDefID def_id) {
     return expr_tab_new_id(vm->expr_tab, def_id);
 }
 ExprID vm_mk_unit_expr(VM* vm) {
@@ -155,9 +155,9 @@ ExprID vm_mk_get_list_item_ptr_expr(VM* vm, ExprID array, ExprID index) {
     return expr_tab_new_gep(vm->expr_tab, array, index);
 }
 ExprID vm_mk_eval_in_expr(VM* vm, ExprID discarded_expr, ExprID in_expr) {
-    return expr_tab_new_let_in(vm->expr_tab, NULL_DEF_ID, discarded_expr, in_expr);
+    return expr_tab_new_let_in(vm->expr_tab, NULL_GDEF_ID, discarded_expr, in_expr);
 }
-ExprID vm_mk_let_in_expr(VM* vm, DefID def_id, ExprID init_expr, ExprID in_expr) {
+ExprID vm_mk_let_in_expr(VM* vm, GDefID def_id, ExprID init_expr, ExprID in_expr) {
     return expr_tab_new_let_in(vm->expr_tab, def_id, init_expr, in_expr);
 }
 

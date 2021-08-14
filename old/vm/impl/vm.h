@@ -17,12 +17,12 @@ typedef uint64_t IntStr;
 VM* vm_create();
 void vm_destroy(VM* vm);
 
-// registering DefIDs:
+// registering GDefIDs:
 //  - todo: get `raw_def_id` as id(definitions.BaseRec) from Python
-DefID vm_map_def_id(char const* def_name, size_t raw_def_id);
+GDefID vm_map_def_id(char const* def_name, size_t raw_def_id);
 
 // function declaration, defining funcs using expressions:
-FuncID vm_declare_fn(VM* vm, DefID opt_def_id);
+FuncID vm_declare_fn(VM* vm, GDefID opt_def_id);
 void vm_define_fn(VM* vm, FuncID func_id, ExprID expr_id);
 
 // expressions: lazy-functional-encoding of the language: bound to funcs as definitions.
@@ -32,7 +32,7 @@ void vm_define_fn(VM* vm, FuncID func_id, ExprID expr_id);
 // NOTE: expressions are 'analysis capable' <=> we can query side-effects-specifier IF expression context-free.
 
 // atoms:
-ExprID vm_mk_id_expr(VM* vm, DefID def_id);
+ExprID vm_mk_id_expr(VM* vm, GDefID def_id);
 ExprID vm_mk_unit_expr(VM* vm);
 ExprID vm_mk_literal_int_expr(VM* vm, uint64_t raw_val, size_t width_in_bytes, bool is_signed);
 ExprID vm_mk_literal_float_expr(VM* vm, double f, size_t width_in_bytes);
@@ -60,7 +60,7 @@ ExprID vm_mk_get_adt_elem_expr(VM* vm, ExprID expr_id, ExprID element_index);
 ExprID vm_mk_get_adt_ptr_elem_ptr_expr(VM* vm, ExprID expr_id, ExprID element_index);
 ExprID vm_mk_get_list_item_ptr_expr(VM* vm, ExprID array, ExprID index);
 ExprID vm_mk_eval_in_expr(VM* vm, ExprID discarded_expr, ExprID in_expr);
-ExprID vm_mk_let_in_expr(VM* vm, DefID def_id, ExprID init_expr, ExprID in_expr);
+ExprID vm_mk_let_in_expr(VM* vm, GDefID def_id, ExprID init_expr, ExprID in_expr);
 
 // evaluation: turns expressions into values or equivalent property
 Const vm_evaluate_value(VM* vm, ExprID expr_id);

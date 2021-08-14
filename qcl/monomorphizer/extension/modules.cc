@@ -8,7 +8,7 @@
 #include <cassert>
 
 #include "mast.hh"
-#include "defs.hh"
+#include "gdef.hh"
 #include "mtype.hh"
 #include "panic.hh"
 #include "mval.hh"
@@ -30,7 +30,7 @@ namespace monomorphizer::modules {
 namespace monomorphizer::modules {
 
     struct CommonModInfo {
-        std::vector<DefID> fields;
+        std::vector<GDefID> fields;
         char* name;
     };
 
@@ -40,7 +40,7 @@ namespace monomorphizer::modules {
 
     struct PolyModInfo {
         size_t bv_count;
-        DefID* bv_def_id_array;
+        GDefID* bv_def_id_array;
         std::map<arg_list::ArgListID, MonoModID> instantiated_mono_mods_cache;
     };
 
@@ -73,12 +73,12 @@ namespace monomorphizer::modules {
     }
     size_t add_mono_module_field(
         MonoModID template_id,
-        DefID field_def_id
+        GDefID field_def_id
     ) {
-        auto const def_kind = defs::get_def_kind(field_def_id);
+        auto const def_kind = gdef::get_def_kind(field_def_id);
         assert((
-            def_kind == defs::DefKind::CONST_TOT_TID ||
-            def_kind == defs::DefKind::CONST_TOT_VAL
+            def_kind == gdef::DefKind::CONST_TOT_TID ||
+            def_kind == gdef::DefKind::CONST_TOT_VAL
         ) && "Cannot bind fields in mono-modules without first evaluating.");
         
         auto& fields = s_mono_common_info_table[template_id].fields;
@@ -91,7 +91,7 @@ namespace monomorphizer::modules {
     PolyModID new_polymorphic_module(
         char* mv_template_name,
         size_t bv_def_id_count,
-        DefID* mv_bv_def_id_array
+        GDefID* mv_bv_def_id_array
     ) {
         PolyModID id = s_poly_custom_info_table.size();
         s_poly_common_info_table.push_back({{}, mv_template_name});
@@ -102,7 +102,7 @@ namespace monomorphizer::modules {
     }
     size_t add_poly_module_field(
         PolyModID template_id,
-        DefID field_def_id
+        GDefID field_def_id
     ) {
         auto& fields = s_poly_common_info_table[template_id].fields;
         size_t index = fields.size();
@@ -132,18 +132,26 @@ namespace monomorphizer::modules {
         return s_poly_common_info_table[poly_mod_id].name;
     }
 
-    DefID get_mono_mod_field_at(
+    GDefID get_mono_mod_field_at(
         MonoModID mono_mod_id,
         size_t field_index
     ) {
         return s_mono_common_info_table[mono_mod_id].fields[field_index];
     }
 
-    DefID get_poly_mod_field_at(
+    GDefID get_poly_mod_field_at(
         PolyModID poly_mod_id,
         size_t field_index
     ) {
         return s_poly_common_info_table[poly_mod_id].fields[field_index];
+    }
+
+    size_t get_poly_mod_formal_arg_count(PolyModID poly_mod_id) {
+        return s_poly_custom_info_table[poly_mod_id].bv_count;
+    }
+    GDefID get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t arg_index) {
+        auto poly_mod_info = &s_poly_custom_info_table[poly_mod_id];
+        return poly_mod_info->bv_def_id_array[arg_index];
     }
 
 }
@@ -162,21 +170,21 @@ namespace monomorphizer::modules {
     // Instead, storing computed value helps us cache.
     // We can't use this everywhere because non-total constants may be bound,
     // e.g. a = b where b is a parameter.
-    DefID def_new_total_const_val_for_bv_sub(
+    GDefID def_new_total_const_val_for_bv_sub(
         char const* mod_name,
-        DefID bv_def_id,
+        GDefID bv_def_id,
         size_t bound_id
     ) {
-        defs::DefKind bv_def_kind = defs::get_def_kind(bv_def_id);
-        char* def_name = strdup(defs::get_def_name(bv_def_id));
+        gdef::DefKind bv_def_kind = gdef::get_def_kind(bv_def_id);
+        char* def_name = strdup(gdef::get_def_name(bv_def_id));
         switch (bv_def_kind) {
-            case defs::DefKind::BV_EXP: {
+            case gdef::DefKind::BV_EXP: {
                 mval::ValueID val_id = bound_id;
-                return defs::define_total_const_value(def_name, val_id);
+                return gdef::define_total_const_value(def_name, val_id);
             } break;
-            case defs::DefKind::BV_TS: {
+            case gdef::DefKind::BV_TS: {
                 mtype::TID type_id = bound_id;
-                return defs::define_total_const_type(def_name, type_id);
+                return gdef::define_total_const_type(def_name, type_id);
             } break;
             default: {
                 throw new Panic("Invalid Def Kind in bv_def_id_array");
@@ -224,9 +232,9 @@ namespace monomorphizer::modules {
             
             // todo: generate a substitution
             //  - replace `bv_def_id` with `replacement_def_id`
-            DefID bv_def_id = info->bv_def_id_array[arg_index];
+            GDefID bv_def_id = info->bv_def_id_array[arg_index];
             size_t bound_id = arg_list::head(arg_list_it);
-            DefID replacement_def_id = def_new_total_const_val_for_bv_sub(
+            GDefID replacement_def_id = def_new_total_const_val_for_bv_sub(
                 mod_name,
                 bv_def_id, bound_id
             );

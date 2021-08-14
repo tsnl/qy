@@ -1,7 +1,7 @@
 // This module provides a representation of a monomorphic AST
 // This representation can then be queried (for subsequent operations), and 
 // later, evaluated.
-// NOTE: the DefIDs used here are distinct from the DefIDs generated previously.
+// NOTE: the GDefIDs used here are distinct from the GDefIDs generated previously.
 // - TODO: delete the old version since it is no longer required
 
 #pragma once
@@ -11,7 +11,7 @@
 
 #include "shared-enums.hh"
 #include "id-mast.hh"
-#include "id-defs.hh"
+#include "id-gdef.hh"
 #include "id-modules.hh"
 #include "id-intern.hh"
 
@@ -63,7 +63,7 @@ namespace monomorphizer::mast {
     //
 
     struct GlobalIdTypeSpecNodeInfo {
-        DefID def_id;
+        GDefID def_id;
     };
 
     struct LocalIdTypeSpecNodeInfo {
@@ -130,7 +130,7 @@ namespace monomorphizer::mast {
     };
 
     struct GlobalIdExpNodeInfo {
-        DefID def_id;
+        GDefID def_id;
     };
 
     struct LocalIdExpNodeInfo {
@@ -166,7 +166,7 @@ namespace monomorphizer::mast {
     };
 
     struct LambdaExpNodeInfo {
-        DefID* arg_name_array;
+        GDefID* arg_name_array;
         size_t arg_name_count;
         mast::ExpID body_exp;
     };
@@ -207,7 +207,7 @@ namespace monomorphizer::mast {
     //
 
     struct Bind1VElemNodeInfo {
-        DefID bound_def_id;
+        GDefID bound_def_id;
         mast::ExpID init_exp_id;
     };
 
@@ -278,7 +278,7 @@ namespace monomorphizer::mast {
 
     // Type-specifiers:
     mast::TypeSpecID get_unit_ts();
-    mast::TypeSpecID new_gid_ts(DefID def_id);
+    mast::TypeSpecID new_gid_ts(GDefID def_id);
     mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id);
     mast::TypeSpecID new_ptr_ts(
         mast::TypeSpecID ptd_ts,
@@ -315,10 +315,10 @@ namespace monomorphizer::mast {
     
     // Expressions:
     mast::ExpID get_unit_exp();
-    mast::ExpID new_int_exp(size_t mantissa, IntegerSuffix typing_suffix, bool is_neg);
-    mast::ExpID new_float_exp(double value, FloatSuffix typing_suffix);
+    mast::ExpID new_int_exp(size_t mantissa, IntegerSuffix int_typing_suffix, bool is_neg);
+    mast::ExpID new_float_exp(double value, FloatSuffix float_typing_suffix);
     mast::ExpID new_string_exp(size_t code_point_count, int* code_point_array);
-    mast::ExpID new_gid_exp(DefID def_id);
+    mast::ExpID new_gid_exp(GDefID def_id);
     mast::ExpID new_lid_exp(intern::IntStr int_str_id);
     mast::ExpID new_func_call_exp(
         mast::ExpID called_fn,
@@ -345,7 +345,7 @@ namespace monomorphizer::mast {
     );
     mast::ExpID new_lambda_exp(
         size_t arg_name_count,
-        DefID* arg_name_array,
+        GDefID* arg_name_array,
         mast::ExpID body_exp
     );
     mast::ExpID new_allocate_one_exp(
@@ -377,7 +377,7 @@ namespace monomorphizer::mast {
     
     // Element creation methods:
     mast::ElemID new_bind1v_elem(
-        DefID bound_def_id,
+        GDefID bound_def_id,
         mast::ExpID init_exp_id
     );
     mast::ElemID new_do_elem(

@@ -16,31 +16,31 @@ cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
     const ArgListID EMPTY
 
 # defs:
-cdef extern from "extension/defs.hh" namespace "monomorphizer::defs":
+cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
     # init/drop:
     void ensure_defs_init();
     void drop_defs();
 
     # constant declaration:
-    DefID declare_t_const_mast_node(char* mv_def_name);
-    DefID declare_v_const_mast_node(char* mv_def_name);
+    GDefID declare_t_const_mast_node(char* mv_def_name);
+    GDefID declare_v_const_mast_node(char* mv_def_name);
 
     # lazily binding const mast node defs to a MAST node:
-    void define_declared_t_const(DefID declared_def_id, TypeSpecID ts_id)
-    void define_declared_v_const(DefID declared_def_id, ExpID exp_id)
+    void define_declared_t_const(GDefID declared_def_id, TypeSpecID ts_id)
+    void define_declared_v_const(GDefID declared_def_id, ExpID exp_id)
 
     # bound var definitions:
     # monomorphization is just replacing references to these in polymorphic 
     # modules with total const definitions, returning a monomorphic copy.
-    DefID define_bound_var_ts(char* mv_formal_var_name);
-    DefID define_bound_var_exp(char* mv_formal_var_name);
+    GDefID define_bound_var_ts(char* mv_formal_var_name);
+    GDefID define_bound_var_exp(char* mv_formal_var_name);
 
     # query definition info:
-    bint get_def_is_bv(DefID def_id);
-    DefKind get_def_kind(DefID def_id);
-    const char* get_def_name(DefID def_id);
-    void store_id_at_def_id(DefID def_id, size_t id);
-    size_t load_id_from_def_id(DefID def_id);
+    bint get_def_is_bv(GDefID def_id);
+    DefKind get_def_kind(GDefID def_id);
+    const char* get_def_name(GDefID def_id);
+    void store_id_at_def_id(GDefID def_id, size_t id);
+    size_t load_id_from_def_id(GDefID def_id);
 
 # modules:
 cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
@@ -51,19 +51,21 @@ cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
     # Monomorphic template construction:
     MonoModID new_monomorphic_module(char* mv_template_name, PolyModID opt_parent_template_id);
     # add_field pushes a field and returns its unique index.
-    size_t add_mono_module_field(MonoModID template_id, DefID field_def_id);
+    size_t add_mono_module_field(MonoModID template_id, GDefID field_def_id);
 
     # Polymorphic template construction:
-    PolyModID new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, DefID* mv_bv_def_id_array);
+    PolyModID new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, GDefID* mv_bv_def_id_array);
     # add_field pushes a field and returns the field's unique index.
-    size_t add_poly_module_field(PolyModID template_id, DefID field_def_id);
+    size_t add_poly_module_field(PolyModID template_id, GDefID field_def_id);
 
     # Module fields are accessed by an index that is determined by the order
     # in which symbols are added.
     # By convention, this should be the order in which source nodes are written
     # in source code.
+    GDefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
+    GDefID get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t field_index);
     size_t get_mono_mod_field_count(MonoModID mono_mod_id)
-    DefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
+    GDefID get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index);
 
     # instantiation:
     # turn a PolyModID into a MonoModID using some template arguments.
@@ -80,7 +82,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
 
     # Type-specs:
     TypeSpecID get_unit_ts();
-    TypeSpecID new_gid_ts(DefID def_id);
+    TypeSpecID new_gid_ts(GDefID def_id);
     TypeSpecID new_lid_ts(IntStr int_str_id);
     TypeSpecID new_ptr_ts(TypeSpecID ptd_ts, bint contents_is_mut);
     TypeSpecID new_array_ts(TypeSpecID ptd_ts, ExpID count_exp, bint contents_is_mut);
@@ -100,14 +102,14 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ExpID new_int_exp(size_t mantissa, IntegerSuffix typing_suffix, bint is_neg);
     ExpID new_float_exp(double value, FloatSuffix typing_suffix);
     ExpID new_string_exp(size_t code_point_count, int* code_point_array);
-    ExpID new_gid_exp(DefID def_id);
+    ExpID new_gid_exp(GDefID def_id);
     ExpID new_lid_exp(IntStr int_str_id);
     ExpID new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot);
     ExpID new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp);
     ExpID new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp);
     ExpID new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp);
     ExpID new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index);
-    ExpID new_lambda_exp(size_t arg_name_count, DefID* arg_name_array, ExpID body_exp);
+    ExpID new_lambda_exp(size_t arg_name_count, GDefID* arg_name_array, ExpID body_exp);
     ExpID new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut);
     ExpID new_allocate_many_exp(
         ExpID initializer_stored_val_exp_id,
@@ -123,7 +125,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     );
 
     # Element creation methods:
-    ElemID new_bind1v_elem(DefID bound_def_id, ExpID init_exp_id);
+    ElemID new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id);
     ElemID new_do_elem(ExpID eval_exp_id);
 
 # intern:
@@ -145,7 +147,7 @@ cdef extern from "extension/printing.hh" namespace "monomorphizer::printing":
 
 # init/drop:
 cdef:
-    void w_init():
+    void w_ensure_init():
         ensure_mast_init()
         ensure_defs_init()
 
@@ -166,7 +168,7 @@ cdef:
         return new_string_exp(code_point_count, code_point_array)
     ExpID w_new_lid_exp(IntStr int_str_id):
         return new_lid_exp(int_str_id)
-    ExpID w_new_gid_exp(DefID def_id):
+    ExpID w_new_gid_exp(GDefID def_id):
         return new_gid_exp(def_id)
     ExpID w_new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot):
         return new_func_call_exp(called_fn, arg_exp, call_is_non_tot)
@@ -178,7 +180,7 @@ cdef:
         return new_if_then_else_exp(cond_exp, then_exp, else_exp)
     ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index):
         return new_get_tuple_field_by_index_exp(tuple_exp_id, index)
-    ExpID w_new_lambda_exp(size_t arg_name_count, DefID* arg_name_array, ExpID body_exp):
+    ExpID w_new_lambda_exp(size_t arg_name_count, GDefID* arg_name_array, ExpID body_exp):
         return new_lambda_exp(arg_name_count, arg_name_array, body_exp)
     ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut):
         return new_allocate_one_exp(stored_val_exp_id, allocation_target, allocation_is_mut)
@@ -211,7 +213,7 @@ cdef:
 cdef:
     TypeSpecID w_get_unit_ts():
         return get_unit_ts()
-    TypeSpecID w_new_gid_ts(DefID def_id):
+    TypeSpecID w_new_gid_ts(GDefID def_id):
         return new_gid_ts(def_id)
     TypeSpecID w_new_lid_ts(IntStr int_str_id):
         return new_lid_ts(int_str_id)
@@ -242,7 +244,7 @@ cdef:
 
 # mast: elem:
 cdef:
-    ElemID w_new_bind1v_elem(DefID bound_def_id, ExpID init_exp_id):
+    ElemID w_new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id):
         return new_bind1v_elem(bound_def_id, init_exp_id)
     ElemID w_new_do_elem(ExpID eval_exp_id):
         return new_do_elem(eval_exp_id)
@@ -250,52 +252,56 @@ cdef:
 # defs: global and unscoped
 cdef:
     # functions to define constants:
-    DefID w_declare_t_const_mast_node(char* mv_def_name):
+    GDefID w_declare_t_const_mast_node(char* mv_def_name):
         return declare_t_const_mast_node(mv_def_name)
-    DefID w_declare_v_const_mast_node(char* mv_def_name):
+    GDefID w_declare_v_const_mast_node(char* mv_def_name):
         return declare_v_const_mast_node(mv_def_name)
     
-    void w_define_declared_t_const(DefID declared_def_id, TypeSpecID ts_id):
+    void w_define_declared_t_const(GDefID declared_def_id, TypeSpecID ts_id):
         define_declared_t_const(declared_def_id, ts_id)
-    void w_define_declared_v_const(DefID declared_def_id, ExpID exp_id):
+    void w_define_declared_v_const(GDefID declared_def_id, ExpID exp_id):
         define_declared_v_const(declared_def_id, exp_id)
 
     # functions to define bound vars:
     # monomorphization is just replacing references to these in polymorphic 
     # modules with total const definitions, returning a monomorphic copy.
-    DefID w_define_bound_var_ts(char* mv_formal_var_name):
+    GDefID w_define_bound_var_ts(char* mv_formal_var_name):
         return define_bound_var_ts(mv_formal_var_name)
-    DefID w_define_bound_var_exp(char* mv_formal_var_name):
+    GDefID w_define_bound_var_exp(char* mv_formal_var_name):
         return define_bound_var_exp(mv_formal_var_name)
 
     # functions to query definition info:
-    bint w_get_def_is_bv(DefID def_id):
+    bint w_get_def_is_bv(GDefID def_id):
         return get_def_is_bv(def_id)
-    DefKind w_get_def_kind(DefID def_id):
+    DefKind w_get_def_kind(GDefID def_id):
         return get_def_kind(def_id);
-    const char* w_get_def_name(DefID def_id):
+    const char* w_get_def_name(GDefID def_id):
         return get_def_name(def_id)
-    void w_store_id_at_def_id(DefID def_id, size_t id_):
+    void w_store_id_at_def_id(GDefID def_id, size_t id_):
         store_id_at_def_id(def_id, id_)
-    size_t w_load_id_from_def_id(DefID def_id):
+    size_t w_load_id_from_def_id(GDefID def_id):
         return load_id_from_def_id(def_id)
 
 # modules:
 cdef:
     # Polymorphic template construction:
-    PolyModID w_new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, DefID* mv_bv_def_id_array):
+    PolyModID w_new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, GDefID* mv_bv_def_id_array):
         return new_polymorphic_module(mv_template_name, bv_def_id_count, mv_bv_def_id_array)
     # add_field pushes a field and returns the field's unique index.
-    size_t w_add_poly_module_field(PolyModID template_id, DefID field_def_id):
+    size_t w_add_poly_module_field(PolyModID template_id, GDefID field_def_id):
         return add_poly_module_field(template_id, field_def_id)
 
     # Module fields are accessed by an index that is determined by the order
     # in which symbols are added.
     # By convention, this should be the order in which source nodes are written
     # in source code.
+    GDefID w_get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index):
+        return get_poly_mod_field_at(poly_mod_id, field_index)
+    GDefID w_get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t field_index):
+        return get_poly_mod_formal_arg_at(poly_mod_id, field_index)
     size_t w_get_mono_mod_field_count(MonoModID mono_mod_id):
         return get_mono_mod_field_count(mono_mod_id)
-    DefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index):
+    GDefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index):
         return get_mono_mod_field_at(mono_mod_id, field_index)
 
     # instantiation:
