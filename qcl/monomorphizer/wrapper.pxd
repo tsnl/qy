@@ -1,4 +1,5 @@
 from libc.stddef cimport size_t
+from libc.stdint cimport uint32_t
 from libcpp.string cimport string as cpp_string
 
 #
@@ -13,38 +14,83 @@ from libcpp.string cimport string as cpp_string
 
 cdef extern from "extension/shared-enums.hh" namespace "monomorphizer":
     ctypedef enum SES:
-        Tot = 0,
-        Dv,
-        ST,
-        Exn,
-        ML
+        SES_TOT = 0,
+        SES_DV,
+        SES_ST,
+        SES_EXN,
+        SES_ML
 
     ctypedef enum UnaryOp:
-        LogicalNot = 0,
-        DeRef,
-        Pos,
-        Neg
+        UNARY_LOGICAL_NOT = 0,
+        UNARY_DE_REF,
+        UNARY_POS,
+        UNARY_NEG
 
     ctypedef enum BinaryOp:
-        Pow = 0,
-        Mul, Div, Rem,
-        Add, Sub,
-        LessThan, LessThanOrEquals, GreaterThan, GreaterThanOrEquals,
-        Equals, NotEquals,
-        LogicalAnd,
-        LogicalOr
+        BINARY_POW = 0,
+        BINARY_MUL, BINARY_DIV, BINARY_REM,
+        BINARY_ADD, BINARY_SUB,
+        BINARY_LT, BINARY_LE, BINARY_GT, BINARY_GE,
+        BINARY_EQ, BINARY_NE,
+        BINARY_LOGICAL_AND,
+        BINARY_LOGICAL_OR
 
     ctypedef enum AllocationTarget:
-        Stack = 0,
-        Heap
+        ALLOCATION_TARGET_STACK = 0,
+        ALLOCATION_TARGET_HEAP
 
     ctypedef enum IntegerSuffix:
-        U1 = 0, U8, U16, U32, U64,
-        S8, S16, S32, S64
+        IS_U1 = 0,
+        IS_U8,
+        IS_U16,
+        IS_U32,
+        IS_U64,
+        IS_S8,
+        IS_S16,
+        IS_S32,
+        IS_S64
 
     ctypedef enum FloatSuffix:
-        F32 = 0, F64
+        FS_F32 = 0,
+        FS_F64
 
+
+cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
+    ctypedef enum NodeKind:
+        # type-specifiers:
+        TS_UNIT,
+        TS_GID,
+        TS_LID,
+        TS_PTR,
+        TS_ARRAY,
+        TS_SLICE,
+        TS_FUNC_SGN,
+        TS_TUPLE,
+        TS_GET_POLY_MODULE_FIELD,
+        TS_GET_MONO_MODULE_FIELD,
+
+        # expressions:
+        EXP_UNIT,
+        EXP_INT,
+        EXP_FLOAT,
+        EXP_STRING,
+        EXP_LID,
+        EXP_GID,
+        EXP_FUNC_CALL,
+        EXP_UNARY_OP,
+        EXP_BINARY_OP,
+        EXP_IF_THEN_ELSE,
+        EXP_GET_TUPLE_FIELD,
+        EXP_GET_POLY_MODULE_FIELD,
+        EXP_GET_MONO_MODULE_FIELD,
+        EXP_LAMBDA,
+        EXP_ALLOCATE_ONE,
+        EXP_ALLOCATE_MANY,
+        EXP_CHAIN,
+
+        # chain elements:
+        ELEM_BIND1V,
+        ELEM_DO
 
 #
 # Arg Lists:
@@ -154,7 +200,13 @@ cdef:
     ExpID w_new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp)
     ExpID w_new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp)
     ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
-    ExpID w_new_lambda_exp(size_t arg_name_count, GDefID * arg_name_array, ExpID body_exp)
+    ExpID w_new_lambda_exp(
+            uint32_t arg_name_count,
+            IntStr* arg_name_array,
+            uint32_t ctx_enclosed_name_count,
+            IntStr* ctx_enclosed_name_array,
+            ExpID body_exp
+    )
     ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
     ExpID w_new_allocate_many_exp(
         ExpID initializer_stored_val_exp_id,
@@ -193,6 +245,10 @@ cdef:
     ElemID w_new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id)
     ElemID w_new_do_elem(ExpID eval_exp_id)
 
+# shared:
+cdef:
+    NodeKind w_get_node_kind(NodeID node_id)
+
 #
 # Defs:
 #
@@ -200,25 +256,15 @@ cdef:
 # constant definitions:
 cdef:
     # declaring definitions for PolyModID fields:
-    GDefID w_declare_t_const_mast_node(char* mv_def_name)
-    GDefID w_declare_v_const_mast_node(char* mv_def_name)
-    
-    # defining definitions in PolyModID fields:
-    void w_define_declared_t_const(GDefID declared_def_id, TypeSpecID ts_id)
-    void w_define_declared_v_const(GDefID declared_def_id, ExpID exp_id)
-    
-    # bound var definitions:
-    # monomorphization is just replacing references to these in polymorphic 
-    # modules with total const definitions, returning a monomorphic copy.
-    GDefID w_define_bound_var_ts(char* mv_formal_var_name);
-    GDefID w_define_bound_var_exp(char* mv_formal_var_name);
+    GDefID w_declare_global_def(DefKind kind, char* mv_def_name)
 
     # query definition info:
-    bint w_get_def_is_bv(GDefID def_id);
-    DefKind w_get_def_kind(GDefID def_id);
-    const char* w_get_def_name(GDefID def_id);
-    void w_store_id_at_def_id(GDefID def_id, size_t id_);
-    size_t w_load_id_from_def_id(GDefID def_id);
+    bint w_get_def_is_bv(GDefID def_id)
+    DefKind w_get_def_kind(GDefID def_id)
+    const char* w_get_def_name(GDefID def_id)
+    size_t w_get_def_target(GDefID def_id)
+    void w_set_def_target(GDefID def_id, size_t target_id);
+
 
 #
 # Modules:
@@ -248,8 +294,8 @@ cdef:
 #
 
 cdef:
-    IntStr w_intern_string_1(cpp_string s)
-    IntStr w_intern_string_2(const char* nt_bytes)
+    IntStr w_intern_string_1(cpp_string s, bint is_tid_not_vid)
+    IntStr w_intern_string_2(const char* nt_bytes, bint is_tid_not_vid)
 
 
 #

@@ -4,15 +4,15 @@ exports {
 
 --- sub vec[T] ---
 
-Vec2 = impl[T,2]::Vector;
-Vec3 = impl[T,3]::Vector;
-add2 = impl[T,2]::add;
-add3 = impl[T,3]::add;
+Vec2 = impl[T,2]:Vector;
+Vec3 = impl[T,3]:Vector;
+add2 = impl[T,2]:add;
+add3 = impl[T,3]:add;
 
 --- sub impl[T, n] ---
 
-n: U32;
-help_apply_piecewise_bin_op: (Vector, Vector, BinOpFn) -> TOT Vector;
+n ~ U32;
+help_apply_piecewise_bin_op ~ (Vector, Vector, BinOpFn) -> TOT Vector;
 
 Vector = [T * n];
 BinOpFn = (T, T) -> TOT T;

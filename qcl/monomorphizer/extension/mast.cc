@@ -2,11 +2,15 @@
 #include "gdef.hh"
 
 #include <vector>
+#include <iostream>
+#include <iomanip>
+
 #include "panic.hh"
+#include "shared-enums.hh"
 
 namespace monomorphizer::mast {
 
-    extern mast::NodeID const NULL_NODE_ID = -1;
+    extern mast::NodeID const NULL_NODE_ID = UNIVERSAL_NULL_ID;
     
     size_t const DEFAULT_NODE_MGR_CAPACITY = 16 * 1024;
     
@@ -35,8 +39,11 @@ namespace monomorphizer::mast {
         }
 
         inline void push(NodeKind kind) {
+            // std::cout << "Pushing NK=" << (size_t)kind << std::endl;
+            auto id = m_kind_table.size();
             m_kind_table.push_back(kind);
             m_info_table.emplace_back();
+            assert(m_kind_table[id] == kind);
         }
 
         inline NodeKind kind_of(size_t index) {
@@ -349,18 +356,20 @@ namespace monomorphizer::mast {
         return new_node_id;
     }
     mast::ExpID new_lambda_exp(
-        size_t arg_name_count,
-        GDefID* arg_name_array,
-        mast::ExpID body_exp
+        uint32_t arg_name_count,
+        intern::IntStr* mv_arg_name_array,
+        uint32_t ctx_enclosed_name_count,
+        intern::IntStr* mv_ctx_enclosed_name_array,
+        mast::ExpID body_exp_id
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_LAMBDA);
+        auto new_node_id = help_alloc_node(EXP_LAMBDA);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_lambda;
 
         info_ptr->arg_name_count = arg_name_count;
-        info_ptr->arg_name_array = new GDefID[arg_name_count];
-        for (size_t i = 0; i < arg_name_count; i++) {
-            info_ptr->arg_name_array[i] = arg_name_array[i];
-        }
+        info_ptr->ctx_enclosed_name_count = ctx_enclosed_name_count;
+        info_ptr->arg_name_array = mv_arg_name_array;
+        info_ptr->ctx_enclosed_name_array = mv_ctx_enclosed_name_array;
+        info_ptr->body_exp = body_exp_id;
 
         return new_node_id;
     }
@@ -399,7 +408,7 @@ namespace monomorphizer::mast {
         mast::ElemID* prefix_elem_id_array,
         mast::ExpID ret_exp_id
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_CHAIN);
+        auto new_node_id = help_alloc_node(EXP_CHAIN);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_chain;
 
         info_ptr->prefix_elem_count = prefix_elem_id_count;
@@ -440,13 +449,13 @@ namespace monomorphizer::mast {
     }
 
     mast::ElemID new_bind1v_elem(
-        GDefID bound_def_id,
+        intern::IntStr bound_id,
         mast::ExpID init_exp_id
     ) {
         auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1V);
         auto info_ptr = &get_info_ptr(new_node_id)->elem_bind1v;
 
-        info_ptr->bound_def_id = bound_def_id;
+        info_ptr->bound_id = bound_id;
         info_ptr->init_exp_id = init_exp_id;
 
         return new_node_id;

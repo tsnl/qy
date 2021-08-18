@@ -5,10 +5,10 @@ The AST module provides objects to identify parts of input source code.
 
 import enum
 import abc
+import typing as t
 
 from collections import defaultdict
 from qcl.typer import definition
-from typing import *
 
 from qcl import excepts
 from qcl import frontend
@@ -27,9 +27,9 @@ class BaseNode(object, metaclass=abc.ABCMeta):
 
 
 class TypedBaseNode(BaseNode):
-    x_tid: Optional["type.identity.TID"]
-    x_ses: Optional["type.side_effects.SES"]
-    x_ctx: Optional["typer.context.Context"]
+    x_tid: t.Optional["type.identity.TID"]
+    x_ses: t.Optional["type.side_effects.SES"]
+    x_ctx: t.Optional["typer.context.Context"]
 
     def __init__(self, loc: "feedback.ILoc"):
         super().__init__(loc)
@@ -40,19 +40,19 @@ class TypedBaseNode(BaseNode):
         self.x_rml = None       # rel memory loc: for mem-window types, handles where memory is stored.
 
     @property
-    def tid(self) -> Optional["type.identity.TID"]:
+    def tid(self) -> t.Optional["type.identity.TID"]:
         return self.x_tid
 
     @property
-    def ses(self) -> Optional["type.side_effects.SES"]:
+    def ses(self) -> t.Optional["type.side_effects.SES"]:
         return self.x_ses
 
     @property
-    def ctx(self) -> Optional["typer.context.Context"]:
+    def ctx(self) -> t.Optional["typer.context.Context"]:
         return self.x_ctx
 
     @property
-    def cs(self) -> Optional["type.closure_spec.CS"]:
+    def cs(self) -> t.Optional["type.closure_spec.CS"]:
         return self.x_cs
 
     @property
@@ -155,12 +155,19 @@ class NumberExp(BaseExp):
             None: None
         }[self.suffix]
 
+        # calculating value:
+        self.value_text = "".join((
+            c
+            for c in self.text
+            if c != '_' and c not in all_suffices
+        ))
+
     def __str__(self):
         return self.text
 
 
 class StringExp(BaseExp):
-    def __init__(self, loc, chunks: List["StringExpChunk"]):
+    def __init__(self, loc, chunks: t.List["StringExpChunk"]):
         super().__init__(loc)
 
         self.chunks = chunks
@@ -176,7 +183,7 @@ class StringExp(BaseExp):
 
 
 class StringExpChunk(BaseExp):
-    def __init__(self, loc, runes: List[int], quote_str: str):
+    def __init__(self, loc, runes: t.List[int], quote_str: str):
         super().__init__(loc)
         self.runes = runes
         self.text = ''.join(chr(rune) for rune in self.runes)
@@ -189,7 +196,7 @@ class StringExpChunk(BaseExp):
 
 class IdExp(BaseExp):
     name: str
-    found_def_rec: Optional[definition.BaseRecord]
+    found_def_rec: t.Optional[definition.BaseRecord]
 
     def __init__(self, loc, name):
         super().__init__(loc)
@@ -201,12 +208,13 @@ class IdExp(BaseExp):
 
 
 class LambdaExp(BaseExp):
-    def __init__(self, loc: "feedback.ILoc", arg_names: List[str], body: BaseExp):
+    def __init__(self, loc: "feedback.ILoc", arg_names: t.List[str], body: BaseExp):
         super().__init__(loc)
         self.arg_names = arg_names
         self.body = body
         self.ret_ses = type.side_effects.SES.Tot
         self.non_local_name_map = {}
+        self.global_name_map = {}
 
     def finalize_fn_ses(self, ses: "type.side_effects.SES"):
         assert ses in (
@@ -218,15 +226,13 @@ class LambdaExp(BaseExp):
         )
         self.ret_ses = ses
 
-    def add_non_local(self, non_local_id_name, non_local_id_def_rec):
-        # TODO: if the non-local def rec is global, it need not be added to the closure table.
-        #   - if `(non_local_id_def_rec.opt_container_func is None)`
-        # TODO: if the non-local def rec is a TID, it need not be added to the closure table.
-        existing_non_local = self.non_local_name_map.get(non_local_id_name, None)
-        if existing_non_local is None:
-            self.non_local_name_map[non_local_id_name] = non_local_id_def_rec
-        else:
-            assert existing_non_local is non_local_id_def_rec
+    def add_non_local_id_ref(self, non_local_id_name, non_local_id_def_rec):
+        assert non_local_id_name not in self.non_local_name_map
+        self.non_local_name_map[non_local_id_name] = non_local_id_def_rec
+
+    def add_global_id_ref(self, name, found_def_obj):
+        assert name not in self.global_name_map
+        self.global_name_map[name] = found_def_obj
 
 
 class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):
@@ -337,8 +343,8 @@ class FileModExp(BaseModExp):
     def __init__(
             self, loc: feedback.ILoc,
             source: frontend.FileModuleSource,
-            imports_map: Dict[str, str], exports_list: List[str],
-            sub_module_map: Dict[str, "SubModExp"]
+            imports_map: t.Dict[str, str], exports_list: t.List[str],
+            sub_module_map: t.Dict[str, "SubModExp"]
     ):
         super().__init__(loc)
         self.source = source
@@ -359,7 +365,7 @@ class FileModExp(BaseModExp):
 class SubModExp(BaseModExp):
     def __init__(
             self, loc: feedback.ILoc,
-            template_arg_names: List[str], elements: List["BaseElem"]
+            template_arg_names: t.List[str], elements: t.List["BaseElem"]
     ):
         super().__init__(loc)
         self.table = Table(
@@ -377,9 +383,9 @@ class SubModExp(BaseModExp):
 
 class ChainExp(BaseExp):
     def __init__(
-            self, loc, elements, opt_tail: Optional[BaseExp],
-            opt_prefix_ts: Optional["BaseTypeSpec"],
-            opt_prefix_es: Optional["type.side_effects.SES"]
+            self, loc, elements, opt_tail: t.Optional[BaseExp],
+            opt_prefix_ts: t.Optional["BaseTypeSpec"],
+            opt_prefix_es: t.Optional["type.side_effects.SES"]
     ):
         """
         Creates a new chain expression.
@@ -416,9 +422,9 @@ class CastExp(BaseExp):
 #
 
 class TupleExp(BaseExp):
-    items: List[BaseExp]
+    items: t.List[BaseExp]
 
-    def __init__(self, loc, items: List[BaseExp]):
+    def __init__(self, loc, items: t.List[BaseExp]):
         super().__init__(loc)
         self.items = items
 
@@ -439,7 +445,7 @@ class UnitTypeSpec(BaseTypeSpec):
 
 class IdTypeSpec(BaseTypeSpec):
     name: str
-    found_def_rec: Optional[definition.BaseRecord]
+    found_def_rec: t.Optional[definition.BaseRecord]
 
     def __init__(self, loc: "feedback.ILoc", name: str):
         super().__init__(loc)
@@ -453,7 +459,13 @@ class IdTypeSpec(BaseTypeSpec):
 class IdTypeSpecInModule(BaseTypeSpec):
     data: "IdNodeInModuleHelper"
 
-    def __init__(self, loc: "feedback.ILoc", opt_container: Optional["IdTypeSpecInModule"], elem_name: str, elem_args=None):
+    def __init__(
+            self,
+            loc: "feedback.ILoc",
+            opt_container: t.Optional["GetModuleNode"],
+            elem_name: str,
+            elem_args=None
+    ):
         super().__init__(loc)
         opt_container_data = None if opt_container is None else opt_container.data
         self.data = IdNodeInModuleHelper(loc, opt_container_data, elem_name, elem_args)
@@ -463,9 +475,9 @@ class IdTypeSpecInModule(BaseTypeSpec):
 
 
 class TupleTypeSpec(BaseTypeSpec):
-    items: List[BaseTypeSpec]
+    items: t.List[BaseTypeSpec]
 
-    def __init__(self, loc: "feedback.ILoc", items: List[BaseTypeSpec]):
+    def __init__(self, loc: "feedback.ILoc", items: t.List[BaseTypeSpec]):
         super().__init__(loc)
         self.items = items
 
@@ -473,7 +485,7 @@ class TupleTypeSpec(BaseTypeSpec):
 class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
-    opt_ses: Optional["type.side_effects.SES"]
+    opt_ses: t.Optional["type.side_effects.SES"]
     closure_spec: "type.closure_spec.CS"
 
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
@@ -572,7 +584,7 @@ class AllocateArrayExp(BaseAllocateExp):
             allocator: Allocator, is_mut: bool,
             loc: feedback.ILoc,
             collection_ts: "BaseTypeSpec",
-            array_size_exp: BaseExp, opt_initializer_exp: Optional[BaseExp]
+            array_size_exp: BaseExp, opt_initializer_exp: t.Optional[BaseExp]
     ):
         super().__init__(allocator, is_mut, loc)
         self.array_size_exp = array_size_exp
@@ -608,11 +620,11 @@ class Table(object):
     """
 
     def __init__(
-            self, loc, alias: str, elements: List["BaseElem"],
+            self, loc, alias: str, elements: t.List["BaseElem"],
             accepts_binding_elements=True,
             accepts_typing_elements=True,
             accepts_imperative_elements=False,
-            import_sym_names: Optional[Iterable[str]] = None
+            import_sym_names: t.Optional[t.Iterable[str]] = None
     ):
         super().__init__()
         self.loc = loc
@@ -648,7 +660,6 @@ class Table(object):
         # - used for import, template args
         # - defining here lets us naturally detect conflicts at only one point, while parsing
         if import_sym_names is not None:
-            assert isinstance(import_sym_names, Iterable)
             for extra_sym_name in import_sym_names:
                 self.binding_elems_map[extra_sym_name].append('<internal-def>')
 
@@ -821,7 +832,12 @@ class ForceEvalElem(BaseImperativeElem):
 class IdExpInModule(BaseExp):
     data: "IdNodeInModuleHelper"
 
-    def __init__(self, loc, opt_container: "IdExpInModule", elem_name: str, elem_args=None):
+    def __init__(
+            self,
+            loc, opt_container: "GetModuleNode",
+            elem_name: str,
+            elem_args=None,
+    ):
         super().__init__(loc)
         opt_container_data = None if opt_container is None else opt_container.data
         self.data = IdNodeInModuleHelper(loc, opt_container_data, elem_name, elem_args=elem_args)
@@ -857,20 +873,16 @@ class GetElementByDotIndexExp(BaseExp):
 
 
 #
-# TODO: add/amend AST nodes for pointers, arrays, and slices.
-#   - this could include literal array expressions
-#
-
-#
-# TODO: add/amend AST nodes for 'new' expressions using keywords `make` and `push`.
+# TODO: add/amend AST nodes for pointers, arrays, and slice literals.
 #
 
 
 class IdNodeInModuleHelper(object):
-    opt_container: Optional["IdNodeInModuleHelper"]
-    elem_args: List[Union[BaseExp, BaseTypeSpec]]
+    opt_container: t.Optional["IdNodeInModuleHelper"]
+    elem_args: t.List[t.Union[BaseExp, BaseTypeSpec]]
     elem_name: str
-    opt_child: Optional["IdNodeInModuleHelper"]
+    opt_child: t.Optional["IdNodeInModuleHelper"]
+    found_def_rec: t.Optional["typer.definition.BaseRecord"]
 
     def __init__(self, loc, opt_container, elem_name, elem_args=None):
         super().__init__()
@@ -878,6 +890,7 @@ class IdNodeInModuleHelper(object):
         self.opt_container = opt_container
         self.elem_name = elem_name
         self.opt_child = None
+        self.found_def_rec = None
 
         if elem_args is not None:
             self.elem_args = elem_args
@@ -902,3 +915,21 @@ class IdNodeInModuleHelper(object):
         else:
             return f"{self.elem_name}{elem_args_str}"
 
+
+#
+# GetModuleNode: a name-reference to a defined/imported module with optional template arguments.
+#
+
+class GetModuleNode(BaseNode):
+    data: "IdNodeInModuleHelper"
+
+    def __init__(
+            self,
+            loc: feedback.ILoc,
+            opt_container: t.Optional["GetModuleNode"],
+            elem_name: str,
+            elem_args=None
+    ):
+        super().__init__(loc)
+        opt_container_data = None if opt_container is None else opt_container.data
+        self.data = IdNodeInModuleHelper(loc, opt_container_data, elem_name, elem_args=elem_args)

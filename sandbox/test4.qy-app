@@ -1,19 +1,19 @@
 --- sub test4 ---
 
 Vec2f = Struct {
-    x: F32;
-    y: F32;
+    x ~ F32;
+    y ~ F32;
 };
 
 Vec3f = Struct {
-    v2: Vec2f;
-    z: F32;
+    v2 ~ Vec2f;
+    z ~ F32;
 };
 
 PixelComponent = Enum {
-    red: ();
-    green: ();
-    blue: ();
+    red ~ ();
+    green ~ ();
+    blue ~ ();
 };
 
 p1 = Vec3f((0f, 0f), 0f);

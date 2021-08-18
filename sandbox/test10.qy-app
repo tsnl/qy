@@ -1,6 +1,6 @@
 --- sub currying_in_c[T, U, v, w, x, y, z] ---
 
-f: NoCtxPtr { F32 -> ![F32] -> ST () };
+f ~ NoCtxPtr { F32 -> ![F32] -> ST () };
 
 f = (value) -> (ptr) -> ST {
     a = 42;

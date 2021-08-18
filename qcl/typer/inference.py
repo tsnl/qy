@@ -412,8 +412,8 @@ def unify_existing_def(ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> sub
         old_def_ses = type.side_effects.of(old_def_tid)
 
         new_def_ses_is_better = (
-            new_def_ses != SES.Elim_AnyNonTot and
-            old_def_ses == SES.Elim_AnyNonTot
+            new_def_ses not in (SES.Elim_AnyNonTot, SES.Elim_Any) and
+            old_def_ses in (SES.Elim_AnyNonTot, SES.Elim_Any)
         )
         #
         # Comparing CS (ClosureSpec):
@@ -479,15 +479,15 @@ def help_infer_exp_tid(
         # SES is always `Tot` for a `load` operation:
         call_ses = SES.Tot
 
-        if found_def_obj.opt_container_func is None:
+        if found_def_obj.is_bound_globally_visible:
             # found def is a global ID. No closure required.
             closure_spec = CS.No
-        else:
-            # found def is defined inside a function.
 
-            # we cannot access an ID in this context or a higher context with a container func without being in a func
-            # ourselves.
-            assert ctx.opt_func is not None
+            # adding this ID to the function's global enclosed set
+            if ctx.opt_func is not None:
+                ctx.opt_func.add_global_id_ref(exp.name, found_def_obj)
+        else:
+            # found def is defined inside a function or a global IIFE.
 
             # checking if the accessed ID is in the same function as us, or a higher one (in which case, this is a
             # non-local ID)
@@ -497,8 +497,9 @@ def help_infer_exp_tid(
             else:
                 closure_spec = CS.Yes
 
-                # adding this ID to the function's 'enclosed set'
-                ctx.opt_func.add_non_local(exp.name, found_def_obj)
+                # adding this ID to the function's nonlocal enclosed set
+                if ctx.opt_func is not None:
+                    ctx.opt_func.add_non_local_id_ref(exp.name, found_def_obj)
 
         # returning:
         ret_sub, def_tid = found_def_obj.scheme.shallow_instantiate()
@@ -595,14 +596,28 @@ def help_infer_exp_tid(
 
         # checking that '!' used with formal definitions of the right side-effects specifier:
         formal_ses = type.side_effects.of(formal_fn_tid)
+        elim_formal_ses = formal_ses in (
+            type.side_effects.SES.Elim_Any,
+            type.side_effects.SES.Elim_AnyNonTot
+        )
+
         formal_ses_is_tot = (formal_ses == SES.Tot)
         call_ses_is_tot = (call_ses == SES.Tot)
-        if formal_ses_is_tot and not call_ses_is_tot:
-            msg_suffix = "Total function called with '!' specifier"
-            raise excepts.TyperCompilationError(msg_suffix)
-        elif not formal_ses_is_tot and call_ses_is_tot:
-            msg_suffix = "Non-total function must be called with a '!' specifier"
-            raise excepts.TyperCompilationError(msg_suffix)
+        elim_call_ses = call_ses in (
+            type.side_effects.SES.Elim_Any,
+            type.side_effects.SES.Elim_AnyNonTot
+        )
+        if not elim_formal_ses and not elim_call_ses:
+            if formal_ses_is_tot and not call_ses_is_tot:
+                msg_suffix = "Total function called with '!' specifier"
+                raise excepts.TyperCompilationError(msg_suffix)
+            elif not formal_ses_is_tot and call_ses_is_tot:
+                msg_suffix = "Non-total function must be called with a '!' specifier"
+                raise excepts.TyperCompilationError(msg_suffix)
+        elif elim_formal_ses and not elim_call_ses:
+            fn_exp_ses = unifier.unify_ses(fn_exp_ses, call_ses)
+        elif elim_call_ses and not elim_formal_ses:
+            fn_exp_ses = unifier.unify_ses(fn_exp_ses, formal_ses)
 
         exp_ses = unifier.unify_ses(call_ses, fn_exp_ses, arg_exp_ses)
 
@@ -1308,6 +1323,9 @@ def help_type_id_in_module_node(
             instantiated_scheme,
             replace_deeply=True
         )
+
+    # TODO: store the `found_def_obj` on this node for later.
+    data.found_def_rec = found_def_obj
 
     # returning the resulting substitution, TID, SES, and CS:
     return sub, found_tid, out_ses, out_cs

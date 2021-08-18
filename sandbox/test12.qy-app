@@ -9,4 +9,13 @@ hello = 42;
 
 --- sub vec2 ---
 
-x = 666;
+J = vec1[U64]:A;
+k = vec1[U64]:hello;
+m = k * vec1[U64]:hello;
+n = f_negate(4f);
+
+f_negate ~ (F32) -> F32;
+f_negate = (x) -> (
+    -x
+);
+

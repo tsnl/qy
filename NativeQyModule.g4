@@ -23,7 +23,7 @@ moduleExports
     : 'exports' '{' lines+=exportLine (',' lines+=exportLine)* '}'
     ;
 exportLine
-    : name=VID '::' '*'
+    : name=VID ':' '*'
     ;
 
 moduleDef
@@ -40,7 +40,7 @@ moduleDef
 
 
 tableElement
-    : lhs_id=VID ':' ts=typeSpec         #typeValIdElement
+    : lhs_id=VID '~' ts=typeSpec         #typeValIdElement
     | lhs_id=VID '=' init_exp=expr       #bindValIdElement
     | lhs_id=TID '=' init_ts=typeSpec    #bindTypeIdElement
     | 'do' eval_exp=expr                 #forceEvalChainElement
@@ -61,8 +61,8 @@ chainTableWrapper
 //
 
 moduleAddressPrefix
-    :                                mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? '::'
-    | opt_prefix=moduleAddressPrefix mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? '::'
+    :                                mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
+    | opt_prefix=moduleAddressPrefix mod_name=VID ('[' args+=actualTemplateArg (',' args+=actualTemplateArg)* ']')? ':'
     ;
 actualTemplateArg
     : e=expr

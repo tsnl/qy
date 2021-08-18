@@ -13,14 +13,15 @@
 #include "panic.hh"
 #include "mval.hh"
 #include "arg-list.hh"
+#include "shared-enums.hh"
 
 //
 // Implementation: Compile-time constants
 //
 
 namespace monomorphizer::modules {
-    extern MonoModID const NULL_MONO_MOD_ID = -1;
-    extern PolyModID const NULL_POLY_MOD_ID = -1;
+    extern MonoModID const NULL_MONO_MOD_ID = UNIVERSAL_NULL_ID;
+    extern PolyModID const NULL_POLY_MOD_ID = UNIVERSAL_NULL_ID;
 }
 
 //
@@ -176,15 +177,15 @@ namespace monomorphizer::modules {
         size_t bound_id
     ) {
         gdef::DefKind bv_def_kind = gdef::get_def_kind(bv_def_id);
-        char* def_name = strdup(gdef::get_def_name(bv_def_id));
+        char* mv_def_name = strdup(gdef::get_def_name(bv_def_id));
         switch (bv_def_kind) {
             case gdef::DefKind::BV_EXP: {
                 mval::ValueID val_id = bound_id;
-                return gdef::define_total_const_value(def_name, val_id);
+                return gdef::declare_global_def(gdef::DefKind::CONST_TOT_VAL, mv_def_name);
             } break;
             case gdef::DefKind::BV_TS: {
                 mtype::TID type_id = bound_id;
-                return gdef::define_total_const_type(def_name, type_id);
+                return gdef::declare_global_def(gdef::DefKind::CONST_TOT_TID, mv_def_name);
             } break;
             default: {
                 throw new Panic("Invalid Def Kind in bv_def_id_array");

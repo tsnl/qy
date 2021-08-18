@@ -21,7 +21,7 @@ namespace monomorphizer::mast {
     // Node Kind enum:
     //
 
-    enum class NodeKind {
+    enum NodeKind: size_t {
         // type-specifiers:
         TS_UNIT,
         TS_GID,
@@ -166,8 +166,10 @@ namespace monomorphizer::mast {
     };
 
     struct LambdaExpNodeInfo {
-        GDefID* arg_name_array;
-        size_t arg_name_count;
+        uint32_t arg_name_count;
+        uint32_t ctx_enclosed_name_count;
+        intern::IntStr* arg_name_array;
+        intern::IntStr* ctx_enclosed_name_array;
         mast::ExpID body_exp;
     };
 
@@ -207,7 +209,7 @@ namespace monomorphizer::mast {
     //
 
     struct Bind1VElemNodeInfo {
-        GDefID bound_def_id;
+        intern::IntStr bound_id;
         mast::ExpID init_exp_id;
     };
 
@@ -344,9 +346,11 @@ namespace monomorphizer::mast {
         size_t index
     );
     mast::ExpID new_lambda_exp(
-        size_t arg_name_count,
-        GDefID* arg_name_array,
-        mast::ExpID body_exp
+        uint32_t arg_name_count,
+        intern::IntStr* arg_name_array,
+        uint32_t ctx_enclosed_item_count,
+        intern::IntStr* ctx_enclosed_name_array,
+        mast::ExpID body_exp_id
     );
     mast::ExpID new_allocate_one_exp(
         mast::ExpID stored_val_exp_id,
@@ -377,7 +381,7 @@ namespace monomorphizer::mast {
     
     // Element creation methods:
     mast::ElemID new_bind1v_elem(
-        GDefID bound_def_id,
+        intern::IntStr bound_id,
         mast::ExpID init_exp_id
     );
     mast::ElemID new_do_elem(

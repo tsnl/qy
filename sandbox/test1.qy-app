@@ -39,10 +39,10 @@ add = (v, w) -> {
 
 --- sub test1 ---
 
-a1: I16;
-a2: I16;
-a3: I16;
-a4: I16;
+a1 ~ I16;
+a2 ~ I16;
+a3 ~ I16;
+a4 ~ I16;
 
 a1 = 42;
 a2 = 43;
@@ -63,11 +63,11 @@ a5 = (
 );
 
 omega = (
-    if (0b) Tot {
+    if (0b) TOT {
         1
-    } else if (1b) Tot {
+    } else if (1b) TOT {
         0
-    } else Tot {
+    } else TOT {
         2
     }
 );

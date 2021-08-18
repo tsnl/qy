@@ -4,23 +4,26 @@
 #include <cstdint>
 #include <optional>
 
+#include "id-mast.hh"
 #include "id-mval.hh"
+#include "id-intern.hh"
+#include "shared-enums.hh"
 
 namespace monomorphizer::mval {
 
     extern ValueID const NULL_VID;
 
-    enum class ValueKind {
-        Unit,
-        U1, U8, U16, U32, U64,
-        S8, S16, S32, S64,
-        F32, F64,
-        String,
-        Tuple,
-        Array,
-        Slice
+    enum ValueKind {
+        VK_UNIT,
+        VK_U1, VK_U8, VK_U16, VK_U32, VK_U64,
+        VK_S8, VK_S16, VK_S32, VK_S64,
+        VK_F32, VK_F64,
+        VK_STRING,
+        VK_TUPLE,
+        VK_ARRAY,
+        VK_SLICE,
+        VK_FUNCTION
 
-        // todo: add functions: body is just MAST code
         // todo: add pointers
     };
 
@@ -38,6 +41,7 @@ namespace monomorphizer::mval {
         double f64;
         size_t string_info_index;
         size_t sequence_info_index;
+        size_t func_info_index;
     };
 
 }
@@ -45,6 +49,23 @@ namespace monomorphizer::mval {
 namespace monomorphizer::mval {
 
     extern size_t const MAX_VAL_HASH_BYTE_COUNT;
+
+    struct CtxEnclosedId {
+        intern::IntStr name;
+        size_t target;
+
+        inline
+        CtxEnclosedId()
+        :   name(UNIVERSAL_NULL_ID),
+            target(UNIVERSAL_NULL_ID)
+        {}
+
+        inline
+        CtxEnclosedId(intern::IntStr enclosed_name, size_t enclosed_target)
+        :   name(enclosed_name),
+            target(enclosed_target)
+        {}
+    };
 
     // value constructors:
     ValueID get_unit();
@@ -61,6 +82,13 @@ namespace monomorphizer::mval {
     ValueID push_f64(double v);
     ValueID push_str(size_t code_point_count, int* mv_code_point_array);
     ValueID push_tuple(size_t elem_id_count, ValueID* mv_elem_id_array);
+    ValueID push_function(
+        uint32_t arg_name_count,
+        intern::IntStr* mv_arg_name_array,
+        uint32_t ctx_enclosed_id_count,
+        CtxEnclosedId* mv_ctx_enclosed_id_array,
+        mast::ExpID body_exp_id
+    );
 
     // property accessors:
     ValueKind value_kind(ValueID value_id);

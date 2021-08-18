@@ -1,7 +1,7 @@
 --- sub test2 ---
 
-Vec3f = Struct { x: Float32; y: Float32; z: Float32; };
-Vec4f = Struct { x: Float32; y: Float32; z: Float32; w: Float32; };
+Vec3f = Struct { x: F32; y: F32; z: F32; };
+Vec4f = Struct { x: F32; y: F32; z: F32; w: F32; };
 
 zero_v3f = Vec3f(0, 0, 0);
 

@@ -23,4 +23,7 @@ def init_func(fn_tid: "identity.TID", closure_spec: CS):
 
 
 def of(fn_tid: "identity.TID"):
-    return fn_closure_spec_table[fn_tid]
+    try:
+        return fn_closure_spec_table[fn_tid]
+    except KeyError:
+        return CS.Maybe

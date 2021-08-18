@@ -9,23 +9,9 @@ from Cython.Build import cythonize
 def mk_wrapper_extension():
     return Extension(
         "wrapper",
-        sources=[
-            "wrapper.pyx",
-            # "extension/arg-list.cc",
-            # "extension/gdef.cc",
-            # "extension/eval.cc",
-            # "extension/mast.cc",
-            # "extension/modules.cc",
-            # "extension/mtype.cc",
-            # "extension/mval.cc",
-            # "extension/sub.cc"
-        ],
-        extra_objects=[
-            "libCppMonomorphizerExt.a"
-        ],
-        extra_compile_args=[
-            "-std=c++17",
-        ],
+        sources=["wrapper.pyx"],
+        extra_objects=["libCppMonomorphizerExt.a"],
+        extra_compile_args=["-std=c++17"],
         language='c++'
     )
 
@@ -33,12 +19,8 @@ def mk_wrapper_extension():
 def mk_copier_extension():
     return Extension(
         "copier",
-        sources=[
-            "copier.pyx"
-        ],
-        extra_compile_args=[
-            '-std=c++17'
-        ],
+        sources=["copier.pyx"],
+        extra_compile_args=["-std=c++17"],
         language='c++'
     )
 

@@ -308,8 +308,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             ast.node.UnaryOp.Pos: '+',
             ast.node.UnaryOp.Neg: '-',
             ast.node.UnaryOp.LogicalNot: 'not',
-            ast.node.UnaryOp.DeRef: '@!',
-            ast.node.UnaryOp.DeRefImmutable: '@'
+            ast.node.UnaryOp.DeRef: '@',
         }[unary_op]
 
         arg_spelling = type.spelling.of(arg_tid)
@@ -321,7 +320,8 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
     @staticmethod
     def new_pos_neg_overload_map():
         return {
-            (unary_operator, type.get_int_type(i, src_sgn)): type.get_int_type(i, True)
+            (unary_operator, type.get_int_type(i, is_unsigned=src_sgn)):
+                type.get_int_type(i, is_unsigned=False)
             for i in (
                 8,
                 16,
@@ -332,6 +332,15 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             for src_sgn in (
                 False,
                 True
+            )
+            for unary_operator in (
+                ast.node.UnaryOp.Pos,
+                ast.node.UnaryOp.Neg
+            )
+        } | {
+            (unary_operator, type.get_float_type(i)): type.get_float_type(i)
+            for i in (
+                32, 64
             )
             for unary_operator in (
                 ast.node.UnaryOp.Pos,
@@ -490,7 +499,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         return {
             (
                 binary_operator,
-                type.get_int_type(i, is_unsigned=src_sgn)
+                type.get_int_type(i, is_unsigned=src_is_unsigned)
             ): (
                 type.get_int_type(1, is_unsigned=True)
             )
@@ -501,7 +510,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 64,
                 128
             )
-            for src_sgn in (
+            for src_is_unsigned in (
                 False,
                 True
             )

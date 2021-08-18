@@ -206,15 +206,14 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         return out_exp
 
     def visitModuleAddressPrefix(self, ctx):
-        # NOTE: this function returns a `GetModElementExp` to access the module of the prefix.
-        #       thus, idExpInModule must further construct `GetModElementExp` as well.
         opt_prefix = self.visit(ctx.opt_prefix) if ctx.opt_prefix is not None else None
         suffix_name = ctx.mod_name.text
         suffix_args = [self.visit(arg) for arg in ctx.args]
-        out_exp = ast.node.IdExpInModule(
+        out_exp = ast.node.GetModuleNode(
             self.ctx_loc(ctx),
             opt_container=opt_prefix,
-            elem_name=suffix_name, elem_args=suffix_args
+            elem_name=suffix_name,
+            elem_args=suffix_args
         )
         return out_exp
 
@@ -259,7 +258,8 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             [self.visit(chunk) for chunk in ctx.chunks]
         )
 
-    def helpVisitStringChunk(self, ctx, quote_str):
+    @staticmethod
+    def help_visit_string_chunk(ctx, quote_str):
         content = ctx.tk.text[len(quote_str):-len(quote_str)]
         runes = []
         index = 0
@@ -299,7 +299,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitSqStringChunk(self, ctx):
         quote_str = "'"
-        runes = self.helpVisitStringChunk(ctx, quote_str)
+        runes = self.help_visit_string_chunk(ctx, quote_str)
         return ast.node.StringExpChunk(
             self.ctx_loc(ctx),
             runes, quote_str
@@ -307,7 +307,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitDqStringChunk(self, ctx):
         quote_str = '"'
-        runes = self.helpVisitStringChunk(ctx, quote_str)
+        runes = self.help_visit_string_chunk(ctx, quote_str)
         return ast.node.StringExpChunk(
             self.ctx_loc(ctx),
             runes, quote_str
@@ -315,7 +315,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitMlSqStringChunk(self, ctx):
         quote_str = "'''"
-        runes = self.helpVisitStringChunk(ctx, quote_str)
+        runes = self.help_visit_string_chunk(ctx, quote_str)
         return ast.node.StringExpChunk(
             self.ctx_loc(ctx),
             runes, quote_str
@@ -323,7 +323,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitMlDqStringChunk(self, ctx):
         quote_str = '"""'
-        runes = self.helpVisitStringChunk(ctx, quote_str)
+        runes = self.help_visit_string_chunk(ctx, quote_str)
         return ast.node.StringExpChunk(
             self.ctx_loc(ctx),
             runes, quote_str
@@ -377,11 +377,6 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             self.ctx_loc(ctx),
             self.visit(ctx.ts), self.visit(ctx.data)
         )
-
-    #
-    # Constructions (using type specs):
-    # TODO: implement construction visitor
-    #
 
     #
     # Postfix Expressions:
@@ -706,9 +701,4 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
     # TODO: finish parser features
     #
 
-    # - visit struct
-    # - visit pointer, array, type-spec
-    # - visit make expressions
-    # - visit array, type-spec expressions
-    # - modules may accept template arguments
-    # - accessing IDs from another module, possibly calling a template function (module).
+    # - visit array literals, array type-specs

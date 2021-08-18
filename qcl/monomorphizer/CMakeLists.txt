@@ -36,6 +36,7 @@ add_library(
     "extension/panic.hh"
     "extension/printing.cc"
     "extension/printing.hh"
+    "extension/shared-enums.cc"
     "extension/shared-enums.hh"
     "extension/stack.cc"
     "extension/stack.hh"

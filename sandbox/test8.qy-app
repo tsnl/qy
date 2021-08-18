@@ -26,8 +26,7 @@ w = f1(f2(z));
 
 --- sub recursion ---
 
-g: (Float32) -> Float32;
-
+g ~ (Float32) -> Float32;
 g = (x) -> {
     w = g(x);
     0f
@@ -39,10 +38,10 @@ Vec2 = Struct {
     x: T;
     y: T;
 };
-Vec2i = linAlg[I32]::Vec2;
-Vec2f = linAlg[F32]::Vec2;
+Vec2i = linAlg[I32]:Vec2;
+Vec2f = linAlg[F32]:Vec2;
 
 --- sub hello ---
 
-Vec2i = linAlg::Vec2i;
-Vec2f = linAlg::Vec2f;
+Vec2i = linAlg:Vec2i;
+Vec2f = linAlg:Vec2f;

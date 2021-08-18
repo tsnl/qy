@@ -1,5 +1,8 @@
 --- sub howdy ---
 
+x ~ NoCtxPtr { F32 -> ![F32] -> ST F32 };
+y ~ NoCtxPtr { ![F32] -> ML F32 };
+
 x = (v) -> (p) -> ST {
     // v--- violates the context pointer ban
     // do p := v;
@@ -10,8 +13,6 @@ x = (v) -> (p) -> ST {
 y = (b) -> ML {
     x(0f)!(b)
 };
-x: NoCtxPtr { F32 -> ![F32] -> ST F32 };
-y: NoCtxPtr { ![F32] -> ML F32 };
 
 /*
 --- henlo submod ---

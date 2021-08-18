@@ -3,6 +3,7 @@ This module wraps the `extension/` directory.
 """
 
 from libc.stddef cimport size_t
+from libc.stdint cimport uint32_t
 # from qcl.monomorphizer cimport wrapper 
 
 #
@@ -21,26 +22,15 @@ cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
     void ensure_defs_init();
     void drop_defs();
 
-    # constant declaration:
-    GDefID declare_t_const_mast_node(char* mv_def_name);
-    GDefID declare_v_const_mast_node(char* mv_def_name);
-
-    # lazily binding const mast node defs to a MAST node:
-    void define_declared_t_const(GDefID declared_def_id, TypeSpecID ts_id)
-    void define_declared_v_const(GDefID declared_def_id, ExpID exp_id)
-
-    # bound var definitions:
-    # monomorphization is just replacing references to these in polymorphic 
-    # modules with total const definitions, returning a monomorphic copy.
-    GDefID define_bound_var_ts(char* mv_formal_var_name);
-    GDefID define_bound_var_exp(char* mv_formal_var_name);
+    # declaration:
+    GDefID declare_global_def(DefKind kind, char* mv_bound_name)
 
     # query definition info:
     bint get_def_is_bv(GDefID def_id);
     DefKind get_def_kind(GDefID def_id);
     const char* get_def_name(GDefID def_id);
-    void store_id_at_def_id(GDefID def_id, size_t id);
-    size_t load_id_from_def_id(GDefID def_id);
+    size_t get_def_target(GDefID def_id);
+    void set_def_target(GDefID def_id, size_t target);
 
 # modules:
 cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
@@ -109,7 +99,13 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ExpID new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp);
     ExpID new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp);
     ExpID new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index);
-    ExpID new_lambda_exp(size_t arg_name_count, GDefID* arg_name_array, ExpID body_exp);
+    ExpID new_lambda_exp(
+            uint32_t arg_name_count,
+            IntStr* arg_name_array,
+            uint32_t ctx_enclosed_name_count,
+            IntStr* ctx_enclosed_name_array,
+            ExpID body_exp
+    );
     ExpID new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut);
     ExpID new_allocate_many_exp(
         ExpID initializer_stored_val_exp_id,
@@ -128,10 +124,14 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ElemID new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id);
     ElemID new_do_elem(ExpID eval_exp_id);
 
+    # Shared:
+    NodeKind get_node_kind(NodeID node_id)
+
 # intern:
 cdef extern from "extension/intern.hh" namespace "monomorphizer::intern":
-    IntStr intern_string(cpp_string s)
+    IntStr intern_string(cpp_string s, bint is_tid_not_vid)
     cpp_string get_interned_string(IntStr int_str_id)
+    bint is_interned_string_tid_not_vid(IntStr int_str_id)
 
 # printing:
 cdef extern from "extension/printing.hh" namespace "monomorphizer::printing":
@@ -180,8 +180,18 @@ cdef:
         return new_if_then_else_exp(cond_exp, then_exp, else_exp)
     ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index):
         return new_get_tuple_field_by_index_exp(tuple_exp_id, index)
-    ExpID w_new_lambda_exp(size_t arg_name_count, GDefID* arg_name_array, ExpID body_exp):
-        return new_lambda_exp(arg_name_count, arg_name_array, body_exp)
+    ExpID w_new_lambda_exp(
+            uint32_t arg_name_count,
+            IntStr* arg_name_array,
+            uint32_t ctx_enclosed_name_count,
+            IntStr* ctx_enclosed_name_array,
+            ExpID body_exp
+    ):
+        return new_lambda_exp(
+            arg_name_count, arg_name_array,
+            ctx_enclosed_name_count, ctx_enclosed_name_array,
+            body_exp
+        )
     ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut):
         return new_allocate_one_exp(stored_val_exp_id, allocation_target, allocation_is_mut)
     ExpID w_new_allocate_many_exp(
@@ -249,38 +259,28 @@ cdef:
     ElemID w_new_do_elem(ExpID eval_exp_id):
         return new_do_elem(eval_exp_id)
 
+# mast: common:
+cdef:
+    NodeKind w_get_node_kind(NodeID node_id):
+        return get_node_kind(node_id)
+
 # defs: global and unscoped
 cdef:
-    # functions to define constants:
-    GDefID w_declare_t_const_mast_node(char* mv_def_name):
-        return declare_t_const_mast_node(mv_def_name)
-    GDefID w_declare_v_const_mast_node(char* mv_def_name):
-        return declare_v_const_mast_node(mv_def_name)
-    
-    void w_define_declared_t_const(GDefID declared_def_id, TypeSpecID ts_id):
-        define_declared_t_const(declared_def_id, ts_id)
-    void w_define_declared_v_const(GDefID declared_def_id, ExpID exp_id):
-        define_declared_v_const(declared_def_id, exp_id)
-
-    # functions to define bound vars:
-    # monomorphization is just replacing references to these in polymorphic 
-    # modules with total const definitions, returning a monomorphic copy.
-    GDefID w_define_bound_var_ts(char* mv_formal_var_name):
-        return define_bound_var_ts(mv_formal_var_name)
-    GDefID w_define_bound_var_exp(char* mv_formal_var_name):
-        return define_bound_var_exp(mv_formal_var_name)
+    # constructor:
+    GDefID w_declare_global_def(DefKind kind, char* mv_bound_name):
+        return declare_global_def(kind, mv_bound_name)
 
     # functions to query definition info:
     bint w_get_def_is_bv(GDefID def_id):
         return get_def_is_bv(def_id)
     DefKind w_get_def_kind(GDefID def_id):
-        return get_def_kind(def_id);
+        return get_def_kind(def_id)
     const char* w_get_def_name(GDefID def_id):
         return get_def_name(def_id)
-    void w_store_id_at_def_id(GDefID def_id, size_t id_):
-        store_id_at_def_id(def_id, id_)
-    size_t w_load_id_from_def_id(GDefID def_id):
-        return load_id_from_def_id(def_id)
+    size_t w_get_def_target(GDefID def_id):
+        return get_def_target(def_id)
+    void w_set_def_target(GDefID def_id, size_t target):
+        set_def_target(def_id, target)
 
 # modules:
 cdef:
@@ -311,11 +311,11 @@ cdef:
 
 # interning:
 cdef:
-    IntStr w_intern_string_1(cpp_string s):
-        return intern_string(s)
-    IntStr w_intern_string_2(const char* nt_bytes):
+    IntStr w_intern_string_1(cpp_string s, bint is_id_tid_not_vid):
+        return intern_string(s, is_id_tid_not_vid)
+    IntStr w_intern_string_2(const char* nt_bytes, bint is_id_tid_not_vid):
         s = cpp_string(nt_bytes)
-        return intern_string(s)
+        return intern_string(s, is_id_tid_not_vid)
 
 # printing:
 cdef:

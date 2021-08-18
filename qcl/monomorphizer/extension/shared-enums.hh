@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace monomorphizer {
 
     //
@@ -8,42 +10,44 @@ namespace monomorphizer {
     //
 
     enum SES: size_t {
-        Tot,
-        Dv,
-        ST,
-        Exn,
-        ML
+        SES_TOT,
+        SES_DV,
+        SES_ST,
+        SES_EXN,
+        SES_ML
     };
 
     enum UnaryOp: size_t {
-        LogicalNot,
-        DeRef,
-        Pos,
-        Neg
+        UNARY_LOGICAL_NOT,
+        UNARY_DE_REF,
+        UNARY_POS,
+        UNARY_NEG
     };
 
     enum BinaryOp: size_t {
-        Pow,
-        Mul, Div, Rem,
-        Add, Sub,
-        LessThan, LessThanOrEquals, GreaterThan, GreaterThanOrEquals,
-        Equals, NotEquals,
-        LogicalAnd,
-        LogicalOr
+        BINARY_POW,
+        BINARY_MUL, BINARY_DIV, BINARY_REM,
+        BINARY_ADD, BINARY_SUB,
+        BINARY_LT, BINARY_LE, BINARY_GT, BINARY_GE,
+        BINARY_EQ, BINARY_NE,
+        BINARY_LOGICAL_AND,
+        BINARY_LOGICAL_OR
     };
 
     enum AllocationTarget: size_t {
-        Stack,
-        Heap
+        ALLOCATION_TARGET_STACK,
+        ALLOCATION_TARGET_HEAP
     };
 
     enum IntegerSuffix: size_t {
-        U1, U8, U16, U32, U64,
-        S8, S16, S32, S64
+        IS_U1, IS_U8, IS_U16, IS_U32, IS_U64,
+        IS_S8, IS_S16, IS_S32, IS_S64
     };
 
     enum FloatSuffix: size_t {
-        F32, F64
+        FS_F32, FS_F64
     };
+
+    extern size_t const UNIVERSAL_NULL_ID;
 
 }

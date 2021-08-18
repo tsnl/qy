@@ -25,6 +25,7 @@ class SES(enum.Enum):
     ST = enum.auto()
     Exn = enum.auto()
     ML = enum.auto()
+    Elim_Any = enum.auto()
     Elim_AnyNonTot = enum.auto()
 
 
@@ -37,4 +38,7 @@ def init(fn_tid: identity.TID, ses: SES):
 
 
 def of(fn_tid: identity.TID):
-    return side_effects[fn_tid]
+    try:
+        return side_effects[fn_tid]
+    except KeyError:
+        return SES.Elim_Any
