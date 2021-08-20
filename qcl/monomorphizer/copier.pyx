@@ -35,14 +35,10 @@ PyBinaryOp = ast.node.BinaryOp
 
 
 cpdef void monomorphize_project(object proj: frontend.project.Project):
-    print("--- Monomorphizer ---")
+    print("--- BEG Monomorphizer ---")
 
     # ensuring init:
     wrapper.w_ensure_init()
-
-    # sourcing entry point:
-    entry_point_source_module: frontend.FileModuleSource = proj.entry_point_source_module
-    entry_point_file_mod_exp: ast.node.FileModExp = entry_point_source_module.ast_file_mod_exp_from_frontend
 
     # Running phase 1:
     # generating PolyModIDs for each sub-mod in this project
@@ -52,8 +48,17 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
     # Running phase 2:
     define_declared_def_ids_in_proj(proj)
 
-    # Debug:
-    print_all_poly_mods("Post-Phase-2", proj)
+    # Running phase 3:
+    instantiate_entry_point(proj)
+
+    # TODO: dump the extension state, write ways to access it.
+    print()
+    print_all_poly_mods("FINALLY", proj)
+    print()
+    print_all_mono_mods("FINALLY", proj)
+    print()
+    
+    print("--- END Monomorphizer: OK ---")
 
 
 #
@@ -61,6 +66,10 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
 # Shared:
 #
 #
+
+cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
+    extern const wrapper.GDefID NULL_GDEF_ID;
+
 
 cdef char* mk_c_str_from_py_str(object py_str: str):
     py_str_len = len(py_str)
@@ -483,14 +492,6 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             body_exp
         )
 
-    # ExpID w_new_lambda_exp(
-    #             uint32_t arg_name_count,
-    #             IntStr* arg_name_array,
-    #             uint32_t ctx_enclosed_name_count,
-    #             IntStr* ctx_enclosed_name_array,
-    #             ExpID body_exp
-    #     )
-
     # TODO: translate AST to MAST using the following functions:
     # ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
     # ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
@@ -549,10 +550,45 @@ cdef define_declared_def_ids_in_sub_mod(object sub_mod_name: str, object sub_mod
 #
 
 cdef void print_all_poly_mods(object title: str, object proj: frontend.Project):
-    # DEBUG: printing the generated PolyModID:
-    print(f"... BEG of generated PolyModID Dump: {title}...")
+    print(f">- BEG of generated PolyModID dump: {title} -<")
+
     for file_mod_exp in proj.file_module_exp_list:
         assert isinstance(file_mod_exp, ast.node.FileModExp)
         for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
             wrapper.w_print_poly_mod(poly_mod_id_map[sub_mod_exp])
-    print(f"... END of generated PolyModID Dump: {title} ...")
+
+    print(f">- END of generated PolyModID dump: {title} -<")
+
+
+cdef void print_all_mono_mods(object title: str, object proj: frontend.Project):
+    print(f">- BEG of generated MonoModID dump: {title} -<")
+
+    mono_mod_count = wrapper.w_count_all_mono_modules()
+    for mono_mod_id in range(mono_mod_count):
+        wrapper.w_print_mono_mod(mono_mod_id)
+
+    print(f">- END of generated MonoModID dump: {title} -<")
+
+#
+#
+# Phase 3: instantiating the entry point module
+#
+#
+
+cdef instantiate_entry_point(object proj: frontend.Project):
+    entry_point_source_module: frontend.FileModuleSource = proj.entry_point_source_module
+    entry_point_file_mod_exp: ast.node.FileModExp = entry_point_source_module.ast_file_mod_exp_from_frontend
+    
+    entry_point_sub_mod_name = "entry_point_for_v1_default_loader"
+    if entry_point_sub_mod_name not in entry_point_file_mod_exp.sub_module_map:
+        raise excepts.CheckerCompilationError(
+            f"Expected a sub-module named `{entry_point_sub_mod_name}` in the first file module."
+        )
+    
+    entry_point_sub_mod_exp = entry_point_file_mod_exp.sub_module_map[entry_point_sub_mod_name]
+    entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
+    # MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
+    wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
+
+    # TODO: verify that there exists a function field named 'main' of the desired signature
+    #   - can be performed before or after monomorphization

@@ -33,11 +33,12 @@
 #include "id-mast.hh"
 #include "id-mtype.hh"
 #include "id-mval.hh"
+#include "sub.hh"
 
 namespace monomorphizer::eval {
 
     // NOTE: these functions could throw errors 
-    mtype::TID eval_type(mast::TypeSpecID ts_id);
-    mval::ValueID eval_exp(mast::ExpID exp_id);
+    mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s);
+    mval::ValueID eval_exp(mast::ExpID exp_id, sub::Substitution* s);
 
 }

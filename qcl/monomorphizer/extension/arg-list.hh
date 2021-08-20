@@ -11,7 +11,7 @@ namespace monomorphizer::arg_list {
     // type_equals for type IDs)
     // Note these are immutable references (cf. functional linked lists) and
     // must be constructed in reverse-order.
-    extern ArgListID const EMPTY;
+    extern ArgListID const EMPTY_ARG_LIST;
 
     ArgListID cons_tid(
         ArgListID list,
@@ -28,5 +28,7 @@ namespace monomorphizer::arg_list {
     ArgListID tail(
         ArgListID arg_list_id
     );
+
+    ArgListID empty_arg_list_id();
 
 }

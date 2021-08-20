@@ -171,7 +171,7 @@ namespace monomorphizer::arg_list {
 
 namespace monomorphizer::arg_list {
 
-    extern arg_list::ArgListID const EMPTY = NULL_ATN_ID;
+    ArgListID const EMPTY_ARG_LIST = NULL_ATN_ID;
 
     ArgListID cons_tid(
         ArgListID list,
@@ -204,6 +204,10 @@ namespace monomorphizer::arg_list {
     ArgListID tail(ArgListID arg_list_id) {
         auto parent_node_id = s_atn_table[arg_list_id].m_parent_node_id;
         return static_cast<ArgListID>(parent_node_id);
+    }
+
+    ArgListID empty_arg_list_id() {
+        return EMPTY_ARG_LIST;
     }
 
 }

@@ -46,23 +46,64 @@ namespace monomorphizer::printing {
         } else {
             mast::NodeKind nk = mast::get_node_kind(ts_id);
             switch (nk) {
-                case mast::NodeKind::TS_UNIT: { std::cout << "TS_UNIT"; break; }
-                case mast::NodeKind::TS_GID: { std::cout << "TS_GID"; break; }
-                case mast::NodeKind::TS_LID: { std::cout << "TS_LID"; break; }
-                case mast::NodeKind::TS_PTR: { std::cout << "TS_PTR"; break; }
-                case mast::NodeKind::TS_ARRAY: { std::cout << "TS_ARRAY"; break; }
-                case mast::NodeKind::TS_SLICE: { std::cout << "TS_SLICE"; break; }
-                case mast::NodeKind::TS_FUNC_SGN: { std::cout << "TS_FUNC_SGN"; break; }
-                case mast::NodeKind::TS_TUPLE: { std::cout << "TS_TUPLE"; break; }
-                case mast::NodeKind::TS_GET_POLY_MODULE_FIELD: { std::cout << "TS_GET_POLY_MODULE_FIELD"; break; }
-                case mast::NodeKind::TS_GET_MONO_MODULE_FIELD: { std::cout << "TS_GET_MONO_MODULE_FIELD"; break; }
-                default: { std::cout << "<!!ERROR_TS:nk=" << (size_t)nk << ">"; break; }
+                case mast::NodeKind::TS_UNIT: { std::cout << "TS_UNIT"; } break;
+                case mast::NodeKind::TS_GID: { std::cout << "TS_GID"; } break;
+                case mast::NodeKind::TS_LID: { std::cout << "TS_LID"; } break;
+                case mast::NodeKind::TS_PTR: { std::cout << "TS_PTR"; } break;
+                case mast::NodeKind::TS_ARRAY: { std::cout << "TS_ARRAY"; } break;
+                case mast::NodeKind::TS_SLICE: { std::cout << "TS_SLICE"; } break;
+                case mast::NodeKind::TS_FUNC_SGN: { std::cout << "TS_FUNC_SGN"; } break;
+                case mast::NodeKind::TS_TUPLE: { std::cout << "TS_TUPLE"; } break;
+                case mast::NodeKind::TS_GET_POLY_MODULE_FIELD: { std::cout << "TS_GET_POLY_MODULE_FIELD"; } break;
+                case mast::NodeKind::TS_GET_MONO_MODULE_FIELD: { std::cout << "TS_GET_MONO_MODULE_FIELD"; } break;
+                default: { std::cout << "<!!ERROR_TS:nk=" << (size_t)nk << ">"; } break;
             }
         }
     }
     static void print_val(mval::ValueID val_id) {
-        std::cout << "<placeholder-value>";
-        // todo: implement me
+        if (val_id == mval::NULL_VID) {
+            std::cout << "<NULL_VID>";
+        } else {
+            std::cout << val_id;
+
+            mval::ValueKind vk = mval::value_kind(val_id);
+            
+            std::cout << "/";
+            switch (vk) {
+                case mval::ValueKind::VK_S8: { std::cout << "VK_S8"; } break;
+                case mval::ValueKind::VK_S16: { std::cout << "VK_S16"; } break;
+                case mval::ValueKind::VK_S32: { std::cout << "VK_S32"; } break;
+                case mval::ValueKind::VK_S64: { std::cout << "VK_S64"; } break;
+                case mval::ValueKind::VK_U1: { std::cout << "VK_U1"; } break;
+                case mval::ValueKind::VK_U8: { std::cout << "VK_U8"; } break;
+                case mval::ValueKind::VK_U16: { std::cout << "VK_U16"; } break;
+                case mval::ValueKind::VK_U32: { std::cout << "VK_U32"; } break;
+                case mval::ValueKind::VK_U64: { std::cout << "VK_U64"; } break;
+                case mval::ValueKind::VK_F32: { std::cout << "VK_F32"; } break;
+                case mval::ValueKind::VK_F64: { std::cout << "VK_F64"; } break;
+                case mval::ValueKind::VK_STRING: { std::cout << "VK_STRING"; } break;
+                case mval::ValueKind::VK_TUPLE: { std::cout << "VK_TUPLE"; } break;
+                case mval::ValueKind::VK_FUNCTION: { std::cout << "VK_FUNCTION"; } break;
+                default: { std::cout << "!!ERROR_VID:vk=" << (size_t)vk << ">"; } break;
+            }
+
+            auto vi = mval::value_info(val_id);
+            switch (vk) {
+                case mval::ValueKind::VK_S8: { std::cout << "=" << vi.s8; } break;
+                case mval::ValueKind::VK_S16: { std::cout << "=" << vi.s16; } break;
+                case mval::ValueKind::VK_S32: { std::cout << "=" << vi.s32; } break;
+                case mval::ValueKind::VK_S64: { std::cout << "=" << vi.s64; } break;
+                case mval::ValueKind::VK_U1: { std::cout << "=" << vi.u1; } break;
+                case mval::ValueKind::VK_U8: { std::cout << "=" << vi.u8; } break;
+                case mval::ValueKind::VK_U16: { std::cout << "=" << vi.u16; } break;
+                case mval::ValueKind::VK_U32: { std::cout << "=" << vi.u32; } break;
+                case mval::ValueKind::VK_U64: { std::cout << "=" << vi.u64; } break;
+                case mval::ValueKind::VK_F32: { std::cout << "=" << vi.f32; } break;
+                case mval::ValueKind::VK_F64: { std::cout << "=" << vi.f64; } break;
+                
+                default: break;
+            }
+        }
     }
     static void print_type(mtype::TID type_id) {
         std::cout << "<placeholder-type>";
@@ -98,23 +139,23 @@ namespace monomorphizer::printing {
     }
     void print_mono_mod(MonoModID mono_mod_id) {
         auto mod_name = modules::get_mono_mod_name(mono_mod_id);
-        std::cout << "MonoMod: " << mod_name << std::endl;
+        std::cout << "\t" "MonoMod: " << mod_name << std::endl;
         size_t field_count = modules::get_mono_mod_field_count(mono_mod_id);
         for (size_t field_index = 0; field_index < field_count; field_index++) {
             GDefID field_def_id = modules::get_mono_mod_field_at(mono_mod_id, field_index);
-            std::cout << "- ";
+            std::cout << "\t" "- ";
             print_def_id(field_def_id);
             std::cout << std::endl;
         }
     }
     void print_poly_mod(PolyModID poly_mod_id) {
         auto mod_name = modules::get_poly_mod_name(poly_mod_id);
-        std::cout << "PolyMod: " << mod_name << std::endl;
+        std::cout << "\t" "PolyMod: " << mod_name << std::endl;
 
         size_t formal_arg_count = modules::get_poly_mod_formal_arg_count(poly_mod_id);
         for (size_t formal_arg_index = 0; formal_arg_index < formal_arg_count; formal_arg_index++) {
             GDefID formal_arg_def_id = modules::get_poly_mod_formal_arg_at(poly_mod_id, formal_arg_index);
-            std::cout << "- ";
+            std::cout << "\t" "- ";
             print_def_id(formal_arg_def_id);
             std::cout << std::endl;
         }
@@ -122,7 +163,7 @@ namespace monomorphizer::printing {
         size_t field_count = modules::get_poly_mod_field_count(poly_mod_id);
         for (size_t field_index = 0; field_index < field_count; field_index++) {
             GDefID field_def_id = modules::get_poly_mod_field_at(poly_mod_id, field_index);
-            std::cout << "- ";
+            std::cout << "\t" "- ";
             print_def_id(field_def_id);
             std::cout << std::endl;
         }

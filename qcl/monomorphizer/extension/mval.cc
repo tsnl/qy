@@ -37,28 +37,6 @@ namespace monomorphizer::mval {
             elem_id_array{mv_elem_id_array}
         {}
     };
-    struct FuncInfo {
-        uint32_t arg_name_count;
-        uint32_t ctx_enclosed_id_count;
-        intern::IntStr* arg_name_array;
-        CtxEnclosedId* ctx_enclosed_id_array;
-        mast::ExpID body_exp_id;
-
-        inline
-        FuncInfo(
-            uint32_t new_arg_name_count,
-            uint32_t new_ctx_enclosed_id_count,
-            intern::IntStr* mv_arg_name_array,
-            CtxEnclosedId* mv_ctx_enclosed_id_array,
-            mast::ExpID new_body_exp_id
-        )
-        :   arg_name_count(new_arg_name_count),
-            ctx_enclosed_id_count(new_ctx_enclosed_id_count),
-            arg_name_array(mv_arg_name_array),
-            ctx_enclosed_id_array(mv_ctx_enclosed_id_array),
-            body_exp_id(new_body_exp_id)
-        {}
-    };
 
     struct Value {
         ValueKind kind;
@@ -260,6 +238,9 @@ namespace monomorphizer::mval {
         } else {
             return {};
         }
+    }
+    FuncInfo* get_func_info(size_t func_info_index) {
+        return &s_func_info_table[func_info_index];
     }
 
     // serialization:

@@ -12,9 +12,11 @@ from libc.stdint cimport uint32_t
 #
 #
 
-# arg list:
+# misc. extern NULL IDs:
 cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
-    const ArgListID EMPTY
+    extern const ArgListID EMPTY_ARG_LIST
+cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
+    ArgListID empty_arg_list_id()
 
 # defs:
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
@@ -60,6 +62,9 @@ cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
     # instantiation:
     # turn a PolyModID into a MonoModID using some template arguments.
     MonoModID instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
+
+    # system info:
+    size_t count_all_mono_modules()
 
 # mast:
 cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
@@ -309,6 +314,10 @@ cdef:
     MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id):
         return instantiate_poly_mod(poly_mod_id, arg_list_id)
 
+    # mono module count:
+    size_t w_count_all_mono_modules():
+        return count_all_mono_modules()
+
 # interning:
 cdef:
     IntStr w_intern_string_1(cpp_string s, bint is_id_tid_not_vid):
@@ -323,3 +332,8 @@ cdef:
         print_poly_mod(poly_mod_id)
     void w_print_mono_mod(MonoModID mono_mod_id):
         print_mono_mod(mono_mod_id)
+
+# arg list:
+cdef:
+    ArgListID w_empty_arg_list_id():
+        return empty_arg_list_id()

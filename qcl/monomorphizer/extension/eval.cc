@@ -176,7 +176,7 @@ namespace monomorphizer::eval {
                 auto arg_array = info->actual_arg_array;
 
                 // constructing an ArgList by iterating in reverse order:
-                arg_list::ArgListID actual_arg_list = arg_list::EMPTY;
+                arg_list::ArgListID actual_arg_list = arg_list::EMPTY_ARG_LIST;
                 for (size_t i = 0; i < arg_count; i++) {
                     auto arg_index = arg_count - (i + 1);
                     auto arg_node_id = arg_array[arg_index];
@@ -391,6 +391,7 @@ namespace monomorphizer::eval {
                     "NotImplemented: p2m_exp for GetPolyModuleField"
                 );
             } break;
+
             case mast::EXP_GET_MONO_MODULE_FIELD:
             {
                 auto raw_info = mast::get_info_ptr(mast_exp_id);
@@ -626,7 +627,7 @@ namespace monomorphizer::eval {
                 auto elem_array = info->elem_ts_array;
 
                 // constructing an arg-list in reverse order:
-                auto made_arg_list = arg_list::EMPTY;
+                auto made_arg_list = arg_list::EMPTY_ARG_LIST;
                 for (size_t i = 0; i < elem_count; i++) {
                     auto elem_index = elem_count - (i + 1);
                     auto elem_ts = elem_array[elem_index];
@@ -720,13 +721,60 @@ namespace monomorphizer::eval {
     }
     static mval::ValueID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_call;
-        // todo: figure out how to evaluate function calls.
-        //  - we need some 'stack' behavior, so must restore any
-        //    store-clobbered GDefIDs when processing function return
-        //  - consider writing a function that allocates space for the
-        //    arguments, copies them, 
-        // todo: ensure evaluated functions are strictly TOT 
-        throw new Panic("NotImplemented: eval for EXP_FUNC_CALL");
+
+        // first, evaluating the argument and function in the outer stack frame:
+        mval::ValueID fun_vid = eval_mono_exp(exp_id, st);
+        mval::ValueID arg_vid = eval_mono_exp(exp_id, st);
+
+        // reaching inside the `fun` VID to retrieve the expression to evaluate, args to pass.
+        assert(mval::value_kind(fun_vid) == mval::ValueKind::VK_FUNCTION);
+        size_t func_info_index = mval::value_info(fun_vid).func_info_index;
+        mval::FuncInfo* func_info_p = mval::get_func_info(func_info_index);
+        auto fn_enclosed_id_count = func_info_p->ctx_enclosed_id_count;
+        auto fn_enclosed_id_array = func_info_p->ctx_enclosed_id_array;
+        auto fn_arg_name_array = func_info_p->arg_name_array;
+        auto fn_arg_name_count = func_info_p->arg_name_count;
+        auto fn_body_exp_id = func_info_p->body_exp_id;
+
+        // pushing a new frame to the stack, computing the return value:
+        stack::push_stack_frame(st);
+        mval::ValueID ret_val_id;
+        {
+            // setting up the stack frame with ctx_enclosed_ids
+            for (uint32_t i = 0; i < fn_enclosed_id_count; i++) {
+                auto enclosed_mapping = fn_enclosed_id_array[i];
+                if (intern::is_interned_string_tid_not_vid(enclosed_mapping.name)) {
+                    // target is an mtype::TID
+                    mtype::TID target = enclosed_mapping.target;
+                    stack::def_t_in_stack(st, enclosed_mapping.name, target);
+                } else {
+                    // target is an mval::ValueID
+                    mval::ValueID target = enclosed_mapping.target;
+                    stack::def_v_in_stack(st, enclosed_mapping.name, target);
+                }
+            }
+
+            // setting up the stack frame with arguments
+            if (fn_arg_name_count == 0) {
+                // no arguments need be bound
+            } else if (fn_arg_name_count == 1) {
+                stack::def_v_in_stack(st, fn_arg_name_array[0], arg_vid);
+            } else {
+                assert(mval::value_kind(arg_vid) == mval::ValueKind::VK_TUPLE);
+                auto arg_seq_info_index = mval::value_info(arg_vid).sequence_info_index;
+                for (uint32_t j = 0; j < fn_arg_name_count; j++) {
+                    intern::IntStr arg_name = fn_arg_name_array[j];
+                    mval::ValueID arg_bound = mval::get_seq_elem(arg_seq_info_index, j).value();
+                    stack::def_v_in_stack(st, arg_name, arg_bound);
+                }
+            }
+
+            // evaluating the return expression in this stack frame:
+            ret_val_id = eval_mono_exp(fn_body_exp_id, st);
+        }
+        stack::pop_stack_frame(st);
+
+        return ret_val_id;
     }
     static mval::ValueID eval_mono_unary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_unary;
@@ -1154,14 +1202,12 @@ namespace monomorphizer::eval {
 
 namespace monomorphizer::eval {
 
-    mtype::TID eval_type(mast::TypeSpecID ts_id) {
-        auto s = sub::create();
+    mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s) {
         auto res = eval_poly_ts(ts_id, s);
         sub::destroy(s);
         return res;
     }
-    mval::ValueID eval_exp(mast::ExpID exp_id) {
-        auto s = sub::create();
+    mval::ValueID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
         auto res = eval_poly_exp(exp_id, s);
         sub::destroy(s);
         return res;

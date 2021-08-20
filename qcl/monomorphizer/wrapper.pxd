@@ -114,8 +114,6 @@ cdef extern from "extension/id-gdef.hh" namespace "monomorphizer":
     ctypedef size_t GDefID
 
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
-    const GDefID NULL_GDEF_ID;
-
     ctypedef enum DefKind:
         BV_EXP,
         BV_TS,
@@ -289,6 +287,9 @@ cdef:
     # turn a PolyModID into a MonoModID using some template arguments.
     MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
 
+    # mono modules:
+    size_t w_count_all_mono_modules()
+
 #
 # Interning:
 #
@@ -299,9 +300,17 @@ cdef:
 
 
 #
-# printing:
+# Printing:
 #
 
 cdef:
     void w_print_poly_mod(PolyModID poly_mod_id)
     void w_print_mono_mod(MonoModID mono_mod_id)
+
+
+#
+# ArgListID:
+#
+
+cdef:
+    ArgListID w_empty_arg_list_id()

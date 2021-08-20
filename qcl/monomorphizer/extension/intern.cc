@@ -8,7 +8,7 @@
 
 namespace monomorphizer::intern {
 
-    extern IntStr NULL_INTSTR_ID = UNIVERSAL_NULL_ID;
+    IntStr NULL_INTSTR_ID = UNIVERSAL_NULL_ID;
 
     // intern map: string -> IntStr
     static std::map<std::string, IntStr> s_intern_map;

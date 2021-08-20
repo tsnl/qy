@@ -21,14 +21,14 @@ imports {
 --- sub vec[Scalar] ---
 
 Vector3 = Struct {
-    x: Scalar;
-    y: Scalar;
-    z: Scalar;
+    x ~ Scalar;
+    y ~ Scalar;
+    z ~ Scalar;
 };
 
 add = (v, w) -> {
-    v: Vector3;
-    w: Vector3;
+    v ~ Vector3;
+    w ~ Vector3;
 
     Vector3 (
         v.x + w.x,

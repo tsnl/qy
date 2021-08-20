@@ -18,10 +18,6 @@ class TyperCompilationError(CompilationError):
     pass
 
 
-class PtcCheckCompilationError(CompilationError):
-    pass
-
-
 class CheckerCompilationError(CompilationError):
     pass
 

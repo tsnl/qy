@@ -12,6 +12,7 @@
 namespace monomorphizer::mval {
 
     extern ValueID const NULL_VID;
+    extern size_t const MAX_VAL_HASH_BYTE_COUNT;
 
     enum ValueKind {
         VK_UNIT,
@@ -44,15 +45,10 @@ namespace monomorphizer::mval {
         size_t func_info_index;
     };
 
-}
-
-namespace monomorphizer::mval {
-
-    extern size_t const MAX_VAL_HASH_BYTE_COUNT;
-
     struct CtxEnclosedId {
         intern::IntStr name;
         size_t target;
+        // NOTE: `target` is either an mtype::TID or an mval::ValueID
 
         inline
         CtxEnclosedId()
@@ -66,6 +62,33 @@ namespace monomorphizer::mval {
             target(enclosed_target)
         {}
     };
+
+    struct FuncInfo {
+        uint32_t arg_name_count;
+        uint32_t ctx_enclosed_id_count;
+        intern::IntStr* arg_name_array;
+        CtxEnclosedId* ctx_enclosed_id_array;
+        mast::ExpID body_exp_id;
+
+        inline
+        FuncInfo(
+            uint32_t new_arg_name_count,
+            uint32_t new_ctx_enclosed_id_count,
+            intern::IntStr* mv_arg_name_array,
+            CtxEnclosedId* mv_ctx_enclosed_id_array,
+            mast::ExpID new_body_exp_id
+        )
+        :   arg_name_count(new_arg_name_count),
+            ctx_enclosed_id_count(new_ctx_enclosed_id_count),
+            arg_name_array(mv_arg_name_array),
+            ctx_enclosed_id_array(mv_ctx_enclosed_id_array),
+            body_exp_id(new_body_exp_id)
+        {}
+    };
+
+}
+
+namespace monomorphizer::mval {
 
     // value constructors:
     ValueID get_unit();
@@ -94,6 +117,7 @@ namespace monomorphizer::mval {
     ValueKind value_kind(ValueID value_id);
     ValueInfo value_info(ValueID value_id);
     std::optional<ValueID> get_seq_elem(size_t sequence_info_index, size_t index);
+    FuncInfo* get_func_info(size_t func_info_index);
 
     // equality:
     bool equals(ValueID v1, ValueID v2);

@@ -24,7 +24,7 @@ namespace monomorphizer::modules {
     // Monomorphic template construction:
     MonoModID new_monomorphic_module(
         char* mv_template_name,
-        PolyModID opt_parent_template_id
+        PolyModID parent_template_id
     );
     // add_field pushes a field and returns its unique index.
     size_t add_mono_module_field(
@@ -63,5 +63,8 @@ namespace monomorphizer::modules {
         PolyModID poly_mod_id,
         arg_list::ArgListID arg_list_id
     );
+
+    // system info:
+    size_t count_all_mono_modules();
 
 }
