@@ -30,6 +30,11 @@ T2 = m1[F64, U32]:A;
 T3 = m1[F64, U32]:E;
 
 // FIXME: get these working too:
+//  - references to original template arguments do not resolve globally
+//      - may have to add template fields as original fields in PolyMod
+//  - when multiple template args are present, order is reversed incorrectly
+//      - a 'double inversion' may occur somewhere
+
 // T4 = m1[F64, U32]:T;
 // T5 = m1[F64, U32]:U;
 // third = m3:f_negate(45f);
