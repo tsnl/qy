@@ -1,29 +1,27 @@
---- sub vec1[T, m] ---
+--- sub m0 ---
+
+x = 42;
+
+--- sub m1[T] ---
 
 A = T;
 B = I64;
 C = F32;
 D = F64;
 
-hello = 42 * m;
+--- sub m2 [n] ---
 
---- sub vec2 ---
-
-J = vec1[U64, 0]:A;
-k = vec1[U64, 0]:hello;
-m = k * vec1[U64, 0]:hello;
-n = f_negate(4f);
-
-f_negate ~ (F32) -> F32;
-f_negate = (x) -> (
-    -x
-);
+hello = 42 * n;
 
 --- sub entry_point_for_v1_default_loader ---
 
-first = 1 + 1;
+v1 = 1 + 1;
+// v2 = m2[+3]:hello;
+// v3 = m2[+4]:hello;
+
+// T1 = U32;
+T1 = m1[U32]:A;
 
 // FIXME: get these working too:
-// second = vec1[U32, first]:hello;
 // third = vec2:f_negate(45f);
 // main = () -> 0;

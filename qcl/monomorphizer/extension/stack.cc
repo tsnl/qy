@@ -39,8 +39,8 @@ namespace monomorphizer::stack {
     Stack* create_stack() {
         return new Stack();
     }
-    void destroy_stack(Stack* stack) {
-        delete stack;
+    void destroy_stack(Stack* st) {
+        delete st;
     }
 
     void push_stack_frame(Stack* stack) {

@@ -43,21 +43,21 @@ namespace monomorphizer::mtype {
     static TID s_f64_tid = 0;
     static TID s_str_tid = 0;
 
-    void ensure_init() {
+    void ensure_mtype_init() {
         if (!s_is_init) {
-            s_unit_tid = mint_tid(TypeKind::Unit);
-            s_u1_tid = mint_tid(TypeKind::U1);
-            s_u8_tid = mint_tid(TypeKind::U8);
-            s_u16_tid = mint_tid(TypeKind::U16);
-            s_u32_tid = mint_tid(TypeKind::U32);
-            s_u64_tid = mint_tid(TypeKind::U64);
-            s_s8_tid = mint_tid(TypeKind::S8);
-            s_s16_tid = mint_tid(TypeKind::S16);
-            s_s32_tid = mint_tid(TypeKind::S32);
-            s_s64_tid = mint_tid(TypeKind::S64);
-            s_f32_tid = mint_tid(TypeKind::F32);
-            s_f64_tid = mint_tid(TypeKind::F64);
-            s_str_tid = mint_tid(TypeKind::String);
+            s_unit_tid = mint_tid(TK_UNIT);
+            s_u1_tid = mint_tid(TK_U1);
+            s_u8_tid = mint_tid(TK_U8);
+            s_u16_tid = mint_tid(TK_U16);
+            s_u32_tid = mint_tid(TK_U32);
+            s_u64_tid = mint_tid(TK_U64);
+            s_s8_tid = mint_tid(TK_S8);
+            s_s16_tid = mint_tid(TK_S16);
+            s_s32_tid = mint_tid(TK_S32);
+            s_s64_tid = mint_tid(TK_S64);
+            s_f32_tid = mint_tid(TK_F32);
+            s_f64_tid = mint_tid(TK_F64);
+            s_str_tid = mint_tid(TK_STRING);
             s_is_init = true;
         }
     }
@@ -108,7 +108,7 @@ namespace monomorphizer::mtype {
         if (it != s_tuple_tid_cache.end()) {
             return it->second;
         } else {
-            auto id = mint_tid(TypeKind::Tuple);
+            auto id = mint_tid(TK_TUPLE);
             s_tuple_tid_cache.insert({arg_list_id, id});
             return id;
         }
@@ -120,7 +120,7 @@ namespace monomorphizer::mtype {
         if (it != s_ptr_tid_cache.end()) {
             return it->second;
         } else {
-            auto id = mint_tid(TypeKind::Pointer);
+            auto id = mint_tid(TK_POINTER);
             s_ptr_tid_cache.insert({key, id});
             return id;
         }
@@ -136,7 +136,7 @@ namespace monomorphizer::mtype {
         if (it != s_array_tid_cache.end()) {
             return it->second;
         } else {
-            auto id = mint_tid(TypeKind::Array);
+            auto id = mint_tid(TK_ARRAY);
             s_array_tid_cache.insert({key, id});
             return id;
         }
@@ -148,7 +148,7 @@ namespace monomorphizer::mtype {
         if (it != s_slice_tid_cache.end()) {
             return it->second;
         } else {
-            auto id = mint_tid(TypeKind::Slice);
+            auto id = mint_tid(TK_SLICE);
             s_slice_tid_cache.insert({key, id});
             return id;
         }
@@ -160,9 +160,18 @@ namespace monomorphizer::mtype {
         if (it != s_func_tid_cache.end()) {
             return it->second;
         } else {
-            auto id = mint_tid(TypeKind::Function);
+            auto id = mint_tid(TK_FUNCTION);
             s_func_tid_cache.insert({key, id});
             return id;
+        }
+    }
+
+    TypeKind kind_of_tid(TID tid) {
+        if (tid != UNIVERSAL_NULL_ID) {
+            return s_kind_table[tid];
+        } else {
+            // error
+            return TK_UNIT;
         }
     }
 

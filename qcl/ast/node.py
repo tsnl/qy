@@ -379,6 +379,8 @@ class SubModExp(BaseModExp):
         self.template_def_list_from_typer = None
         self.bind1v_def_obj_list_from_typer = None
         self.bind1t_def_obj_list_from_typer = None
+        self.mast_bind1v_field_index_mapping_from_monomorphizer = None
+        self.mast_bind1t_field_index_mapping_from_monomorphizer = None
 
 
 class ChainExp(BaseExp):

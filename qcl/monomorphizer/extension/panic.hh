@@ -1,6 +1,7 @@
 #pragma once
 
 #include <exception>
+#include <iostream>
 #include <string>
 
 namespace monomorphizer {
@@ -14,6 +15,9 @@ namespace monomorphizer {
 
     inline Panic::Panic(std::string msg)
     :   m_msg(std::move(msg))
-    {}
+    {
+        std::cout << "MONOMORPHIZER_PANIC: " << m_msg << std::endl;
+        std::cout.flush();
+    }
 
 }

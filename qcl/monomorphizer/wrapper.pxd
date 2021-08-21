@@ -106,6 +106,8 @@ cdef extern from "extension/id-arg-list.hh" namespace "monomorphizer::arg_list":
 cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
     ctypedef size_t ValueID
 
+    void ensure_mval_init()
+
 #
 # Defs:
 #
@@ -151,12 +153,11 @@ cdef extern from "extension/id-mast.hh" namespace "monomorphizer::mast":
 
 
 #
-# TID
+# MType/TID
 #
 
-cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
+cdef extern from "extension/id-mtype.hh" namespace "monomorphizer::mtype":
     ctypedef size_t TID
-
 
 #
 #
@@ -314,3 +315,28 @@ cdef:
 
 cdef:
     ArgListID w_empty_arg_list_id()
+
+
+#
+# MType:
+#
+
+cdef:
+    TID w_get_unit_tid();
+    TID w_get_u1_tid();
+    TID w_get_u8_tid();
+    TID w_get_u16_tid();
+    TID w_get_u32_tid();
+    TID w_get_u64_tid();
+    TID w_get_s8_tid();
+    TID w_get_s16_tid();
+    TID w_get_s32_tid();
+    TID w_get_s64_tid();
+    TID w_get_f32_tid();
+    TID w_get_f64_tid();
+    TID w_get_string_tid();
+    TID w_get_tuple_tid(ArgListID arg_list_id);
+    TID w_get_ptr_tid(TID ptd_tid, bint contents_is_mut);
+    TID w_get_array_tid(TID ptd_tid, ValueID count_val_id, bint contents_is_mut);
+    TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
+    TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);

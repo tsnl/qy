@@ -9,7 +9,7 @@
 
 namespace monomorphizer::mtype {
 
-    void ensure_init();
+    void ensure_mtype_init();
 
     // TODO: create a `MType` module that...
     //  - is pretty much identical to the python `type` module
@@ -20,17 +20,18 @@ namespace monomorphizer::mtype {
     // In other words,
     //  id1 == id2 <=> type(id1) == type(id2)
 
-    enum class TypeKind {
-        Unit,
-        U1, U8, U16, U32, U64,
-        S8, S16, S32, S64,
-        F32, F64,
-        String,
-        Tuple,
-        Pointer,
-        Array,
-        Slice,
-        Function
+    enum TypeKind {
+        TK_ERROR = 0,
+        TK_UNIT,
+        TK_U1, TK_U8, TK_U16, TK_U32, TK_U64,
+        TK_S8, TK_S16, TK_S32, TK_S64,
+        TK_F32, TK_F64,
+        TK_STRING,
+        TK_TUPLE,
+        TK_POINTER,
+        TK_ARRAY,
+        TK_SLICE,
+        TK_FUNCTION
     };
 
     TID get_unit_tid();

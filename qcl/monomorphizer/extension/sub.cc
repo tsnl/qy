@@ -1,6 +1,7 @@
 #include "sub.hh"
 
 #include <map>
+#include <iostream>
 
 #include "gdef.hh"
 #include "debug.hh"
@@ -21,14 +22,15 @@ namespace monomorphizer::sub {
             GDefID original_def_id,
             GDefID replacement_def_id
         );
-        GDefID rw_def_id(
-            GDefID def_id
-        );
+        GDefID rw_def_id(GDefID def_id);
       private:
         static bool validate_monomorphizing_replacement(
             GDefID original_def_id,
             GDefID replacement_def_id
         );
+
+      public:
+        void debug_print();
     };
 
     Substitution::Substitution()
@@ -48,7 +50,15 @@ namespace monomorphizer::sub {
         assert(validate_ok && "Invalid monomorphizing replacement");
 #endif
         auto old_pair = m_subs.insert({original_def_id, replacement_def_id});
-        assert(old_pair.first == m_subs.end());
+        assert(old_pair.second && "Insertion into sub-map failed");
+
+#if (MONOMORPHIZER_DEBUG)
+        std::cout 
+            << "added monomorphizing replacement: " 
+            << original_def_id << " -> " << replacement_def_id 
+            << std::endl;
+        std::cout.flush();
+#endif
     }
 
     bool Substitution::validate_monomorphizing_replacement(
@@ -123,6 +133,17 @@ namespace monomorphizer::sub {
 
     GDefID rw_def_id(Substitution* sub, GDefID def_id) {
         return sub->rw_def_id(def_id);
+    }
+
+    void debug_print(sub::Substitution* s) {
+        s->debug_print();
+    }
+
+    void Substitution::debug_print() {
+        std::cout << "Sub (" << m_subs.size() << "):" << std::endl;
+        for (auto it = m_subs.begin(); it != m_subs.end(); it++) {
+            std::cout << "- " << it->first << " -> " << it->second << std::endl;
+        }
     }
 
 }

@@ -48,6 +48,10 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
     # Running phase 2:
     define_declared_def_ids_in_proj(proj)
 
+    print()
+    print_all_poly_mods("POST-P2", proj)
+    print()
+
     # Running phase 3:
     instantiate_entry_point(proj)
 
@@ -116,31 +120,45 @@ cdef wrapper.GDefID get_def_id_from_def_rec(object found_def_rec: typer.definiti
 
 
 cdef void forward_declare_proj(object proj: frontend.project.Project):
-    # declaring each global builtin:
-    builtin_def_name_list = [
-        "U1", "U8", "U16", "U32", "U64",
-        "I8", "I16", "I32", "I64",
-        "F32", "F64",
-        "Str"
-    ]
-    for builtin_def_name in builtin_def_name_list:
+    # defining each global builtin:
+    builtin_def_name_list = {
+        "U1": wrapper.w_get_u1_tid(), 
+        "U8": wrapper.w_get_u8_tid(), 
+        "U16": wrapper.w_get_u16_tid(), 
+        "U32": wrapper.w_get_u32_tid(), 
+        "U64": wrapper.w_get_u64_tid(),
+
+        "I8": wrapper.w_get_s8_tid(), 
+        "I16": wrapper.w_get_s16_tid(), 
+        "I32": wrapper.w_get_s32_tid(), 
+        "I64": wrapper.w_get_s64_tid(),
+        "F32": wrapper.w_get_f32_tid(), 
+        "F64": wrapper.w_get_f64_tid(),
+
+        "Str": wrapper.w_get_string_tid()
+    }
+    for builtin_def_name, builtin_def_target in builtin_def_name_list.items():
         def_rec = proj.final_root_ctx.lookup(builtin_def_name)
         if def_rec is None:
             print(f"ERROR: builtin named '{builtin_def_name}' not found")
             return
 
+        # declaring:
         if isinstance(def_rec, typer.definition.TypeRecord):
             def_id = wrapper.w_declare_global_def(
-                wrapper.CONST_TS,
+                wrapper.CONST_TOT_TID,
                 mk_c_str_from_py_str(builtin_def_name)
             )
         elif isinstance(def_rec, typer.definition.ValueRecord):
             def_id = wrapper.w_declare_global_def(
-                wrapper.CONST_EXP,
+                wrapper.CONST_TOT_VAL,
                 mk_c_str_from_py_str(builtin_def_name)
             )
         else:
             raise NotImplementedError(f"Unknown def_rec type: {def_rec.__class__.__name__}")
+
+        # defining:
+        wrapper.w_set_def_target(def_id, builtin_def_target)
 
         # mapping:
         def_to_gdef_map[def_rec] = def_id
@@ -193,7 +211,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
 
     # declaring fields for this module given bind1v and bind1t lists
     # (in this order)
-    mast_bind1v_field_index_mapping = [
+    sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer = [
         wrapper.w_add_poly_module_field(
             new_poly_mod_id,
             wrapper.w_declare_global_def(wrapper.CONST_EXP, mk_c_str_from_py_str(bind1v_def_obj.name))
@@ -203,7 +221,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
             sub_mod_exp.bind1v_def_obj_list_from_typer
         )
     ]
-    mast_bind1t_field_index_mapping = [
+    sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer = [
         wrapper.w_add_poly_module_field(
             new_poly_mod_id,
             wrapper.w_declare_global_def(wrapper.CONST_TS, mk_c_str_from_py_str(bind1t_def_obj.name))
@@ -224,13 +242,13 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     #   - this pass is tantamount to forward declaration
     for v_def_rec, mod_field_index in zip(
             sub_mod_exp.bind1v_def_obj_list_from_typer,
-            mast_bind1v_field_index_mapping
+            sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer
     ):
         def_to_gdef_map[v_def_rec] = wrapper.w_get_poly_mod_field_at(new_poly_mod_id, mod_field_index)
 
     for t_def_rec, mod_field_index in zip(
         sub_mod_exp.bind1t_def_obj_list_from_typer,
-        mast_bind1t_field_index_mapping
+        sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer
     ):
         def_to_gdef_map[t_def_rec] = wrapper.w_get_poly_mod_field_at(new_poly_mod_id, mod_field_index)
 
@@ -283,8 +301,42 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
 
     # IdTypeSpecInModule
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
-        def_id = get_def_id_from_def_rec(ts.data.found_def_rec)
-        return wrapper.w_new_gid_ts(def_id)
+        assert len(ts.data.elem_args) == 0
+        assert ts.data.opt_container is not None
+
+        found_sub_mod_exp = ts.data.opt_container.found_def_rec.mod_exp
+        assert isinstance(found_sub_mod_exp, ast.node.SubModExp)
+
+        poly_mod_id = poly_mod_id_map[found_sub_mod_exp]
+
+        original_bind1t_index = None
+        for i, d in enumerate(found_sub_mod_exp.bind1t_def_obj_list_from_typer):
+            if d.name == ts.data.elem_name:
+                original_bind1t_index = i
+                break
+        else:
+            raise excepts.CompilerError("Could not find def object for field, though typing ok.")
+
+        mast_field_index_map = found_sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer
+        ts_field_ix = <size_t> mast_field_index_map[original_bind1t_index]
+
+        actual_arg_count = len(ts.data.opt_container.elem_args)
+        actual_arg_array = <wrapper.NodeID*> malloc(actual_arg_count * sizeof(wrapper.NodeID))
+        for arg_index, arg_node in enumerate(ts.data.opt_container.elem_args):
+            if isinstance(arg_node, ast.node.BaseExp):
+                target = ast_to_mast_exp(arg_node)
+            else:
+                assert isinstance(arg_node, ast.node.BaseTypeSpec)
+                target = ast_to_mast_ts(arg_node)
+
+            actual_arg_array[arg_index] = target
+
+        return wrapper.w_new_get_poly_module_field_ts(
+            poly_mod_id,
+            ts_field_ix,
+            actual_arg_count,
+            actual_arg_array
+        )
 
     # TupleTypeSpec
     elif isinstance(ts, ast.node.TupleTypeSpec):
@@ -411,8 +463,42 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             return wrapper.w_new_gid_exp(def_id)
 
     elif isinstance(e, ast.node.IdExpInModule):
-        gdef_id = def_to_gdef_map[e.data.found_def_rec]
-        return wrapper.w_new_gid_exp(gdef_id)
+        assert len(e.data.elem_args) == 0
+        assert e.data.opt_container is not None
+
+        found_sub_mod_exp = e.data.opt_container.found_def_rec.mod_exp
+        assert isinstance(found_sub_mod_exp, ast.node.SubModExp)
+
+        poly_mod_id = poly_mod_id_map[found_sub_mod_exp]
+
+        original_bind1v_index = None
+        for i, d in enumerate(found_sub_mod_exp.bind1v_def_obj_list_from_typer):
+            if d.name == e.data.elem_name:
+                original_bind1v_index = i
+                break
+        else:
+            raise excepts.CompilerError("Could not find def object for field, though typing ok.")
+
+        mast_field_index_map = found_sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer
+        exp_field_ix = <size_t> mast_field_index_map[original_bind1v_index]
+
+        actual_arg_count = len(e.data.opt_container.elem_args)
+        actual_arg_array = <wrapper.NodeID*> malloc(actual_arg_count * sizeof(wrapper.NodeID))
+        for arg_index, arg_node in enumerate(e.data.opt_container.elem_args):
+            if isinstance(arg_node, ast.node.BaseExp):
+                target = ast_to_mast_exp(arg_node)
+            else:
+                assert isinstance(arg_node, ast.node.BaseTypeSpec)
+                target = ast_to_mast_ts(arg_node)
+
+            actual_arg_array[arg_index] = target
+
+        return wrapper.w_new_get_poly_module_field_exp(
+            poly_mod_id,
+            exp_field_ix,
+            actual_arg_count,
+            actual_arg_array
+        )
 
     elif isinstance(e, ast.node.PostfixVCallExp):
         called_exp_id = ast_to_mast_exp(e.called_exp)

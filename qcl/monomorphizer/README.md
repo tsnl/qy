@@ -36,6 +36,10 @@ then dynamically linked against each wrapper.
 This ensures that only one copy of the extension is resident in memory at once,
 and prevents odd behavior when global variables are cloned.
 
+NOTE: since this library is statically linked with the wrapper, symbols in C++
+will only update in Python-land when Cython detects the linked Python extension module,
+`wrapper.pyx`, has changed.
+
 ## Usage
 
 - create `template` instances for each sub-module

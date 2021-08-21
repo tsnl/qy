@@ -18,11 +18,12 @@ cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
 cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
     ArgListID empty_arg_list_id()
 
+
 # defs:
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
     # init/drop:
     void ensure_defs_init();
-    void drop_defs();
+    void drop_defs(); 
 
     # declaration:
     GDefID declare_global_def(DefKind kind, char* mv_bound_name)
@@ -91,7 +92,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         size_t actual_arg_count,
         NodeID* actual_arg_array
     );
-
+    
     # Expressions:
     ExpID get_unit_exp();
     ExpID new_int_exp(size_t mantissa, IntegerSuffix typing_suffix, bint is_neg);
@@ -143,6 +144,30 @@ cdef extern from "extension/printing.hh" namespace "monomorphizer::printing":
     void print_poly_mod(PolyModID poly_mod_id)
     void print_mono_mod(MonoModID mono_mod_id)
 
+# mtype:
+cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
+    void ensure_mtype_init()
+
+    TID get_unit_tid();
+    TID get_u1_tid();
+    TID get_u8_tid();
+    TID get_u16_tid();
+    TID get_u32_tid();
+    TID get_u64_tid();
+    TID get_s8_tid();
+    TID get_s16_tid();
+    TID get_s32_tid();
+    TID get_s64_tid();
+    TID get_f32_tid();
+    TID get_f64_tid();
+    TID get_string_tid();
+    TID get_tuple_tid(ArgListID arg_list_id);
+    TID get_ptr_tid(TID ptd_tid, bint contents_is_mut);
+    TID get_array_tid(TID ptd_tid, ValueID count_val_id, bint contents_is_mut);
+    TID get_slice_tid(TID ptd_tid, bint contents_is_mut);
+    TID get_function_tid(TID arg_tid, TID ret_tid, SES ses);
+
+
 
 #
 #
@@ -155,11 +180,11 @@ cdef:
     void w_ensure_init():
         ensure_mast_init()
         ensure_defs_init()
+        ensure_mtype_init()
 
     void w_drop():
         drop_mast()
         drop_defs()
-
 
 # mast: expressions:
 cdef:
@@ -224,6 +249,7 @@ cdef:
             arg_count, arg_array
         )
 
+
 # mast: type-specs:
 cdef:
     TypeSpecID w_get_unit_ts():
@@ -261,6 +287,7 @@ cdef:
 cdef:
     ElemID w_new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id):
         return new_bind1v_elem(bound_def_id, init_exp_id)
+        
     ElemID w_new_do_elem(ExpID eval_exp_id):
         return new_do_elem(eval_exp_id)
 
@@ -337,3 +364,43 @@ cdef:
 cdef:
     ArgListID w_empty_arg_list_id():
         return empty_arg_list_id()
+
+
+# MType:
+cdef:
+    TID w_get_unit_tid():
+        return get_unit_tid()
+    TID w_get_u1_tid():
+        return get_u1_tid()
+    TID w_get_u8_tid():
+        return get_u8_tid()
+    TID w_get_u16_tid():
+        return get_u16_tid()
+    TID w_get_u32_tid():
+        return get_u32_tid()
+    TID w_get_u64_tid():
+        return get_u64_tid()
+    TID w_get_s8_tid():
+        return get_s8_tid()
+    TID w_get_s16_tid():
+        return get_s16_tid()
+    TID w_get_s32_tid():
+        return get_s32_tid()
+    TID w_get_s64_tid():
+        return get_s64_tid()
+    TID w_get_f32_tid():
+        return get_f32_tid()
+    TID w_get_f64_tid():
+        return get_f64_tid()
+    TID w_get_string_tid():
+        return get_string_tid()
+    TID w_get_tuple_tid(ArgListID arg_list_id):
+        return get_tuple_tid(arg_list_id)
+    TID w_get_ptr_tid(TID ptd_tid, bint contents_is_mut):
+        return get_ptr_tid(ptd_tid, contents_is_mut)
+    TID w_get_array_tid(TID ptd_tid, ValueID count_val_id, bint contents_is_mut):
+        return get_array_tid(ptd_tid, count_val_id, contents_is_mut)
+    TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut):
+        return get_slice_tid(ptd_tid, contents_is_mut)
+    TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses):
+        return get_function_tid(arg_tid, ret_tid, ses)

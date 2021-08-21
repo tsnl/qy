@@ -15,6 +15,7 @@ namespace monomorphizer::mval {
     extern size_t const MAX_VAL_HASH_BYTE_COUNT;
 
     enum ValueKind {
+        VK_ERROR = 0,
         VK_UNIT,
         VK_U1, VK_U8, VK_U16, VK_U32, VK_U64,
         VK_S8, VK_S16, VK_S32, VK_S64,

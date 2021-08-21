@@ -27,4 +27,6 @@ namespace monomorphizer::sub {
         GDefID def_id
     );
 
+    void debug_print(Substitution* s);
+
 }
