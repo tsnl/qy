@@ -3,6 +3,7 @@
 #include <vector>
 #include <deque>
 #include <cstddef>
+#include <iostream>
 
 #include "mval.hh"
 
@@ -208,6 +209,20 @@ namespace monomorphizer::arg_list {
 
     ArgListID empty_arg_list_id() {
         return EMPTY_ARG_LIST;
+    }
+
+    static void print_arg_list_helper(ArgListID arg_list_id) {
+        if (arg_list_id != EMPTY_ARG_LIST) {
+            print_arg_list_helper(tail(arg_list_id));
+            std::cout << " " << head(arg_list_id);
+        } else {
+            std::cout << "<END_OF_ARG_LIST>";
+        }
+    }
+    void print_arg_list(ArgListID arg_list_id) {
+        std::cout << "ARG LIST: ";
+        print_arg_list_helper(arg_list_id);
+        std::cout << std::endl;
     }
 
 }

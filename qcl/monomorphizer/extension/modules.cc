@@ -176,6 +176,7 @@ namespace monomorphizer::modules {
 
         // debug:
         std::cout << "DEBUG: instantiating poly-mod " << poly_mod_id << " with args " << arg_list_id << std::endl;
+        arg_list::print_arg_list(arg_list_id);
 
         // checking if we have instantiated this module with these args before:
         // NOTE: `info` is a `const` reference if only cache read:
@@ -275,6 +276,7 @@ namespace monomorphizer::modules {
                             mono_field_def_id
                         );
                     }
+                    assert(remaining_arg_list_id == arg_list::EMPTY_ARG_LIST);
                 }
             }
 

@@ -41,7 +41,7 @@ namespace monomorphizer::eval {
 
 namespace monomorphizer::eval {
 
-    static arg_list::ArgListID arg_list_from_array(
+    static arg_list::ArgListID arg_list_from_node_array(
         size_t arg_count,
         mast::NodeID* arg_array,
         sub::Substitution* s,
@@ -56,11 +56,13 @@ namespace monomorphizer::eval {
             if (elem_is_exp) {
                 auto elem_exp_id = arg_node_id;
                 auto elem_exp_val = eval_poly_exp_impl(elem_exp_id, s, st);
+                std::cout << "INFO: arg_list_from_node_array: Inserting VID in list: " << elem_exp_val << std::endl;
                 actual_arg_list = arg_list::cons_val(actual_arg_list, elem_exp_val);
             } else {
                 auto elem_ts_id = arg_node_id;
                 auto elem_ts_tid = eval_poly_ts_impl(elem_ts_id, s, st);
-                actual_arg_list = arg_list::cons_tid(actual_arg_list, elem_ts_id);
+                std::cout << "INFO: arg_list_from_node_array: Inserting TID in list: " << elem_ts_tid << std::endl;
+                actual_arg_list = arg_list::cons_tid(actual_arg_list, elem_ts_tid);
             }
         }
         return actual_arg_list;
@@ -77,31 +79,33 @@ namespace monomorphizer::eval {
         auto ts_kind = mast::get_node_kind(mast_ts_id);
         switch (ts_kind) {
             case mast::TS_UNIT: 
-            case mast::TS_LID: {
+            case mast::TS_LID: 
+            {
                 return mast_ts_id;
             }
-            case mast::TS_GID: {
-                // IDs accessed from within a monomorphic module are always
-                // monomorphic.
-                // However, this substitution may require us to rewrite this ID
-                // with another.
+            case mast::TS_GID: 
+            {
+                // This substitution may require us to rewrite this ID with another.
                 auto info = mast::get_info_ptr(mast_ts_id)->ts_gid;
                 GDefID old_def_id = info.def_id;
                 gdef::DefKind old_def_kind = gdef::get_def_kind(old_def_id);
                 switch (old_def_kind) {
                     case gdef::DefKind::CONST_TOT_TID:
                     {
-                        // no substitution/copying needed
+                        // no substitution/copying possible: substitutions only replace BV_? or expressions/typespecs,
+                        // neither of which is stored here.
+                        // Hence, this operation is identity.
                         return mast_ts_id;
                     }
                     case gdef::DefKind::CONST_TS:
                     {
                         // must apply this substitution to the stored ID
-                        auto old_target = gdef::get_def_target(old_def_id);
-                        auto new_target = p2m_ts(old_target, s, st);
+                        mast::TypeSpecID old_target = gdef::get_def_target(old_def_id);
+                        mast::TypeSpecID new_target = p2m_ts(old_target, s, st);
                         if (new_target != old_target) {
                             char* cp_name = strdup(gdef::get_def_name(old_def_id));
-                            GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_EXP, cp_name);
+                            GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_TS, cp_name);
+                            gdef::set_def_target(new_def_id, new_target);
                             return mast::new_gid_ts(new_def_id);
                         } else {
                             return mast_ts_id;
@@ -221,7 +225,7 @@ namespace monomorphizer::eval {
                 auto arg_array = info->actual_arg_array;
 
                 // constructing an ArgList by iterating in reverse order:
-                arg_list::ArgListID actual_arg_list = arg_list_from_array(
+                arg_list::ArgListID actual_arg_list = arg_list_from_node_array(
                     arg_count,
                     arg_array,
                     s,
@@ -277,6 +281,7 @@ namespace monomorphizer::eval {
                         if (new_target != old_target) {
                             char* cp_name = strdup(gdef::get_def_name(old_def_id));
                             GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_EXP, cp_name);
+                            gdef::set_def_target(new_def_id, new_target);
                             return mast::new_gid_exp(new_def_id);
                         } else {
                             return mast_exp_id;
@@ -289,6 +294,11 @@ namespace monomorphizer::eval {
                         if (new_def_id == old_def_id) {
                             return mast_exp_id;
                         } else {
+                            std::cout 
+                                << "INFO: Rewrite in BV_EXP: " 
+                                << "replacing " << old_def_id << " with " << new_def_id << " such that "
+                                << "new target is " << gdef::get_def_target(new_def_id)
+                                << std::endl;
                             return mast::new_gid_exp(new_def_id);
                         }
                     }
@@ -430,7 +440,7 @@ namespace monomorphizer::eval {
                 auto arg_array = info->arg_array;
 
                 // constructing an ArgList by iterating in reverse order:
-                arg_list::ArgListID actual_arg_list = arg_list_from_array(
+                arg_list::ArgListID actual_arg_list = arg_list_from_node_array(
                     arg_count,
                     arg_array,
                     s, st
@@ -1256,12 +1266,10 @@ namespace monomorphizer::eval {
 namespace monomorphizer::eval {
 
     mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s) {
-        auto res = eval_poly_ts(ts_id, s);
-        return res;
+        return eval_poly_ts(ts_id, s);
     }
     mval::ValueID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
-        auto res = eval_poly_exp(exp_id, s);
-        return res;
+        return eval_poly_exp(exp_id, s);
     }
 
 }

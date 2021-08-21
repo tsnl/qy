@@ -345,6 +345,7 @@ cdef:
     size_t w_count_all_mono_modules():
         return count_all_mono_modules()
 
+
 # interning:
 cdef:
     IntStr w_intern_string_1(cpp_string s, bint is_id_tid_not_vid):

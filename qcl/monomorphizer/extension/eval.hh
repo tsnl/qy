@@ -18,7 +18,7 @@
 //      - HENCE: 
 //
 //
-//      TODO: write 2 (families of) functions: 
+//      DONE: write 2 (families of) functions: 
 //          (1) monomorphize_it: returns monomorphic version of TS/Exp
 //          (2) evaluate_it: 
 //                  - returns mval::ValueID or mtype::TID
