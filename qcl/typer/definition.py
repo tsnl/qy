@@ -18,7 +18,8 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
             new_scheme: "scheme.Scheme",
             universe: "Universe",
             opt_func: t.Optional["ast.node.LambdaExp"],
-            is_bound_globally_visible: bool
+            is_bound_globally_visible: bool,
+            def_is_bound_var: bool
     ):
         assert isinstance(new_scheme, scheme.Scheme)
         super().__init__()
@@ -30,6 +31,7 @@ class BaseRecord(object, metaclass=abc.ABCMeta):
         self.opt_container_func: t.Optional["ast.node.LambdaExp"] = opt_func
         self.opt_container_submodule: t.Optional["ast.node.SubModExp"] = None
         self.is_bound_globally_visible = is_bound_globally_visible
+        self.is_bound_var_def_obj = def_is_bound_var
 
     def init_def_context(self, def_context):
         # storing the container sub-module:
@@ -47,14 +49,16 @@ class ValueRecord(BaseRecord):
             loc: feedback.ILoc,
             value_tid: type.identity.TID,
             opt_func,
-            is_bound_globally_visible: bool
+            is_bound_globally_visible: bool,
+            def_is_bound_var: bool
     ):
         super().__init__(
             project,
             name, loc,
             scheme.Scheme(value_tid), Universe.Value,
             opt_func,
-            is_bound_globally_visible=is_bound_globally_visible
+            is_bound_globally_visible=is_bound_globally_visible,
+            def_is_bound_var=def_is_bound_var
         )
 
         self.val_def_id = self.project.allocate_val_def_id(self)
@@ -66,7 +70,8 @@ class TypeRecord(BaseRecord):
             project: "frontend.Project",
             name: str, loc: feedback.ILoc, type_tid: type.identity.TID,
             opt_func,
-            is_bound_globally_visible
+            is_bound_globally_visible,
+            def_is_bound_var
     ):
         super().__init__(
             project,
@@ -74,7 +79,8 @@ class TypeRecord(BaseRecord):
             scheme.Scheme(type_tid),
             Universe.Type,
             opt_func=opt_func,
-            is_bound_globally_visible=is_bound_globally_visible
+            is_bound_globally_visible=is_bound_globally_visible,
+            def_is_bound_var=def_is_bound_var
         )
 
 
@@ -83,14 +89,15 @@ class ModRecord(BaseRecord):
             self,
             project: "frontend.Project",
             name: str, loc: feedback.ILoc,
-            mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp",
+            mod_scheme: scheme.Scheme, mod_exp: "ast.node.BaseModExp"
     ):
         super().__init__(
             project,
             name, loc,
             mod_scheme, Universe.Module,
             opt_func=None,
-            is_bound_globally_visible=True  # all modules are globally visible
+            is_bound_globally_visible=True,     # all modules are globally visible
+            def_is_bound_var=False              # no module can be used as a template arg
         )
         self.mod_exp = mod_exp
 

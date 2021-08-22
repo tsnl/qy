@@ -175,7 +175,7 @@ namespace monomorphizer::modules {
         char const* mod_name = base->name; 
 
         // debug:
-        std::cout << "DEBUG: instantiating poly-mod " << poly_mod_id << " with args " << arg_list_id << std::endl;
+        // std::cout << "DEBUG: instantiating poly-mod " << poly_mod_id << " with args " << arg_list_id << std::endl;
         arg_list::print_arg_list(arg_list_id);
 
         // checking if we have instantiated this module with these args before:
@@ -206,78 +206,75 @@ namespace monomorphizer::modules {
             
             // adding fields for (1) poly mod fields and (2) formal args
             //  - NOTE: must add poly mod fields first so indices can be blindly copied
-            {
-                // This segment is the first key to monomorphization:
-                // it defines a new CONST with a total value/type that be used as a 
-                // replacement during sub&copy.
-                // WHY TOTAL? If we pass an AST node that uses a subbed ID, we have 
-                // problems. Furthermore, AST node would need to be re-evaluated.
-                // Instead, storing computed value helps us cache.
-                // We can't use this everywhere because non-total constants may be bound,
-                // e.g. a = b where b is a parameter.
+            
+            // This segment is the first key to monomorphization:
+            // it defines a new CONST with a total value/type that be used as a 
+            // replacement during sub&copy.
+            // WHY TOTAL? If we pass an AST node that uses a subbed ID, we have 
+            // problems. Furthermore, AST node would need to be re-evaluated.
+            // Instead, storing computed value helps us cache.
+            // We can't use this everywhere because non-total constants may be bound,
+            // e.g. a = b where b is a parameter.
 
-                // FIRST, adding poly mod fields:
-                for (GDefID poly_field_def_id: base->fields) {
-                    auto poly_field_def_kind = gdef::get_def_kind(poly_field_def_id);
-                    bool is_poly_field_def_tid_not_vid = (poly_field_def_kind == gdef::DefKind::CONST_TS);
-                    if (!is_poly_field_def_tid_not_vid) {
-                        assert(poly_field_def_kind == gdef::DefKind::CONST_EXP);
-                    }
-                    char* cp_bound_name = strdup(gdef::get_def_name(poly_field_def_id));
-
-                    gdef::DefKind mono_field_def_kind = (
-                        (is_poly_field_def_tid_not_vid) ?
-                        gdef::DefKind::CONST_TOT_TID :
-                        gdef::DefKind::CONST_TOT_VAL
-                    );
-                    GDefID mono_field_def_id = gdef::declare_global_def(mono_field_def_kind, cp_bound_name);
-                    modules::add_mono_module_field(mono_mod_id, mono_field_def_id);
+            // FIRST, adding poly mod fields:
+            for (GDefID poly_field_def_id: base->fields) {
+                auto poly_field_def_kind = gdef::get_def_kind(poly_field_def_id);
+                bool is_poly_field_def_tid_not_vid = (poly_field_def_kind == gdef::DefKind::CONST_TS);
+                if (!is_poly_field_def_tid_not_vid) {
+                    assert(poly_field_def_kind == gdef::DefKind::CONST_EXP);
                 }
+                char* cp_bound_name = strdup(gdef::get_def_name(poly_field_def_id));
 
-                // SECOND, adding template arg fields, that just map to constants once monomorphized:
-                // FIXME: these are separate definitions than used in the substitution.
-                // Simultaneously updating 'sub' object:
-                if (info->bv_count) {
-                    replacement_gdef_array = static_cast<GDefID*>(malloc(sizeof(GDefID) * info->bv_count));
-                    arg_list::ArgListID remaining_arg_list_id = arg_list_id;
-                    for (size_t i = 0; i < info->bv_count; i++) {
-                        size_t poly_formal_arg_index = info->bv_count - (i+1);
-                        GDefID poly_formal_bv_def_id = info->bv_def_id_array[poly_formal_arg_index];
+                gdef::DefKind mono_field_def_kind = (
+                    (is_poly_field_def_tid_not_vid) ?
+                    gdef::DefKind::CONST_TOT_TID :
+                    gdef::DefKind::CONST_TOT_VAL
+                );
+                GDefID mono_field_def_id = gdef::declare_global_def(mono_field_def_kind, cp_bound_name);
+                modules::add_mono_module_field(mono_mod_id, mono_field_def_id);
+            }
 
-                        char* cp_bound_name = strdup(gdef::get_def_name(poly_formal_bv_def_id));
+            // SECOND, generating a 'sub' object:
+            if (info->bv_count) {
+                replacement_gdef_array = static_cast<GDefID*>(malloc(sizeof(GDefID) * info->bv_count));
+                arg_list::ArgListID remaining_arg_list_id = arg_list_id;
+                for (size_t i = 0; i < info->bv_count; i++) {
+                    size_t const poly_formal_arg_index = i;
+                    GDefID poly_formal_bv_def_id = info->bv_def_id_array[poly_formal_arg_index];
 
-                        assert(remaining_arg_list_id != arg_list::EMPTY_ARG_LIST);
-                        size_t mono_actual_arg_id = arg_list::head(remaining_arg_list_id);
-                        remaining_arg_list_id = arg_list::tail(remaining_arg_list_id);
+                    char* cp_bound_name = strdup(gdef::get_def_name(poly_formal_bv_def_id));
 
-                        gdef::DefKind mono_def_kind;
-                        switch (gdef::get_def_kind(poly_formal_bv_def_id)) {
-                            case gdef::DefKind::BV_EXP: {
-                                mono_def_kind = gdef::DefKind::CONST_TOT_VAL;
-                            } break;
-                            case gdef::DefKind::BV_TS: {
-                                mono_def_kind = gdef::DefKind::CONST_TOT_TID;
-                            } break;
-                            default: {
-                                throw new Panic("Unknown template arg def kind");
-                            }
+                    assert(remaining_arg_list_id != arg_list::EMPTY_ARG_LIST);
+                    size_t mono_actual_arg_id = arg_list::head(remaining_arg_list_id);
+                    remaining_arg_list_id = arg_list::tail(remaining_arg_list_id);
+
+                    gdef::DefKind mono_def_kind;
+                    switch (gdef::get_def_kind(poly_formal_bv_def_id)) {
+                        case gdef::DefKind::BV_EXP: {
+                            mono_def_kind = gdef::DefKind::CONST_TOT_VAL;
+                        } break;
+                        case gdef::DefKind::BV_TS: {
+                            mono_def_kind = gdef::DefKind::CONST_TOT_TID;
+                        } break;
+                        default: {
+                            throw new Panic("Unknown template arg def kind");
                         }
-                        GDefID mono_field_def_id = gdef::declare_global_def(mono_def_kind, cp_bound_name);
-                        modules::add_mono_module_field(mono_mod_id, mono_field_def_id);
-                        replacement_gdef_array[poly_formal_arg_index] = mono_field_def_id;
-
-                        // since we have the value of the template arg already, we define it here too:
-                        gdef::set_def_target(mono_field_def_id, mono_actual_arg_id);
-
-                        // updating the `substitution` object:
-                        sub::add_monomorphizing_replacement(
-                            instantiating_sub, 
-                            poly_formal_bv_def_id, 
-                            mono_field_def_id
-                        );
                     }
-                    assert(remaining_arg_list_id == arg_list::EMPTY_ARG_LIST);
+                    GDefID mono_field_def_id = gdef::declare_global_def(mono_def_kind, cp_bound_name);
+                    // modules::add_mono_module_field(mono_mod_id, mono_field_def_id);
+                    replacement_gdef_array[poly_formal_arg_index] = mono_field_def_id;
+
+                    // since we have the value of the template arg already, we define it here too:
+                    gdef::set_def_target(mono_field_def_id, mono_actual_arg_id);
+
+                    // updating the `substitution` object:
+                    sub::add_monomorphizing_replacement(
+                        instantiating_sub, 
+                        poly_formal_bv_def_id, 
+                        mono_field_def_id
+                    );
                 }
+                assert(remaining_arg_list_id == arg_list::EMPTY_ARG_LIST);
             }
 
             // caching:
@@ -296,10 +293,10 @@ namespace monomorphizer::modules {
                 // acquiring the mono field:
                 GDefID mono_field_def_id = get_mono_mod_field_at(mono_mod_id, i);
 
-                std::cout
-                    << "DEBUG: Computing evaluated target for field " << i
-                    << " with name '" << gdef::get_def_name(mono_field_def_id) << "'"
-                    << "..." << std::endl;
+                // std::cout
+                //     << "DEBUG: Computing evaluated target for field " << i
+                //     << " with name '" << gdef::get_def_name(mono_field_def_id) << "'"
+                //     << "..." << std::endl;
 
                 // evaluating the poly field:
                 size_t raw_mono_field_target;
@@ -319,17 +316,17 @@ namespace monomorphizer::modules {
                     }
                 }
 
-                std::cout 
-                    << "DEBUG: Setting evaluated target for field " << i
-                    << " with name '" << gdef::get_def_name(mono_field_def_id) << "'"
-                    << " to target value " << raw_mono_field_target
-                    << std::endl;
+                // std::cout 
+                //     << "DEBUG: Setting evaluated target for field " << i
+                //     << " with name '" << gdef::get_def_name(mono_field_def_id) << "'"
+                //     << " to target value " << raw_mono_field_target
+                //     << std::endl;
 
                 // setting the target of the mono field to be the evaluated poly field:
                 if (raw_mono_field_target != NULL_MONO_MOD_ID) {
                     gdef::set_def_target(mono_field_def_id, raw_mono_field_target);
                 } else {
-                    // debug: ignore for now...
+                    throw new Panic("Evaluation produced 'null' target: is there a cycle?");
                 }
             }
         }

@@ -190,6 +190,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     # unlike the typer before, this time we create BVs for type and value variables.
     bv_def_id_count = len(sub_mod_exp.template_arg_names)
     name_def_obj_pairs_iterable = zip(sub_mod_exp.template_arg_names, sub_mod_exp.template_def_list_from_typer)
+    cp_bv_def_id_list = []
     for i, (bv_arg_name, bv_arg_def_obj) in enumerate(name_def_obj_pairs_iterable):
         # TODO: define to get GDefID, then push to mv_bv_def_id_array for w_new_polymorphic_module
         bv_arg_name_c_str = mk_c_str_from_py_str(bv_arg_name)
@@ -201,6 +202,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
             raise NotImplementedError("Unknown BV arg def-record type")
         
         bv_def_id_array[i] = def_id
+        cp_bv_def_id_list.append(def_id)
 
     # constructing the module using BVs:
     new_poly_mod_id = wrapper.w_new_polymorphic_module(
@@ -315,7 +317,11 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
                 original_bind1t_index = i
                 break
         else:
-            raise excepts.CompilerError("Could not find def object for field, though typing ok.")
+            for template_arg_index, template_arg_name in enumerate(found_sub_mod_exp.template_arg_names):
+                if ts.data.elem_name == template_arg_name:
+                    panic("NotImplemented: finding an index for template args")
+            else:
+                panic("Could not find def object for field, though typing ok.")
 
         mast_field_index_map = found_sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer
         ts_field_ix = <size_t> mast_field_index_map[original_bind1t_index]
@@ -386,15 +392,15 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
     elif isinstance(ts, ast.node.AdtTypeSpec):
         adt_kind = ts.adt_kind
         if adt_kind == ast.node.AdtKind.Union:
-            raise NotImplementedError("ast_to_mast_ts for AdtKind.Union")
+            panic("NotImplemented: ast_to_mast_ts for AdtKind.Union")
         elif adt_kind == ast.node.AdtKind.Structure:
-            raise NotImplementedError("ast_to_mast_ts for AdtKind.Struct")
+            panic("NotImplemented: ast_to_mast_ts for AdtKind.Struct")
         else:
-            raise NotImplementedError("ast_to_mast_ts for AdtTypeSpec with unknown kind")
+            panic("NotImplemented: ast_to_mast_ts for AdtTypeSpec with unknown kind")
 
     # error:
     else:
-        raise NotImplementedError(f"ast_to_mast_ts for t={ts} of kind {ts.__class__.__name__}")
+        panic(f"NotImplemented: ast_to_mast_ts for t={ts} of kind {ts.__class__.__name__}")
 
 
 cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
@@ -426,7 +432,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             elif width_in_bits == 1:
                 int_suffix = wrapper.IS_U1
             else:
-                raise NotImplementedError("Unknown UInt size")
+                panic("Unknown UInt size in `qcl.monomorphizer.copier.ast_to_mast_exp`")
             mantissa: size_t = int(e.value_text)
             return wrapper.w_new_int_exp(mantissa, int_suffix, 0)
 
@@ -440,7 +446,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             elif width_in_bits == 8:
                 int_suffix = wrapper.IS_S8
             else:
-                raise NotImplementedError("Unknown SInt size")
+                panic("Unknown SInt size in `qcl.monomorphizer.copier.ast_to_mast_exp`")
 
             mantissa = int(e.value_text)
             return wrapper.w_new_int_exp(mantissa, int_suffix, 0)
@@ -595,11 +601,11 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
     # )
 
 
-    raise NotImplementedError(f"ast_to_mast_exp for e={e}")
+    panic(f"NotImplemented: ast_to_mast_exp for e={e}")
 
 
 cdef wrapper.ElemID ast_to_mast_elem(object e: ast.node.BaseElem):
-    raise NotImplementedError(f"ast_to_mast_elem for e={e}")
+    panic(f"NotImplemented: ast_to_mast_elem for e={e}")
 
 
 cdef void define_declared_def_ids_in_proj(object proj: frontend.project.Project):
@@ -670,6 +676,7 @@ cdef instantiate_entry_point(object proj: frontend.Project):
         raise excepts.CheckerCompilationError(
             f"Expected a sub-module named `{entry_point_sub_mod_name}` in the first file module."
         )
+        panic("see `CheckerCompilationError` above.")
     
     entry_point_sub_mod_exp = entry_point_file_mod_exp.sub_module_map[entry_point_sub_mod_name]
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
@@ -678,3 +685,14 @@ cdef instantiate_entry_point(object proj: frontend.Project):
 
     # TODO: verify that there exists a function field named 'main' of the desired signature
     #   - can be performed before or after monomorphization
+
+
+#
+#
+# Panic
+#
+#
+
+cdef void panic(object msg: str):
+    print(f"FATAL_ERROR: {msg}")
+    exit(-1)

@@ -105,7 +105,8 @@ class Context(object):
                 project,
                 type_template_arg_name,
                 self.loc, fresh_bound_var, self.opt_func,
-                is_bound_globally_visible=True
+                is_bound_globally_visible=True,
+                def_is_bound_var=True
             )
             def_ok = self.try_define(type_template_arg_name, def_record)
             assert def_ok
@@ -201,7 +202,8 @@ def make_default_root(project):
             def_name, loc,
             def_type_id,
             opt_func=None,
-            is_bound_globally_visible=True
+            is_bound_globally_visible=True,
+            def_is_bound_var=False
         )
         return def_obj
 

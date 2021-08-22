@@ -289,14 +289,16 @@ def infer_binding_elem_types(
                     project,
                     id_name, elem.loc, def_tid,
                     opt_func=ctx.opt_func,
-                    is_bound_globally_visible=is_bound_globally_visible
+                    is_bound_globally_visible=is_bound_globally_visible,
+                    def_is_bound_var=False
                 )
             elif du == definition.Universe.Type:
                 def_rec = definition.TypeRecord(
                     project,
                     id_name, elem.loc, def_tid,
                     opt_func=ctx.opt_func,
-                    is_bound_globally_visible=is_bound_globally_visible
+                    is_bound_globally_visible=is_bound_globally_visible,
+                    def_is_bound_var=False
                 )
             else:
                 raise NotImplementedError("Unknown universe in binding")
@@ -667,7 +669,8 @@ def help_infer_exp_tid(
                     project,
                     arg_name, exp.loc, formal_arg_tid,
                     opt_func=exp,
-                    is_bound_globally_visible=False
+                    is_bound_globally_visible=False,
+                    def_is_bound_var=False
                 )
                 formal_arg_def_ok = lambda_ctx.try_define(arg_name, arg_def_obj)
                 if not formal_arg_def_ok:
@@ -1143,6 +1146,14 @@ def help_type_id_in_module_node(
             msg_suffix = f"expected {file_mod_name} to refer to a file-mod, not other"
             raise excepts.TyperCompilationError(msg_suffix)
 
+        # validating the found definition as a non-bound-var:
+        elif found_def_obj.is_bound_var_def_obj:
+            msg_suffix = (
+                f"cannot access formal argument by `:<name>`. "
+                f"(if you really want to do this, please use an explicit alias)"
+            )
+            raise excepts.TyperCompilationError(msg_suffix)
+
         # by design, no node of this type can have no child.
         # this block is mostly setup for states encountered below.
         assert data.has_child
@@ -1180,6 +1191,14 @@ def help_type_id_in_module_node(
                 f"element {data.elem_name} in the wrong universe: "
                 f"found {found_def_obj.universe.name}, "
                 f"expected {expect_du.name}"
+            )
+            raise excepts.TyperCompilationError(msg_suffix)
+
+        # validating the found definition as a non-bound-var:
+        if found_def_obj.is_bound_var_def_obj:
+            msg_suffix = (
+                f"cannot access formal argument by `:<name>`. "
+                f"(if you really want to do this, please use an explicit alias)"
             )
             raise excepts.TyperCompilationError(msg_suffix)
 
