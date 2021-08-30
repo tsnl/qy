@@ -2,7 +2,7 @@
 
 x = 42;
 
---- sub m1[T, U, n] ---
+--- sub m1 [T, U, n] ---
 
 A = T;
 E = U;
@@ -30,4 +30,4 @@ k = m3:f_negate;
 main = () -> 0;
 
 // FIXME: get this working
-// third = m3:f_negate(45f);
+third = m3:f_negate(45f);

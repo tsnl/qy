@@ -989,6 +989,8 @@ def help_infer_exp_tid(
 
         return sub, ret_tid, ses, cs
 
+    # TODO: TupleExp: should be very straightforward
+
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
 

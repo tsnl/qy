@@ -782,8 +782,8 @@ namespace monomorphizer::eval {
         auto info = &mast::get_info_ptr(exp_id)->exp_call;
 
         // first, evaluating the argument and function in the outer stack frame:
-        mval::ValueID fun_vid = eval_mono_exp(exp_id, st);
-        mval::ValueID arg_vid = eval_mono_exp(exp_id, st);
+        mval::ValueID fun_vid = eval_mono_exp(info->called_fn, st);
+        mval::ValueID arg_vid = eval_mono_exp(info->arg_exp_id, st);
 
         // reaching inside the `fun` VID to retrieve the expression to evaluate, args to pass.
         assert(mval::value_kind(fun_vid) == mval::ValueKind::VK_FUNCTION);
@@ -850,6 +850,8 @@ namespace monomorphizer::eval {
                     case mval::VK_S16:
                     case mval::VK_S32:
                     case mval::VK_S64:
+                    case mval::VK_F32:
+                    case mval::VK_F64:
                     {
                         return arg_val_id;
                     }
@@ -872,6 +874,8 @@ namespace monomorphizer::eval {
                     case mval::VK_S16: return mval::push_s16(-vi.s16);
                     case mval::VK_S32: return mval::push_s32(-vi.s32);
                     case mval::VK_S64: return mval::push_s64(-vi.s64);
+                    case mval::VK_F32: return mval::push_f32(-vi.f32);
+                    case mval::VK_F64: return mval::push_f64(-vi.f64);
                     default: throw new Panic("Invalid arg to unary op '-'");
                 }
             } break;
