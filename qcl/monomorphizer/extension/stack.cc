@@ -22,7 +22,7 @@ namespace monomorphizer::stack {
 
     size_t lookup(Stack* stack, intern::IntStr int_str_id) {
         for (size_t i = 0; i <= stack->frames.size(); i++) {
-            size_t frame_index = stack->frames.size() - i;
+            size_t frame_index = stack->frames.size() - (1+i);
             Frame const* frame_ref = &stack->frames[frame_index];
             auto it = frame_ref->id_map.find(int_str_id);
             if (it != frame_ref->id_map.end()) {

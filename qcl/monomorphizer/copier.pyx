@@ -12,6 +12,12 @@ Instantiating the entry point PolyMod produces a MonoMod, and only generates the
 the returned MonoMod.
 Furthermore, the extension only allows evaluated values (total constants) to be stored in MonoMod fields.
 Thus, we also obtain the value of each field.
+
+PHASES
+This pass is broken into multiple phases:
+- P1: declarations: generating forward declarations for all global variables in polymorphic extension-space
+- P2: definitions: binding initial AST values for all global variables in polymorphic extension-space
+- P3: monomorphization: simply instantiate the entry-point module, 
 """
 
 import typing as t
@@ -48,14 +54,17 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
     # Running phase 2:
     define_declared_def_ids_in_proj(proj)
 
-    print()
-    print_all_poly_mods("POST-P2", proj)
-    print()
+    # Debug print 1:
+    # print()
+    # print_all_poly_mods("POST-P2", proj)
+    # print()
 
     # Running phase 3:
     instantiate_entry_point(proj)
 
     # TODO: dump the extension state, write ways to access it.
+
+    # Debug print 2: printing the extension state to export + debug state (PolyMods)
     print()
     print_all_poly_mods("FINALLY", proj)
     print()
@@ -67,9 +76,14 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
 
 #
 #
-# Shared:
+# Shared among all phases:
 #
 #
+
+cdef void panic(object msg: str):
+    print(f"FATAL_ERROR: {msg}")
+    exit(-1)
+
 
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
     extern const wrapper.GDefID NULL_GDEF_ID;
@@ -257,6 +271,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     # returning the completed module:
     return new_poly_mod_id
 
+
 #
 # PHASE2
 # Definitions for declared definitions, 
@@ -433,6 +448,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
                 int_suffix = wrapper.IS_U1
             else:
                 panic("Unknown UInt size in `qcl.monomorphizer.copier.ast_to_mast_exp`")
+
             mantissa: size_t = int(e.value_text)
             return wrapper.w_new_int_exp(mantissa, int_suffix, 0)
 
@@ -671,6 +687,7 @@ cdef instantiate_entry_point(object proj: frontend.Project):
     entry_point_source_module: frontend.FileModuleSource = proj.entry_point_source_module
     entry_point_file_mod_exp: ast.node.FileModExp = entry_point_source_module.ast_file_mod_exp_from_frontend
     
+    # searching for a sub-module by a specific name to use as an entry point:
     entry_point_sub_mod_name = "entry_point_for_v1_default_loader"
     if entry_point_sub_mod_name not in entry_point_file_mod_exp.sub_module_map:
         raise excepts.CheckerCompilationError(
@@ -678,21 +695,53 @@ cdef instantiate_entry_point(object proj: frontend.Project):
         )
         panic("see `CheckerCompilationError` above.")
     
+    # retrieving the found sub-module for later...
     entry_point_sub_mod_exp = entry_point_file_mod_exp.sub_module_map[entry_point_sub_mod_name]
+
+    # ensuring this module admits 0 template arguments (i.e. is monomorphic):
+    if entry_point_sub_mod_exp.template_arg_names:
+        raise excepts.CheckerCompilationError(
+            f"Entry-point sub-module with name `{entry_point_sub_mod_name}` in the first file module"
+            "cannot admit any template arguments."
+        )
+        panic("see `CheckerCompilationError` above.")
+
+    # searching for a function that can be used as an entry point:
+    #   - cf `main` in C/C++/Java
+    entry_point_function_name = "main_for_v1_default_loader"
+    entry_point_rec = None
+    for rec in entry_point_sub_mod_exp.bind1v_def_obj_list_from_typer:
+        # checking this symbol's name:
+        rec_name_correct = (rec.name == entry_point_function_name)
+        if rec_name_correct:
+            entry_point_rec = rec
+
+    if not entry_point_rec:
+        msg_suffix = f"Could not find a suitable entry point function named `{entry_point_function_name}`"
+        raise excepts.CheckerCompilationError(msg_suffix)
+
+    elif entry_point_rec:
+        # checking this symbol's type:
+        rec_type = rec.scheme.shallow_instantiate()
+        rec_type_correct = (rec_type == wrapper.w_get_function_tid(
+            wrapper.w_get_unit_tid(),
+            wrapper.w_get_s32_tid(),
+            wrapper.SES_ML
+        ))
+        if not rec_type_correct:
+            msg_suffix = (
+                f"Supplied entry-point named `{entry_point_function_name}` does not have the correct type: "
+                f"expected `{entry_point_function_name} ~ () -> ML I32`"
+            )
+            raise excepts.CheckerCompilationError(msg_suffix)
+
+    # instantiating this entry-point sub-module:
+    #   - it acts as the root of all monomorphic global discovery
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
-    # MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
     wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
-
-    # TODO: verify that there exists a function field named 'main' of the desired signature
-    #   - can be performed before or after monomorphization
-
 
 #
 #
 # Panic
 #
 #
-
-cdef void panic(object msg: str):
-    print(f"FATAL_ERROR: {msg}")
-    exit(-1)

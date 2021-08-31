@@ -17,7 +17,8 @@ class Scheme(object):
     def __init__(
             self,
             body_tid: type.identity.TID,
-            bound_var_names: t.Optional[t.List[str]] = None):
+            bound_var_names: t.Optional[t.List[str]] = None
+    ):
         super().__init__()
         if bound_var_names is not None:
             self.bound_vars = [type.new_bound_var(var_name) for var_name in bound_var_names]

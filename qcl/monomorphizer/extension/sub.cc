@@ -52,13 +52,13 @@ namespace monomorphizer::sub {
         auto old_pair = m_subs.insert({original_def_id, replacement_def_id});
         assert(old_pair.second && "Insertion into sub-map failed");
 
-#if (MONOMORPHIZER_DEBUG)
-        std::cout 
-            << "added monomorphizing replacement: " 
-            << original_def_id << " -> " << replacement_def_id 
-            << std::endl;
-        std::cout.flush();
-#endif
+// #if (MONOMORPHIZER_DEBUG)
+//         std::cout 
+//             << "added monomorphizing replacement: " 
+//             << original_def_id << " -> " << replacement_def_id 
+//             << std::endl;
+//         std::cout.flush();
+// #endif
     }
 
     bool Substitution::validate_monomorphizing_replacement(

@@ -56,12 +56,12 @@ namespace monomorphizer::eval {
             if (elem_is_exp) {
                 auto elem_exp_id = arg_node_id;
                 auto elem_exp_val = eval_poly_exp_impl(elem_exp_id, s, st);
-                std::cout << "INFO: arg_list_from_node_array: Inserting VID in list: " << elem_exp_val << std::endl;
+                // std::cout << "INFO: arg_list_from_node_array: Inserting VID in list: " << elem_exp_val << std::endl;
                 actual_arg_list = arg_list::cons_val(actual_arg_list, elem_exp_val);
             } else {
                 auto elem_ts_id = arg_node_id;
                 auto elem_ts_tid = eval_poly_ts_impl(elem_ts_id, s, st);
-                std::cout << "INFO: arg_list_from_node_array: Inserting TID in list: " << elem_ts_tid << std::endl;
+                // std::cout << "INFO: arg_list_from_node_array: Inserting TID in list: " << elem_ts_tid << std::endl;
                 actual_arg_list = arg_list::cons_tid(actual_arg_list, elem_ts_tid);
             }
         }
@@ -73,8 +73,8 @@ namespace monomorphizer::eval {
         sub::Substitution* s,
         stack::Stack* st
     ) {
-        std::cout << "DEBUG: p2m_ts: sub is..." << std::endl;
-        sub::debug_print(s);
+        // std::cout << "DEBUG: p2m_ts: sub is..." << std::endl;
+        // sub::debug_print(s);
 
         auto ts_kind = mast::get_node_kind(mast_ts_id);
         switch (ts_kind) {
@@ -117,7 +117,7 @@ namespace monomorphizer::eval {
                         if (new_def_id == old_def_id) {
                             return mast_ts_id;
                         } else {
-                            std::cout << "INFO: REPLACEMENT: " << old_def_id << " -> " << new_def_id << std::endl;
+                            // std::cout << "INFO: REPLACEMENT: " << old_def_id << " -> " << new_def_id << std::endl;
                             return mast::new_gid_ts(new_def_id);
                         }
                     }
@@ -236,7 +236,7 @@ namespace monomorphizer::eval {
                 return mast::new_get_mono_module_field_ts(mono_mod_id, info->ts_field_index);
             } break;
             default: {
-                std::cout << "INFO: unknown TS node kind = " << ts_kind << std::endl;
+                // std::cout << "INFO: unknown TS node kind = " << ts_kind << std::endl;
                 throw new Panic("NotImplemented: unknown TS node kind");
             } break;
         }
@@ -294,11 +294,11 @@ namespace monomorphizer::eval {
                         if (new_def_id == old_def_id) {
                             return mast_exp_id;
                         } else {
-                            std::cout 
-                                << "INFO: Rewrite in BV_EXP: " 
-                                << "replacing " << old_def_id << " with " << new_def_id << " such that "
-                                << "new target is " << gdef::get_def_target(new_def_id)
-                                << std::endl;
+                            // std::cout 
+                            //     << "INFO: Rewrite in BV_EXP: " 
+                            //     << "replacing " << old_def_id << " with " << new_def_id << " such that "
+                            //     << "new target is " << gdef::get_def_target(new_def_id)
+                            //     << std::endl;
                             return mast::new_gid_exp(new_def_id);
                         }
                     }
@@ -647,7 +647,7 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(ts_id)->ts_gid;
                 GDefID def_id = info->def_id;
                 auto out_tid = eval_def_t(def_id, st);
-                std::cout << "INFO: TS_GID " << ts_id << " evaluates to " << out_tid << std::endl;
+                // std::cout << "INFO: TS_GID " << ts_id << " evaluates to " << out_tid << std::endl;
                 return out_tid;
             } break;
 
@@ -1254,7 +1254,7 @@ namespace monomorphizer::eval {
             }
             default: 
             {
-                std::cout << "INFO: Invalid arg exp kind = " << exp_kind << std::endl;
+                // std::cout << "INFO: Invalid arg exp kind = " << exp_kind << std::endl;
                 throw new Panic("Invalid arg exp to eval_mono_exp");
             }
         }
