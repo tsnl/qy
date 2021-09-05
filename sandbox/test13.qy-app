@@ -1,0 +1,21 @@
+--- sub helper ---
+
+// a = (x) -> TOT {a = 5; a * x};
+// a ~ (I32) -> I32;
+
+fibonacci ~ I32 -> I32;
+fibonacci = (x) -> {
+    if (x == 1 or x == 0) {
+        1
+    } else {
+        fibonacci(x - 1) + fibonacci(x - 2)
+    }
+};
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};
+
+// zero = helper:a(0);
+f5 = helper:fibonacci(5);
+f25 = helper:fibonacci(25);

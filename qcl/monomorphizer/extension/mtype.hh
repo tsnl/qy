@@ -56,7 +56,7 @@ namespace monomorphizer::mtype {
     );
     TID get_array_tid(
         TID ptd_tid, 
-        mval::ValueID count_val_id, 
+        mval::ValVarID count_val_id, 
         bool contents_is_mut
     );
     TID get_slice_tid(

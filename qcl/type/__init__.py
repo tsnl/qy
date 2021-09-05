@@ -77,7 +77,6 @@ _str_tid = _new_str_type()
 #
 
 
-
 def get_int_type(width_in_bits: int, is_unsigned=False) -> identity.TID:
     return _int_tid_map[width_in_bits, is_unsigned]
 

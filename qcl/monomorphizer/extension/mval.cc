@@ -13,9 +13,9 @@
 namespace monomorphizer::mval {
 
     extern size_t const MAX_VAL_HASH_BYTE_COUNT = 64 * 1024;
-    extern ValueID const NULL_VID = -1;
+    extern ValVarID const NULL_VID = -1;
     
-    static ValueID s_unit_val_id = NULL_VID;
+    static ValVarID s_unit_val_id = NULL_VID;
 
     struct StringInfo {
         size_t code_point_count;
@@ -29,10 +29,10 @@ namespace monomorphizer::mval {
     };
     struct SequenceInfo {
         size_t elem_id_count;
-        ValueID* elem_id_array;
+        ValVarID* elem_id_array;
 
         inline
-        SequenceInfo(size_t elem_id_count, ValueID* mv_elem_id_array)
+        SequenceInfo(size_t elem_id_count, ValVarID* mv_elem_id_array)
         :   elem_id_count{elem_id_count},
             elem_id_array{mv_elem_id_array}
         {}
@@ -52,27 +52,27 @@ namespace monomorphizer::mval {
     static std::deque<FuncInfo> s_func_info_table;
 
     // value creation:
-    ValueID get_next_val_id() {
+    ValVarID get_next_val_id() {
         assert(s_value_kind_table.size() == s_value_info_table.size());
         return s_value_kind_table.size();
     }
-    void push_cached_serialized_data(ValueID val_id);
+    void push_cached_serialized_data(ValVarID val_id);
 
-    ValueID push_unit() {
+    ValVarID push_unit() {
         auto id = get_next_val_id();
         s_value_kind_table.push_back(VK_UNIT);
         s_value_info_table.emplace_back();
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID get_unit() {
+    ValVarID get_unit() {
         if (s_unit_val_id == NULL_VID) {
             s_unit_val_id = push_unit();
             assert(s_unit_val_id != NULL_VID);
         }
         return s_unit_val_id;
     }
-    ValueID push_u1(bool v) {
+    ValVarID push_u1(bool v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.u1 = v;
         s_value_kind_table.push_back(VK_U1);
@@ -80,7 +80,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_u8(uint8_t v) {
+    ValVarID push_u8(uint8_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.u8 = v;
         s_value_kind_table.push_back(VK_U8);
@@ -88,7 +88,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_u16(uint16_t v) {
+    ValVarID push_u16(uint16_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.u16 = v;
         s_value_kind_table.push_back(VK_U16);
@@ -96,7 +96,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_u32(uint32_t v) {
+    ValVarID push_u32(uint32_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.u32 = v;
         s_value_kind_table.push_back(VK_U32);
@@ -104,7 +104,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_u64(uint64_t v) {
+    ValVarID push_u64(uint64_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.u64 = v;
         s_value_kind_table.push_back(VK_U64);
@@ -112,7 +112,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_s8(int8_t v) {
+    ValVarID push_s8(int8_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.s8 = v;
         s_value_kind_table.push_back(VK_S8);
@@ -120,7 +120,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_s16(int16_t v) {
+    ValVarID push_s16(int16_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.s16 = v;
         s_value_kind_table.push_back(VK_S16);
@@ -128,7 +128,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_s32(int32_t v) {
+    ValVarID push_s32(int32_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.s32 = v;
         s_value_kind_table.push_back(VK_S32);
@@ -136,7 +136,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_s64(int64_t v) {
+    ValVarID push_s64(int64_t v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.s64 = v;
         s_value_kind_table.push_back(VK_S64);
@@ -144,7 +144,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_f32(float v) {
+    ValVarID push_f32(float v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.f32 = v;
         s_value_kind_table.push_back(VK_F32);
@@ -152,7 +152,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_f64(double v) {
+    ValVarID push_f64(double v) {
         auto id = get_next_val_id();
         ValueInfo vi; vi.f64 = v;
         s_value_kind_table.push_back(VK_F64);
@@ -160,7 +160,7 @@ namespace monomorphizer::mval {
         push_cached_serialized_data(id);
         return id;
     }
-    ValueID push_str(size_t code_point_count, int* mv_code_point_array) {
+    ValVarID push_str(size_t code_point_count, int* mv_code_point_array) {
         auto id = get_next_val_id();
 
         auto string_info_index = s_value_string_info_table.size();
@@ -177,7 +177,7 @@ namespace monomorphizer::mval {
 
         return id;
     }
-    ValueID push_tuple(size_t elem_id_count, ValueID* mv_elem_id_array) {
+    ValVarID push_tuple(size_t elem_id_count, ValVarID* mv_elem_id_array) {
         auto id = get_next_val_id();
 
         auto string_info_index = s_value_string_info_table.size();
@@ -194,7 +194,7 @@ namespace monomorphizer::mval {
 
         return id;
     }
-    ValueID push_function(
+    ValVarID push_function(
         uint32_t arg_name_count,
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
@@ -222,16 +222,16 @@ namespace monomorphizer::mval {
     }
 
     // property accessors:
-    ValueKind value_kind(ValueID value_id) {
+    ValueKind value_kind(ValVarID value_id) {
         return s_value_kind_table[value_id];
     }
-    ValueInfo value_info(ValueID value_id) {
+    ValueInfo value_info(ValVarID value_id) {
         return s_value_info_table[value_id];
     }
-    std::optional<ValueID> get_seq_elem(ValueID tuple_val_id, size_t elem_index) {
+    std::optional<ValVarID> get_seq_elem(ValVarID tuple_val_id, size_t elem_index) {
         size_t sequence_info_index = s_value_info_table[tuple_val_id].sequence_info_index;
         SequenceInfo elem_info = s_value_sequence_info_table[sequence_info_index];
-        ValueID* elem_array = elem_info.elem_id_array;
+        ValVarID* elem_array = elem_info.elem_id_array;
         size_t elem_count = elem_info.elem_id_count;
         if (elem_index < elem_count) {
             return elem_array[elem_index];
@@ -245,18 +245,18 @@ namespace monomorphizer::mval {
 
     // serialization:
     size_t serialize_value(
-        ValueID value_id,
+        ValVarID value_id,
         size_t max_out_size,
         char* out_array
     );
     size_t serialize_value_impl(
-        ValueID value_id, 
+        ValVarID value_id, 
         size_t max_out_size,
         char* out_array, 
         size_t* offset_p
     );
     size_t serialize_value(
-        ValueID value_id,
+        ValVarID value_id,
         size_t max_out_size,
         char* out_array
     ) {
@@ -269,7 +269,7 @@ namespace monomorphizer::mval {
         );
     }
     size_t serialize_value_impl(
-        ValueID value_id, 
+        ValVarID value_id, 
         size_t max_out_size,
         char* out_array, 
         size_t* offset_p
@@ -375,11 +375,8 @@ namespace monomorphizer::mval {
                 StringInfo si = s_value_string_info_table[vi.string_info_index];
                 size_t const bytes_per_code_point = sizeof(int);
                 size_t const bytes_written = (
-                    // length prefix
-                    sizeof(size_t) +
-
-                    // code points:
-                    si.code_point_count * bytes_per_code_point
+                    sizeof(size_t) +                                // length prefix
+                    si.code_point_count * bytes_per_code_point      // si.code_point_count code points
                 );
 
                 if (*offset_p + bytes_written >= max_out_size) {
@@ -435,7 +432,7 @@ namespace monomorphizer::mval {
             }
         }
     }
-    void push_cached_serialized_data(ValueID val_id) {
+    void push_cached_serialized_data(ValVarID val_id) {
         static thread_local char ser_buffer[MAX_VAL_HASH_BYTE_COUNT];
         static auto const hash_callable = std::hash<std::string>();
         
@@ -459,16 +456,12 @@ namespace monomorphizer::mval {
             serialized_string_hash = hash_callable(serialized_string);
         }
         
-        s_value_serialized_string_table.push_back(
-            serialized_string
-        );
-        s_value_serialized_string_hashes_table.push_back(
-            serialized_string_hash
-        );
+        s_value_serialized_string_table.push_back(serialized_string);
+        s_value_serialized_string_hashes_table.push_back(serialized_string_hash);
     }
 
     // equality checks:
-    bool equals(ValueID v1, ValueID v2) {
+    bool equals(ValVarID v1, ValVarID v2) {
         if (v1 == v2) {
             return true;
         }
@@ -482,7 +475,7 @@ namespace monomorphizer::mval {
         
         switch (kind) {
             case VK_UNIT: {
-                throw new Panic("Unit value is not unique! ValueIDs not equal, but same kind");
+                throw new Panic("Unit value is not unique! ValVarIDs not equal, but same kind");
             }
             case VK_FUNCTION: {
                 // unless function IDs are equal, return 'false':

@@ -451,7 +451,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
                 '>': ast.node.BinaryOp.GT,
                 '<=': ast.node.BinaryOp.LEq,
                 '>=': ast.node.BinaryOp.GEq,
-                '=': ast.node.BinaryOp.Eq,
+                '==': ast.node.BinaryOp.Eq,
                 '<>': ast.node.BinaryOp.NE,
                 'and': ast.node.BinaryOp.LogicalAnd,
                 'or': ast.node.BinaryOp.LogicalOr

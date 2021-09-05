@@ -70,9 +70,11 @@ def infer_project_types(
     #       - boolean ret field True if further iterations requested
 
     any_solved = True
+    deferred_sub = substitution.empty
     while any_solved:
-        any_solved, sub = deferred_list.solve_step()
-        rewrite_system_with_sub(root_ctx, deferred_list, sub)
+        any_solved, deferred_sub = deferred_list.solve_step(deferred_sub)
+        if any_solved:
+            rewrite_system_with_sub(root_ctx, deferred_list, deferred_sub)
 
     if not deferred_list.check_all_solved():
         unsolved = deferred_list.unsolved_str()
@@ -465,7 +467,7 @@ def help_infer_exp_tid(
 
         # ensuring the definition exists:
         if found_def_obj is None:
-            raise excepts.TyperCompilationError(f"Symbol {exp.name} used but not defined.")
+            raise excepts.TyperCompilationError(f"Symbol `{exp.name}` used but not defined.")
 
         # ensuring the definition is in the right universe (not a module)
         du = names.infer_def_universe_of(exp.name)
@@ -595,6 +597,7 @@ def help_infer_exp_tid(
         s3 = unifier.unify(actual_fn_tid, formal_fn_tid)
 
         s123 = s3.compose(s12)
+        ret_tid = s123.rewrite_type(ret_tid)
 
         # checking that '!' used with formal definitions of the right side-effects specifier:
         formal_ses = type.side_effects.of(formal_fn_tid)
@@ -625,7 +628,7 @@ def help_infer_exp_tid(
 
         exp_cs = unifier.unify_closure_spec(fn_cs, arg_cs)
 
-        return s123, s123.rewrite_type(ret_tid), exp_ses, exp_cs
+        return s123, ret_tid, exp_ses, exp_cs
 
     elif isinstance(exp, ast.node.CastExp):
         s1, src_tid, exp_ses, exp_cs = infer_exp_tid(
@@ -979,7 +982,7 @@ def help_infer_exp_tid(
         ses = unifier.unify_ses(ses, cond_exp_ses)
         cs = unifier.unify_closure_spec(cs, cond_exp_cs)
 
-        cond_unify_sub = unifier.unify(cond_exp_tid, type.get_int_type(1, is_unsigned=False))
+        cond_unify_sub = unifier.unify(cond_exp_tid, type.get_int_type(1, is_unsigned=True))
         sub = cond_unify_sub.compose(sub)
 
         unify_branch_exp(exp.then_exp)

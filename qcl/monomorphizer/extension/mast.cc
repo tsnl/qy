@@ -405,17 +405,15 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_chain_exp(
         size_t prefix_elem_id_count,
-        mast::ElemID* prefix_elem_id_array,
+        mast::ElemID* mv_prefix_elem_id_array,
         mast::ExpID ret_exp_id
     ) {
         auto new_node_id = help_alloc_node(EXP_CHAIN);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_chain;
 
         info_ptr->prefix_elem_count = prefix_elem_id_count;
-        info_ptr->prefix_elem_array = new mast::ElemID[prefix_elem_id_count];
-        for (size_t i = 0; i < prefix_elem_id_count; i++) {
-            info_ptr->prefix_elem_array[i] = prefix_elem_id_array[i];
-        }
+        info_ptr->prefix_elem_array = mv_prefix_elem_id_array;
+        info_ptr->ret_exp_id = ret_exp_id;
 
         return new_node_id;
     }
@@ -458,6 +456,20 @@ namespace monomorphizer::mast {
         info_ptr->bound_id = bound_id;
         info_ptr->init_exp_id = init_exp_id;
 
+        std::cout << "NOTE: Created mast::Bind1VElem with node-kind " << get_node_kind(new_node_id) << std::endl;
+        return new_node_id;
+    }
+    mast::ElemID new_bind1t_elem(
+        intern::IntStr bound_id,
+        mast::TypeSpecID init_ts_id
+    ) {
+        auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1T);
+        auto info_ptr = &get_info_ptr(new_node_id)->elem_bind1t;
+
+        info_ptr->bound_id = bound_id;
+        info_ptr->init_ts_id = init_ts_id;
+
+        std::cout << "NOTE: Created mast::Bind1TElem with node-kind " << get_node_kind(new_node_id) << std::endl;
         return new_node_id;
     }
     mast::ElemID new_do_elem(
@@ -468,6 +480,7 @@ namespace monomorphizer::mast {
 
         info_ptr->eval_exp_id = eval_exp_id;
 
+        std::cout << "NOTE: Created mast::DoElem with node-kind " << get_node_kind(new_node_id) << std::endl;
         return new_node_id;
     }
 

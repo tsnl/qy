@@ -14,7 +14,7 @@ hello = 42 * n;
 
 --- sub m3 ---
 
-f_negate = (x) -> (-x);
+f_negate = (x) -> TOT {w = -x; w};
 f_negate ~ (F32) -> F32;
 
 --- sub entry_point_for_v1_default_loader ---
@@ -27,10 +27,11 @@ T1 = U32;
 T2 = m1[F64, U32, 0]:A;
 T3 = m1[F64, U32, 0]:E;
 k = m3:f_negate;
-main = () -> ML { 0 };
+main = () -> ML {0};
+main ~ () -> ML I32;
 
-// FIXME: get this working
-third = m3:f_negate(45f);
+third = k(45f);
 fourth = third + 45f;
+// fifth = main!();
 
 main_for_v1_default_loader = main;

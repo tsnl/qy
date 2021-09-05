@@ -21,7 +21,7 @@
 //      DONE: write 2 (families of) functions: 
 //          (1) monomorphize_it: returns monomorphic version of TS/Exp
 //          (2) evaluate_it: 
-//                  - returns mval::ValueID or mtype::TID
+//                  - returns mval::ValVarID or mtype::TID
 //                  - only accepts monomorphic input
 //      Invoke 'monomorphize' for delayed deps (i.e. any lambda body)
 //      Invoke 'monomorphize', then 'evaluate' for immediate deps.
@@ -39,6 +39,6 @@ namespace monomorphizer::eval {
 
     // NOTE: these functions could throw errors 
     mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s);
-    mval::ValueID eval_exp(mast::ExpID exp_id, sub::Substitution* s);
+    mval::ValVarID eval_exp(mast::ExpID exp_id, sub::Substitution* s);
 
 }

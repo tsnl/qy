@@ -231,8 +231,11 @@ class LambdaExp(BaseExp):
         self.non_local_name_map[non_local_id_name] = non_local_id_def_rec
 
     def add_global_id_ref(self, name, found_def_obj):
-        assert name not in self.global_name_map
-        self.global_name_map[name] = found_def_obj
+        opt_existing_def_rec = self.global_name_map.get(name, None)
+        if opt_existing_def_rec is None:
+            self.global_name_map[name] = found_def_obj
+        else:
+            assert found_def_obj is opt_existing_def_rec
 
 
 class BaseCallExp(BaseExp, metaclass=abc.ABCMeta):

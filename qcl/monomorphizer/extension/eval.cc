@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <set>
 
 #include "mast.hh"
 #include "panic.hh"
@@ -21,17 +22,18 @@
 
 namespace monomorphizer::eval {
     
-    mast::TypeSpecID p2m_ts(mast::TypeSpecID ts_id, sub::Substitution* s, stack::Stack* st);
-    mast::ExpID p2m_exp(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st);
+    mast::TypeSpecID p2m_ts(mast::TypeSpecID ts_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
+    mast::ExpID p2m_exp(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
+    mast::ElemID p2m_elem(mast::ElemID elem_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
 
     static mtype::TID eval_poly_ts_impl(mast::TypeSpecID poly_ts, sub::Substitution* s, stack::Stack* st);
-    static mval::ValueID eval_poly_exp_impl(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st);
+    static mval::ValVarID eval_poly_exp_impl(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st);
 
     static mtype::TID eval_poly_ts(mast::TypeSpecID poly_ts, sub::Substitution* s);
-    static mval::ValueID eval_poly_exp(mast::ExpID exp_id, sub::Substitution* s);
+    static mval::ValVarID eval_poly_exp(mast::ExpID exp_id, sub::Substitution* s);
     
     static mtype::TID eval_mono_ts(mast::TypeSpecID ts_id, stack::Stack* stack);
-    static mval::ValueID eval_mono_exp(mast::ExpID exp_id, stack::Stack* stack);
+    static mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* stack);
     
 }
 
@@ -71,7 +73,8 @@ namespace monomorphizer::eval {
     mast::TypeSpecID p2m_ts(
         mast::TypeSpecID mast_ts_id,
         sub::Substitution* s,
-        stack::Stack* st
+        stack::Stack* st,
+        std::set<GDefID>& ignore_gdef_id_set
     ) {
         // std::cout << "DEBUG: p2m_ts: sub is..." << std::endl;
         // sub::debug_print(s);
@@ -99,15 +102,27 @@ namespace monomorphizer::eval {
                     }
                     case gdef::DefKind::CONST_TS:
                     {
-                        // must apply this substitution to the stored ID
-                        mast::TypeSpecID old_target = gdef::get_def_target(old_def_id);
-                        mast::TypeSpecID new_target = p2m_ts(old_target, s, st);
-                        if (new_target != old_target) {
-                            char* cp_name = strdup(gdef::get_def_name(old_def_id));
-                            GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_TS, cp_name);
-                            gdef::set_def_target(new_def_id, new_target);
-                            return mast::new_gid_ts(new_def_id);
+                        // must apply this substitution to the stored ID UNLESS in the ignore set:
+                        auto found_tuple = ignore_gdef_id_set.insert(old_def_id);
+                        if (found_tuple.second) {
+                            // evaluating the nested expression:
+                            mast::TypeSpecID old_target = gdef::get_def_target(old_def_id);
+                            mast::TypeSpecID new_target = p2m_ts(old_target, s, st, ignore_gdef_id_set);
+                            
+                            // removing the gdef ID from the 'ignore' set and...
+                            ignore_gdef_id_set.erase(old_def_id);
+
+                            // ... promptly returning:
+                            if (new_target != old_target) {
+                                char* cp_name = strdup(gdef::get_def_name(old_def_id));
+                                GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_TS, cp_name);
+                                gdef::set_def_target(new_def_id, new_target);
+                                return mast::new_gid_ts(new_def_id);
+                            } else {
+                                return mast_ts_id;
+                            }
                         } else {
+                            // cycle detected: just return the expression as-is.
                             return mast_ts_id;
                         }
                     }
@@ -130,7 +145,7 @@ namespace monomorphizer::eval {
             case mast::TS_PTR: {
                 auto info = mast::get_info_ptr(mast_ts_id)->ts_ptr;
                 auto old_ptd_ts = info.ptd_ts;
-                auto ptd_ts = p2m_ts(old_ptd_ts, s, st);
+                auto ptd_ts = p2m_ts(old_ptd_ts, s, st, ignore_gdef_id_set);
                 bool contents_is_mut = info.contents_is_mut;
                 if (old_ptd_ts != ptd_ts) {
                     return mast::new_ptr_ts(ptd_ts, contents_is_mut);
@@ -141,10 +156,10 @@ namespace monomorphizer::eval {
             case mast::TS_ARRAY: {
                 auto info = mast::get_info_ptr(mast_ts_id)->ts_array;
                 auto old_ptd_ts = info.ptd_ts;
-                auto ptd_ts = p2m_ts(old_ptd_ts, s, st);
+                auto ptd_ts = p2m_ts(old_ptd_ts, s, st, ignore_gdef_id_set);
                 bool contents_is_mut = info.contents_is_mut;
                 auto old_count_exp = info.count_exp;
-                auto count_exp = p2m_exp(old_count_exp, s, st);
+                auto count_exp = p2m_exp(old_count_exp, s, st, ignore_gdef_id_set);
                 if (old_ptd_ts != ptd_ts || old_count_exp != count_exp) {
                     return mast::new_array_ts(
                         ptd_ts, count_exp, 
@@ -157,7 +172,7 @@ namespace monomorphizer::eval {
             case mast::TS_SLICE: {
                 auto info = mast::get_info_ptr(mast_ts_id)->ts_slice;
                 auto old_ptd_ts = info.ptd_ts;
-                auto ptd_ts = p2m_ts(old_ptd_ts, s, st);
+                auto ptd_ts = p2m_ts(old_ptd_ts, s, st, ignore_gdef_id_set);
                 bool contents_is_mut = info.contents_is_mut;
                 if (old_ptd_ts != ptd_ts) {
                     return mast::new_slice_ts(ptd_ts, contents_is_mut);
@@ -173,7 +188,7 @@ namespace monomorphizer::eval {
                 bool any_elem_changed = false;
                 for (size_t i = 0; i < elem_count; i++) {
                     auto old_ts = info.elem_ts_array[i];
-                    auto new_ts = p2m_ts(old_ts, s, st);
+                    auto new_ts = p2m_ts(old_ts, s, st, ignore_gdef_id_set);
                     
                     if (new_ts != old_ts) {
                         any_elem_changed = true;
@@ -197,8 +212,8 @@ namespace monomorphizer::eval {
                 auto old_arg_ts = info->arg_ts;
                 auto old_ret_ts = info->ret_ts;
 
-                auto new_arg_ts = p2m_ts(old_arg_ts, s, st);
-                auto new_ret_ts = p2m_ts(old_ret_ts, s, st);
+                auto new_arg_ts = p2m_ts(old_arg_ts, s, st, ignore_gdef_id_set);
+                auto new_ret_ts = p2m_ts(old_ret_ts, s, st, ignore_gdef_id_set);
                 auto ret_ses = info->ret_ses;
 
                 if (new_arg_ts != old_arg_ts || new_ret_ts != old_ret_ts) {
@@ -243,9 +258,10 @@ namespace monomorphizer::eval {
     }
 
     mast::ExpID p2m_exp(
-        mast::ExpID mast_exp_id,
+        mast::ExpID mast_exp_id, 
         sub::Substitution* s,
-        stack::Stack* st
+        stack::Stack* st,
+        std::set<GDefID>& ignored_gdef_id_set
     ) {
         auto exp_kind = mast::get_node_kind(mast_exp_id);
         switch (exp_kind) {
@@ -260,10 +276,7 @@ namespace monomorphizer::eval {
             
             case mast::EXP_GID:
             {
-                // IDs accessed from within a monomorphic module are always
-                // monomorphic.
-                // However, this substitution may require us to rewrite this ID
-                // with another.
+                // must replace this GDefID or its referenced contents with substitution `s`
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_gid;
                 GDefID old_def_id = info->def_id;
                 gdef::DefKind old_def_kind = gdef::get_def_kind(old_def_id);
@@ -275,21 +288,28 @@ namespace monomorphizer::eval {
                     }
                     case gdef::DefKind::CONST_EXP:
                     {
-                        // must apply this substitution to the stored ID
-                        mast::ExpID old_target = gdef::get_def_target(old_def_id);
-                        mast::ExpID new_target = p2m_exp(old_target, s, st);
-                        if (new_target != old_target) {
-                            char* cp_name = strdup(gdef::get_def_name(old_def_id));
-                            GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_EXP, cp_name);
-                            gdef::set_def_target(new_def_id, new_target);
-                            return mast::new_gid_exp(new_def_id);
+                        // must apply this substitution to the stored ID UNLESS we are already in the process of 
+                        // expanding this ID (i.e., a cycle has occurred)
+                        auto found_tuple = ignored_gdef_id_set.insert(old_def_id);
+                        if (found_tuple.second) {
+                            // insertion succeeded <=> this GDefID was freshly added
+                            mast::ExpID old_target = gdef::get_def_target(old_def_id);
+                            mast::ExpID new_target = p2m_exp(old_target, s, st, ignored_gdef_id_set);
+                            if (new_target != old_target) {
+                                char* cp_name = strdup(gdef::get_def_name(old_def_id));
+                                GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_EXP, cp_name);
+                                gdef::set_def_target(new_def_id, new_target);
+                                return mast::new_gid_exp(new_def_id);
+                            } else {
+                                return mast_exp_id;
+                            }
                         } else {
                             return mast_exp_id;
                         }
                     }
                     case gdef::DefKind::BV_EXP:
                     {
-                        // updating 
+                        // replacing the whole GDefID (with a total constant one)
                         GDefID new_def_id = sub::rw_def_id(s, old_def_id);
                         if (new_def_id == old_def_id) {
                             return mast_exp_id;
@@ -314,10 +334,10 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_call;
                 
                 auto old_fn_exp = info->called_fn;
-                auto new_fn_exp = p2m_exp(old_fn_exp, s, st);
+                auto new_fn_exp = p2m_exp(old_fn_exp, s, st, ignored_gdef_id_set);
 
                 auto old_arg_exp = info->arg_exp_id;
-                auto new_arg_exp = p2m_exp(old_arg_exp, s, st);
+                auto new_arg_exp = p2m_exp(old_arg_exp, s, st, ignored_gdef_id_set);
 
                 bool call_is_non_tot = info->call_is_non_tot;
 
@@ -341,7 +361,7 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_unary;
 
                 auto old_arg_exp = info->arg_exp;
-                auto new_arg_exp = p2m_exp(old_arg_exp, s, st);
+                auto new_arg_exp = p2m_exp(old_arg_exp, s, st, ignored_gdef_id_set);
 
                 auto unary_op = info->unary_op;
 
@@ -359,10 +379,10 @@ namespace monomorphizer::eval {
                 auto binary_op = info->binary_op;
 
                 auto old_lt_arg_exp = info->lt_arg_exp;
-                auto new_lt_arg_exp = p2m_exp(old_lt_arg_exp, s, st);
+                auto new_lt_arg_exp = p2m_exp(old_lt_arg_exp, s, st, ignored_gdef_id_set);
 
                 auto old_rt_arg_exp = info->rt_arg_exp;
-                auto new_rt_arg_exp = p2m_exp(old_rt_arg_exp, s, st);
+                auto new_rt_arg_exp = p2m_exp(old_rt_arg_exp, s, st, ignored_gdef_id_set);
 
                 bool changed = (
                     (old_lt_arg_exp != new_lt_arg_exp) ||
@@ -384,13 +404,13 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_if_then_else;
 
                 auto old_cond_exp = info->cond_exp;
-                auto new_cond_exp = p2m_exp(old_cond_exp, s, st);
+                auto new_cond_exp = p2m_exp(old_cond_exp, s, st, ignored_gdef_id_set);
 
                 auto old_then_exp = info->then_exp;
-                auto new_then_exp = p2m_exp(old_then_exp, s, st);
+                auto new_then_exp = p2m_exp(old_then_exp, s, st, ignored_gdef_id_set);
 
                 auto old_else_exp = info->else_exp;
-                auto new_else_exp = p2m_exp(old_else_exp, s, st);
+                auto new_else_exp = p2m_exp(old_else_exp, s, st, ignored_gdef_id_set);
 
                 bool changed = (
                     (old_cond_exp != new_cond_exp) ||
@@ -414,7 +434,7 @@ namespace monomorphizer::eval {
                 auto info = &raw_info->exp_get_tuple_field;
 
                 auto old_tuple_exp = info->tuple_exp_id;
-                auto new_tuple_exp = p2m_exp(old_tuple_exp, s, st);
+                auto new_tuple_exp = p2m_exp(old_tuple_exp, s, st, ignored_gdef_id_set);
 
                 auto index = info->index;
 
@@ -461,7 +481,7 @@ namespace monomorphizer::eval {
                 auto info = &raw_info->exp_lambda;
 
                 auto old_body_exp_id = info->body_exp;
-                auto new_body_exp_id = p2m_exp(old_body_exp_id, s, st);
+                auto new_body_exp_id = p2m_exp(old_body_exp_id, s, st, ignored_gdef_id_set);
 
                 bool changed = (old_body_exp_id != new_body_exp_id);
                 if (changed) {
@@ -495,7 +515,7 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_allocate_one;
 
                 auto old_init_exp_id = info->stored_val_exp_id;
-                auto new_init_exp_id = p2m_exp(old_init_exp_id, s, st);
+                auto new_init_exp_id = p2m_exp(old_init_exp_id, s, st, ignored_gdef_id_set);
 
                 bool changed = (old_init_exp_id != new_init_exp_id);
                 if (changed) {
@@ -514,10 +534,10 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_allocate_many;
 
                 auto old_init_exp_id = info->initializer_stored_val_exp_id;
-                auto new_init_exp_id = p2m_exp(old_init_exp_id, s, st);
+                auto new_init_exp_id = p2m_exp(old_init_exp_id, s, st, ignored_gdef_id_set);
 
                 auto old_count_exp_id = info->alloc_count_exp;
-                auto new_count_exp_id = p2m_exp(new_init_exp_id, s, st);
+                auto new_count_exp_id = p2m_exp(new_init_exp_id, s, st, ignored_gdef_id_set);
 
                 bool changed = (old_init_exp_id != new_init_exp_id);
                 if (changed) {
@@ -535,12 +555,64 @@ namespace monomorphizer::eval {
             case mast::EXP_CHAIN:
             {
                 auto info = &mast::get_info_ptr(mast_exp_id)->exp_chain;
-                throw new Panic("NotImplemented: p2m_exp for EXP_CHAIN");
+                
+                size_t elem_count = info->prefix_elem_count;
+                mast::ElemID* old_elem_array = info->prefix_elem_array;
+                mast::ElemID* new_elem_array;
+                if (elem_count) {
+                    new_elem_array = new mast::ElemID[elem_count];
+                    // std::cout << "INFO: p2m_exp::EXP_CHAIN has elem-array " << new_elem_array << std::endl;
+                    for (size_t i = 0; i < elem_count; i++) {
+                        new_elem_array[i] = p2m_elem(old_elem_array[i], s, st, ignored_gdef_id_set);
+                    }
+                } else {
+                    new_elem_array = nullptr;
+                }
+
+                mast::ExpID ret_exp_id = p2m_exp(info->ret_exp_id, s, st, ignored_gdef_id_set);
+
+                return mast::new_chain_exp(elem_count, new_elem_array, ret_exp_id);
             } break;
 
             default:
             {
                 throw new Panic("NotImplemented: p2m_exp for unknown exp kind");
+            } break;
+        }
+    }
+
+    mast::ElemID p2m_elem(
+        mast::ElemID elem_id, 
+        sub::Substitution* s, 
+        stack::Stack* st, 
+        std::set<GDefID>& ignored_gdef_id_set
+    ) {
+        mast::NodeKind elem_kind = mast::get_node_kind(elem_id);
+        switch (elem_kind) {
+            case mast::ELEM_BIND1T:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_bind1t;
+                auto bound_id = info->bound_id;
+                auto init_ts_id = p2m_ts(info->init_ts_id, s, st, ignored_gdef_id_set);
+                return mast::new_bind1t_elem(bound_id, init_ts_id);
+            } break;
+            case mast::ELEM_BIND1V:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_bind1v;
+                auto bound_id = info->bound_id;
+                auto init_exp_id = p2m_exp(info->init_exp_id, s, st, ignored_gdef_id_set);
+                return mast::new_bind1v_elem(bound_id, init_exp_id);
+            } break;
+            case mast::ELEM_DO:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_do;
+                auto discarded_exp_id = p2m_exp(info->eval_exp_id, s, st, ignored_gdef_id_set);
+                return mast::new_do_elem(discarded_exp_id);
+            } break;
+            default:
+            {
+                // std::cout << "ERROR_EXTRA: unknown elem kind: " << elem_kind << std::endl;
+                throw new Panic("NotImplemented: p2m_elem for unknown elem kind");
             } break;
         }
     }
@@ -564,7 +636,7 @@ namespace monomorphizer::eval {
                 return eval_mono_ts(stored_ts_id, st);
             } break;
             case gdef::DefKind::BV_TS: {
-                std::cout << "ERROR: DefID = " << def_id << std::endl;
+//                std::cout << "ERROR: DefID = " << def_id << std::endl;
                 throw new Panic("InputError: `eval_def_t` cannot eval a bound var");
             } break;
             default: {
@@ -573,7 +645,7 @@ namespace monomorphizer::eval {
         }
     }
 
-    mval::ValueID eval_def_v(GDefID def_id, stack::Stack* st) {
+    mval::ValVarID eval_def_v(GDefID def_id, stack::Stack* st) {
         gdef::DefKind def_kind = gdef::get_def_kind(def_id);
         switch (def_kind) {
             case gdef::DefKind::CONST_TOT_VAL: {
@@ -592,20 +664,38 @@ namespace monomorphizer::eval {
         }
     }
 
+}
+
+//
+// Implementation:
+//
+
+namespace monomorphizer::eval {
+
+    static mtype::TID eval_mono_ts(mast::TypeSpecID ts_id, stack::Stack* st);
+    static mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st);
+    static void eval_mono_elem(mast::ElemID elem_id, stack::Stack* st);
+
     static mtype::TID eval_poly_ts_impl(
         mast::TypeSpecID poly_ts,
         sub::Substitution* s,
         stack::Stack* st
     ) {
-        mast::TypeSpecID mono_ts = p2m_ts(poly_ts, s, st);
+        mast::TypeSpecID mono_ts; {
+            std::set<GDefID> ignored_def_id_set;
+            mono_ts = p2m_ts(poly_ts, s, st, ignored_def_id_set);
+        }
         return eval_mono_ts(mono_ts, st);
     }
-    static mval::ValueID eval_poly_exp_impl(
+    static mval::ValVarID eval_poly_exp_impl(
         mast::ExpID exp_id,
         sub::Substitution* s,
         stack::Stack* st
     ) {
-        mast::ExpID mono_exp = p2m_exp(exp_id, s, st);
+        mast::ExpID mono_exp; {
+            std::set<GDefID> ignored_def_id_set;
+            mono_exp = p2m_exp(exp_id, s, st, ignored_def_id_set);
+        }
         return eval_mono_exp(mono_exp, st);
     }
 
@@ -627,6 +717,10 @@ namespace monomorphizer::eval {
         stack::destroy_stack(st);
         return res;
     }
+
+    //
+    // `eval_mono_ts` implementation:
+    //
 
     mtype::TID eval_mono_ts(
         mast::TypeSpecID ts_id,
@@ -660,7 +754,7 @@ namespace monomorphizer::eval {
             case mast::TS_ARRAY: {
                 auto info = &mast::get_info_ptr(ts_id)->ts_array;
                 mtype::TID ptd_tid = eval_mono_ts(info->ptd_ts, st);
-                mval::ValueID count_val_id = eval_mono_exp(info->count_exp, st);
+                mval::ValVarID count_val_id = eval_mono_exp(info->count_exp, st);
                 bool is_mut = info->contents_is_mut;
                 return mtype::get_array_tid(ptd_tid, count_val_id, is_mut);
             } break;
@@ -716,12 +810,47 @@ namespace monomorphizer::eval {
         }
     }
 
+    //
+    // `eval_mono_elem` implementation:
+    //
+
+    void eval_mono_elem(mast::ElemID elem_id, stack::Stack* st) {
+        mast::NodeKind elem_kind = mast::get_node_kind(elem_id);
+        switch (elem_kind)
+        {
+            case mast::ELEM_BIND1T:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_bind1t;
+                stack::def_t_in_stack(st, info->bound_id, eval_mono_ts(info->init_ts_id, st));
+            } break;
+            case mast::ELEM_BIND1V:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_bind1v;
+                stack::def_v_in_stack(st, info->bound_id, eval_mono_exp(info->init_exp_id, st));
+            } break;
+            case mast::ELEM_DO:
+            {
+                auto info = &mast::get_info_ptr(elem_id)->elem_do;
+                eval_mono_exp(info->eval_exp_id, st);
+            } break;
+            default:
+            {
+                // std::cout << "DEBUG: unknown elem kind: " << elem_kind << std::endl;
+                throw new Panic("Unknown/invalid 'elem' kind encountered while evaluating");
+            }
+        }
+    }
+
+    //
+    // `eval_mono_exp` implementation:
+    //
+
     static ssize_t signed_int_exp_val(size_t mu, bool b) {
         ssize_t m = mu;
         ssize_t v = b ? -m : +m;
         return v;
     }
-    static mval::ValueID eval_mono_int_exp(mast::ExpID exp_id) {
+    static mval::ValVarID eval_mono_int_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_int;
         auto m = info->mantissa;
         auto b = info->is_neg;
@@ -755,7 +884,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValueID eval_mono_float_exp(mast::ExpID exp_id) {
+    static mval::ValVarID eval_mono_float_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_float;
         switch (info->suffix) {
             case FS_F32: {
@@ -766,7 +895,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValueID eval_mono_string_exp(mast::ExpID exp_id) {
+    static mval::ValVarID eval_mono_string_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_str;
         auto code_point_count = info->code_point_count;
         auto code_point_array = new int[code_point_count];
@@ -778,12 +907,17 @@ namespace monomorphizer::eval {
             code_point_array
         );
     }
-    static mval::ValueID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_call;
 
+        // checking that the SES is TOT: only total functions can be evaluated at compile-time.
+        if (info->call_is_non_tot) {
+            throw new Panic("Cannot evaluate a non-total function at compile-time.");
+        }
+
         // first, evaluating the argument and function in the outer stack frame:
-        mval::ValueID fun_vid = eval_mono_exp(info->called_fn, st);
-        mval::ValueID arg_vid = eval_mono_exp(info->arg_exp_id, st);
+        mval::ValVarID fun_vid = eval_mono_exp(info->called_fn, st);
+        mval::ValVarID arg_vid = eval_mono_exp(info->arg_exp_id, st);
 
         // reaching inside the `fun` VID to retrieve the expression to evaluate, args to pass.
         assert(mval::value_kind(fun_vid) == mval::ValueKind::VK_FUNCTION);
@@ -797,7 +931,7 @@ namespace monomorphizer::eval {
 
         // pushing a new frame to the stack, computing the return value:
         stack::push_stack_frame(st);
-        mval::ValueID ret_val_id;
+        mval::ValVarID ret_val_id;
         {
             // setting up the stack frame with ctx_enclosed_ids
             for (uint32_t i = 0; i < fn_enclosed_id_count; i++) {
@@ -807,8 +941,8 @@ namespace monomorphizer::eval {
                     mtype::TID target = enclosed_mapping.target;
                     stack::def_t_in_stack(st, enclosed_mapping.name, target);
                 } else {
-                    // target is an mval::ValueID
-                    mval::ValueID target = enclosed_mapping.target;
+                    // target is an mval::ValVarID
+                    mval::ValVarID target = enclosed_mapping.target;
                     stack::def_v_in_stack(st, enclosed_mapping.name, target);
                 }
             }
@@ -823,7 +957,7 @@ namespace monomorphizer::eval {
                 auto arg_seq_info_index = mval::value_info(arg_vid).sequence_info_index;
                 for (uint32_t j = 0; j < fn_arg_name_count; j++) {
                     intern::IntStr arg_name = fn_arg_name_array[j];
-                    mval::ValueID arg_bound = mval::get_seq_elem(arg_seq_info_index, j).value();
+                    mval::ValVarID arg_bound = mval::get_seq_elem(arg_seq_info_index, j).value();
                     stack::def_v_in_stack(st, arg_name, arg_bound);
                 }
             }
@@ -835,10 +969,10 @@ namespace monomorphizer::eval {
 
         return ret_val_id;
     }
-    static mval::ValueID eval_mono_unary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_unary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_unary;
                 
-        mval::ValueID arg_val_id = eval_mono_exp(info->arg_exp, st);
+        mval::ValVarID arg_val_id = eval_mono_exp(info->arg_exp, st);
         auto vk = mval::value_kind(arg_val_id);
         auto vi = mval::value_info(arg_val_id);
 
@@ -902,14 +1036,14 @@ namespace monomorphizer::eval {
         }
         return result;
     }
-    static mval::ValueID eval_mono_binary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_binary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_binary;
         
-        mval::ValueID lt_arg_val_id = eval_mono_exp(info->lt_arg_exp, st);
+        mval::ValVarID lt_arg_val_id = eval_mono_exp(info->lt_arg_exp, st);
         auto lt_vk = mval::value_kind(lt_arg_val_id);
         auto lt_vi = mval::value_info(lt_arg_val_id);
 
-        mval::ValueID rt_arg_val_id = eval_mono_exp(info->rt_arg_exp, st);
+        mval::ValVarID rt_arg_val_id = eval_mono_exp(info->rt_arg_exp, st);
         auto rt_vk = mval::value_kind(rt_arg_val_id);
         auto rt_vi = mval::value_info(rt_arg_val_id);
 
@@ -1090,10 +1224,12 @@ namespace monomorphizer::eval {
                 }
             }
             case BINARY_EQ: {
-                return mval::equals(lt_arg_val_id, rt_arg_val_id);
+                auto truth_val = mval::equals(lt_arg_val_id, rt_arg_val_id);
+                return mval::push_u1(truth_val);
             }
             case BINARY_NE: {
-                return !mval::equals(lt_arg_val_id, rt_arg_val_id);
+                auto truth_val = !mval::equals(lt_arg_val_id, rt_arg_val_id);
+                return mval::push_u1(truth_val);
             }
             case BINARY_LOGICAL_AND: {
                 switch (vk) {
@@ -1122,7 +1258,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValueID eval_mono_ite_exp(mast::ExpID ite_exp, stack::Stack* st) {
+    static mval::ValVarID eval_mono_ite_exp(mast::ExpID ite_exp, stack::Stack* st) {
         auto info = &mast::get_info_ptr(ite_exp)->exp_if_then_else;
         auto cond_val_id = eval_mono_exp(info->cond_exp, st);
         auto cond_vk = mval::value_kind(cond_val_id);
@@ -1137,7 +1273,7 @@ namespace monomorphizer::eval {
             eval_mono_exp(info->else_exp, st)
         );
     }
-    static mval::ValueID eval_mono_get_tuple_field_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_get_tuple_field_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_get_tuple_field;
         auto tuple_val_id = eval_mono_exp(info->tuple_exp_id, st);
         auto index = info->index;
@@ -1148,12 +1284,12 @@ namespace monomorphizer::eval {
             throw new Panic("ERROR: sequence index out of bounds");
         }
     }
-    static mval::ValueID eval_mono_get_module_field_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_get_module_field_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_get_mono_module_field;
         GDefID field_def_id = modules::get_mono_mod_field_at(info->template_id, info->field_index);
         return eval_def_v(field_def_id, st);
     }
-    static mval::ValueID eval_mono_lambda_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_lambda_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_lambda;
 
         // copying argument name array:
@@ -1194,7 +1330,25 @@ namespace monomorphizer::eval {
             body_exp
         );
     }
-    mval::ValueID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
+    mval::ValVarID eval_mono_chain_exp(mast::ExpID exp_id, stack::Stack* st) {
+        auto info = &mast::get_info_ptr(exp_id)->exp_chain;
+        
+        stack::push_stack_frame(st);
+        mval::ValVarID res;
+        {
+            auto elem_count = info->prefix_elem_count;
+            auto elem_array = info->prefix_elem_array;
+            for (size_t i = 0; i < elem_count; i++) {
+                eval_mono_elem(elem_array[i], st);
+            }
+            
+            res = eval_mono_exp(info->ret_exp_id, st);
+        }
+        stack::pop_stack_frame(st);
+
+        return res;
+    }
+    mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
         mast::NodeKind exp_kind = mast::get_node_kind(exp_id);
         switch (exp_kind) {
             case mast::EXP_UNIT: {
@@ -1245,7 +1399,7 @@ namespace monomorphizer::eval {
                 throw new Panic("NotImplemented: eval_mono EXP_ALLOCATE_MANY");
             } break;
             case mast::EXP_CHAIN: {
-                throw new Panic("NotImplemented: eval_mono EXP_CHAIN");
+                return eval_mono_chain_exp(exp_id, st);
             } break;
             
             case mast::EXP_GET_POLY_MODULE_FIELD:
@@ -1272,7 +1426,7 @@ namespace monomorphizer::eval {
     mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s) {
         return eval_poly_ts(ts_id, s);
     }
-    mval::ValueID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
+    mval::ValVarID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
         return eval_poly_exp(exp_id, s);
     }
 

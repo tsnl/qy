@@ -1,0 +1,19 @@
+--- sub entry_point_for_v1_default_loader ---
+
+hello ~ I32 -> I32;
+hello = (x) -> {
+    if (x == 0) {
+        hello(x + 2) * 2
+    } else if (x == 1) {
+        42 + hello(x - 1)
+    } else {
+        x
+    }
+};
+
+y = hello(1);
+n = hello(32);
+
+main_for_v1_default_loader = () -> ML {
+    0
+};

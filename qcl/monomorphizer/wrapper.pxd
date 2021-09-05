@@ -104,7 +104,7 @@ cdef extern from "extension/id-arg-list.hh" namespace "monomorphizer::arg_list":
 #
 
 cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
-    ctypedef size_t ValueID
+    ctypedef size_t ValVarID
 
     void ensure_mval_init()
 
@@ -213,7 +213,7 @@ cdef:
         AllocationTarget allocation_target,
         bint allocation_is_mut
     )
-    ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID * prefix_elem_id_array, ExpID ret_exp_id)
+    ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID *mv_prefix_elem_id_array, ExpID ret_exp_id)
     ExpID w_new_get_mono_module_field_exp(MonoModID mono_mod_id, size_t exp_field_ix)
     ExpID w_new_get_poly_module_field_exp(
         PolyModID poly_mod_id, size_t exp_field_ix,
@@ -241,7 +241,8 @@ cdef:
 
 # elements:
 cdef:
-    ElemID w_new_bind1v_elem(GDefID bound_def_id, ExpID init_exp_id)
+    ElemID w_new_bind1v_elem(IntStr bound_def_id, ExpID init_exp_id)
+    ElemID w_new_bind1t_elem(IntStr bound_def_id, TypeSpecID init_ts_id)
     ElemID w_new_do_elem(ExpID eval_exp_id)
 
 # shared:
@@ -337,6 +338,6 @@ cdef:
     TID w_get_string_tid();
     TID w_get_tuple_tid(ArgListID arg_list_id);
     TID w_get_ptr_tid(TID ptd_tid, bint contents_is_mut);
-    TID w_get_array_tid(TID ptd_tid, ValueID count_val_id, bint contents_is_mut);
+    TID w_get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut);
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);

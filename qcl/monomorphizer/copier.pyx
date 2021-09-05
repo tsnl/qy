@@ -20,6 +20,8 @@ This pass is broken into multiple phases:
 - P3: monomorphization: simply instantiate the entry-point module, 
 """
 
+import sys
+import time
 import typing as t
 from collections import namedtuple
 
@@ -81,8 +83,13 @@ cpdef void monomorphize_project(object proj: frontend.project.Project):
 #
 
 cdef void panic(object msg: str):
-    print(f"FATAL_ERROR: {msg}")
-    exit(-1)
+    flush_wait_time_in_sec = 0.05           # 50ms should be plenty
+    time.sleep(flush_wait_time_in_sec)      # allow stdout to flush everything printed so far
+    
+    print(f"FATAL_ERROR: {msg}", flush=True, file=sys.stderr)
+    
+    time.sleep(flush_wait_time_in_sec)      # allow stderr to flush this message
+    exit(-1)                                # exit
 
 
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
@@ -600,28 +607,65 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             body_exp
         )
 
-    # TODO: translate AST to MAST using the following functions:
-    # ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
-    # ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
-    # ExpID w_new_allocate_many_exp(
-    #     ExpID initializer_stored_val_exp_id,
-    #     ExpID alloc_count_exp,
-    #     AllocationTarget allocation_target,
-    #     bint allocation_is_mut
-    # )
-    # ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID * prefix_elem_id_array, ExpID ret_exp_id)
-    # ExpID w_new_get_mono_module_field_exp(MonoModID mono_mod_id, size_t exp_field_ix)
-    # ExpID w_new_get_poly_module_field_exp(
-    #     PolyModID poly_mod_id, size_t exp_field_ix,
-    #     size_t arg_count, NodeID* arg_array
-    # )
+    elif isinstance(e, ast.node.ChainExp):
+        # ast-to-mast for the prefix element list:
+        elem_id_count = <size_t> len(e.table.elements)
+        if elem_id_count:
+            elem_id_array = <wrapper.ElemID*> malloc(sizeof(wrapper.ElemID) * elem_id_count)
+            for i, elem in enumerate(e.table.elements):
+                elem_id_array[i] = ast_to_mast_elem(elem)
+        else:
+            elem_id_array = <wrapper.ElemID*> 0
 
+        # ast-to-mast for the final returned expression:
+        if e.opt_tail is not None:
+            chain_ret_exp_id = ast_to_mast_exp(e.opt_tail)
+        else:
+            chain_ret_exp_id = wrapper.w_get_unit_exp()
 
-    panic(f"NotImplemented: ast_to_mast_exp for e={e}")
+        return wrapper.w_new_chain_exp(
+            elem_id_count,
+            elem_id_array,
+            chain_ret_exp_id
+        )
+
+    else:
+        # TODO: translate AST to MAST using the following functions:
+        # ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
+        # ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
+        # ExpID w_new_allocate_many_exp(
+        #     ExpID initializer_stored_val_exp_id,
+        #     ExpID alloc_count_exp,
+        #     AllocationTarget allocation_target,
+        #     bint allocation_is_mut
+        # )
+        # ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID* prefix_elem_id_array, ExpID ret_exp_id)
+        # ExpID w_new_get_mono_module_field_exp(MonoModID mono_mod_id, size_t exp_field_ix)
+        # ExpID w_new_get_poly_module_field_exp(
+        #     PolyModID poly_mod_id, size_t exp_field_ix,
+        #     size_t arg_count, NodeID* arg_array
+        # )
+
+        panic(f"NotImplemented: ast_to_mast_exp for e={e}")
 
 
 cdef wrapper.ElemID ast_to_mast_elem(object e: ast.node.BaseElem):
-    panic(f"NotImplemented: ast_to_mast_elem for e={e}")
+    if isinstance(e, ast.node.Bind1VElem):
+        return wrapper.w_new_bind1v_elem(
+            mk_int_str_from_py_str(e.id_name, 0),
+            ast_to_mast_exp(e.bound_exp)
+        )
+    elif isinstance(e, ast.node.Bind1TElem):
+        return wrapper.w_new_bind1t_elem(
+            mk_int_str_from_py_str(e.id_name, 1),
+            ast_to_mast_ts(e.bound_type_spec)
+        )
+    elif isinstance(e, ast.node.ForceEvalElem):
+        return wrapper.w_new_do_elem(
+            ast_to_mast_exp(e.discarded_exp)
+        )
+    else:
+        panic(f"Unknown element instance: {e}")
 
 
 cdef void define_declared_def_ids_in_proj(object proj: frontend.project.Project):
@@ -715,33 +759,30 @@ cdef instantiate_entry_point(object proj: frontend.Project):
         rec_name_correct = (rec.name == entry_point_function_name)
         if rec_name_correct:
             entry_point_rec = rec
-
-    if not entry_point_rec:
+            break
+    else:
         msg_suffix = f"Could not find a suitable entry point function named `{entry_point_function_name}`"
         raise excepts.CheckerCompilationError(msg_suffix)
 
-    elif entry_point_rec:
-        # checking this symbol's type:
-        rec_type = rec.scheme.shallow_instantiate()
-        rec_type_correct = (rec_type == wrapper.w_get_function_tid(
-            wrapper.w_get_unit_tid(),
-            wrapper.w_get_s32_tid(),
-            wrapper.SES_ML
-        ))
-        if not rec_type_correct:
-            msg_suffix = (
-                f"Supplied entry-point named `{entry_point_function_name}` does not have the correct type: "
-                f"expected `{entry_point_function_name} ~ () -> ML I32`"
-            )
-            raise excepts.CheckerCompilationError(msg_suffix)
+    # checking the found symbol's type:
+    _, rec_tid = rec.scheme.shallow_instantiate()
+    expected_tid = type.get_fn_type(
+        type.get_unit_type(),
+        type.get_int_type(32, is_unsigned=False),
+        type.side_effects.SES.ML,
+        type.closure_spec.CS.Maybe      # i.e. does not need a ctx pointer, but can be invoked with one (layout)
+    )
+    rec_type_correct = (rec_tid == expected_tid)
+    if not rec_type_correct:
+        msg_suffix = (
+            f"Supplied entry-point named `{entry_point_function_name}` does not have the correct type: "
+            f"expected `{entry_point_function_name} ~ {type.spelling.of(expected_tid)}`, but "
+            f"received `{entry_point_function_name} ~ {type.spelling.of(rec_tid)}`"
+        )
+        # raise excepts.CheckerCompilationError(msg_suffix)
+        panic(msg_suffix)
 
     # instantiating this entry-point sub-module:
     #   - it acts as the root of all monomorphic global discovery
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
     wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
-
-#
-#
-# Panic
-#
-#

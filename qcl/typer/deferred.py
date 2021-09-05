@@ -24,9 +24,8 @@ class DeferredList(object):
         )
         self.unsolved_deferred_order_list.append(unsolved_tuple)
 
-    def solve_step(self) -> t.Tuple[bool, substitution.Substitution]:
+    def solve_step(self, all_sub) -> t.Tuple[bool, substitution.Substitution]:
         any_solved = False
-        all_sub = substitution.empty
 
         if self.unsolved_deferred_order_list:
             still_unsolved_index_list = []
@@ -34,13 +33,13 @@ class DeferredList(object):
                 original_index, deferred_order = unsolved_tuple
 
                 assert isinstance(deferred_order, BaseDeferredOrder)
-                order_solved, order_sub = deferred_order.solve()
-
-                all_sub = order_sub.compose(all_sub)
-                any_solved = any_solved or order_solved
+                order_solved, order_sub = deferred_order.solve(all_sub)
 
                 if not order_solved:
                     still_unsolved_index_list.append(unsolved_tuple)
+
+                any_solved = any_solved or order_solved
+                all_sub = order_sub.compose(all_sub)
 
             self.unsolved_deferred_order_list = still_unsolved_index_list
 
@@ -84,20 +83,23 @@ class BaseDeferredOrder(object, metaclass=abc.ABCMeta):
             self.elem_tid_list[i] = sub.rewrite_type(self.elem_tid_list[i])
 
     @abc.abstractmethod
-    def solve(self) -> t.Tuple[bool, substitution.Substitution]:
+    def solve(self, all_sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         """
         :return: a tuple of...
             - True if solved, else False
             - the substitution to compose
         """
 
+    def extra_args_str(self):
+        return ""
+
     def __str__(self):
-        name = self.__class__.__name__
+        name = f"{self.__class__.__name__}[{self.extra_args_str()}]"
         args = (
             type.spelling.of(elem_tid)
             for elem_tid in self.elem_tid_list
         )
-        return f"{name}({', '.join(args)})"
+        return f"{name}({', '.join(args)}) @ {self.loc}"
 
 
 class TypeCastDeferredOrder(BaseDeferredOrder):
@@ -112,13 +114,16 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
     def src_tid(self):
         return self.elem_tid_list[1]
 
-    def solve(self) -> t.Tuple[bool, substitution.Substitution]:
-        return self.cast(self.src_tid, self.dst_tid)
+    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+        return self.cast(
+            sub.rewrite_type(self.src_tid),
+            sub.rewrite_type(self.dst_tid),
+            sub
+        )
 
     @staticmethod
-    def cast(src_tid, dst_tid):
+    def cast(src_tid, dst_tid, sub):
         solved = True
-        sub = substitution.empty
 
         src_tk = type.kind.of(src_tid)
         dst_tk = type.kind.of(dst_tid)
@@ -253,7 +258,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
     def proxy_ret_tid(self):
         return self.elem_tid_list[1]
 
-    def solve(self) -> t.Tuple[bool, substitution.Substitution]:
+    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         # lazily initializing the static 'pos_neg_overload_map':
         #   - we cannot instantiate this in the global scope for Python module initialization reasons
         if UnaryOpDeferredOrder.pos_neg_overload_map is None:
@@ -285,10 +290,11 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             if arg_tk == type.kind.TK.Pointer:
                 # irrelevant whether pointer is mutable or not.
 
-                sub = unifier.unify(
+                new_sub = unifier.unify(
                     self.proxy_ret_tid,
                     type.elem.tid_of_ptd(self.proxy_arg_tid)
                 )
+                sub = new_sub.compose(sub)
 
                 return (
                     False,
@@ -352,37 +358,77 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
 class BinaryOpDeferredOrder(BaseDeferredOrder):
     # FIXME: need to infer BinaryOp arguments based on either left or right, not both
     overload_map = None
+    uniformly_typed_operators = None
 
     def __init__(self, loc, binary_op, lt_arg_tid, rt_arg_tid, ret_tid):
         super().__init__(loc, [lt_arg_tid, rt_arg_tid, ret_tid])
         self.binary_op = binary_op
 
+    def extra_args_str(self):
+        return self.get_bin_op_spelling(self.binary_op)
+
     @property
     def proxy_lt_arg_tid(self):
         return self.elem_tid_list[0]
+
+    @proxy_lt_arg_tid.setter
+    def proxy_lt_arg_tid(self, val):
+        self.elem_tid_list[0] = val
 
     @property
     def proxy_rt_arg_tid(self):
         return self.elem_tid_list[1]
 
+    @proxy_rt_arg_tid.setter
+    def proxy_rt_arg_tid(self, val):
+        self.elem_tid_list[1] = val
+
     @property
     def proxy_ret_tid(self):
         return self.elem_tid_list[2]
 
-    def solve(self) -> t.Tuple[bool, substitution.Substitution]:
+    @proxy_ret_tid.setter
+    def proxy_ret_tid(self, val):
+        self.elem_tid_list[2] = val
+
+    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         # Initializing overload map lazily:
         if BinaryOpDeferredOrder.overload_map is None:
             BinaryOpDeferredOrder.overload_map = BinaryOpDeferredOrder.new_half_overload_map()
+            BinaryOpDeferredOrder.uniformly_typed_operators = {
+                ast.node.BinaryOp.Pow,
+                ast.node.BinaryOp.Mul,
+                ast.node.BinaryOp.Div,
+                ast.node.BinaryOp.Rem,
+                ast.node.BinaryOp.Add,
+                ast.node.BinaryOp.Sub
+            }
             assert isinstance(BinaryOpDeferredOrder.overload_map, dict)
 
-        # Deferring if arg types are BOTH variables:
+        # Deferring if arg types & return type are ALL variables
         #   - if either arg is a variable, we can still infer types for type-symmetric binary operators.
-        if is_var_tid(self.proxy_lt_arg_tid) and is_var_tid(self.proxy_rt_arg_tid):
+        #   - if both args are variables but return type is not, we can infer all types for symmetric operators.
+        args_are_vars = (is_var_tid(self.proxy_lt_arg_tid) and is_var_tid(self.proxy_rt_arg_tid))
+        ret_is_var = is_var_tid(self.proxy_ret_tid)
+        if args_are_vars and ret_is_var:
             return False, substitution.empty
 
         # Whether lhs or rhs is var or not, we must still unify the types
-        # of symmetric binary operators, i.e. all of them.
-        sub = unifier.unify(self.proxy_lt_arg_tid, self.proxy_rt_arg_tid)
+        # of symmetrically typed binary operators, i.e. all of the binary operators.
+        new_sub = unifier.unify(self.proxy_lt_arg_tid, self.proxy_rt_arg_tid)
+        sub = new_sub.compose(sub)
+
+        # first, assuming no new information was gained this pass:
+        no_new_info_this_pass = True
+
+        def update_with_sub(update_sub):
+            nonlocal sub, self
+            nonlocal no_new_info_this_pass
+            sub = update_sub.compose(sub)
+            # self.proxy_ret_tid = sub.rewrite_type(self.proxy_ret_tid)
+            # self.proxy_lt_arg_tid = sub.rewrite_type(self.proxy_lt_arg_tid)
+            # self.proxy_rt_arg_tid = sub.rewrite_type(self.proxy_rt_arg_tid)
+            no_new_info_this_pass = False
 
         # Trying to look up and solve with the left argument:
         if not is_var_tid(self.proxy_lt_arg_tid):
@@ -391,8 +437,10 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 self.proxy_lt_arg_tid
             )
             ret_tid = BinaryOpDeferredOrder.overload_map.get(key, None)
+            if ret_tid is None:
+                self.raise_call_error()
             ret_sub = unifier.unify(self.proxy_ret_tid, ret_tid)
-            sub = ret_sub.compose(sub)
+            update_with_sub(ret_sub)
 
         # Trying to look and solve with the right argument:
         if not is_var_tid(self.proxy_rt_arg_tid):
@@ -401,24 +449,40 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 self.proxy_rt_arg_tid
             )
             ret_tid = BinaryOpDeferredOrder.overload_map.get(key, None)
-            if ret_tid is not None:
-                ret_sub = unifier.unify(self.proxy_ret_tid, ret_tid)
-                sub = ret_sub.compose(sub)
-            else:
+            if ret_tid is None:
                 self.raise_call_error()
+            ret_sub = unifier.unify(self.proxy_ret_tid, ret_tid)
+            update_with_sub(ret_sub)
+
+        # For arithmetic operators, we can infer the type of all arguments using just the return type,
+        # since they form a closed group:
+        if self.binary_op in self.uniformly_typed_operators:
+            lt_sub = unifier.unify(self.proxy_lt_arg_tid, self.proxy_ret_tid)
+            update_with_sub(lt_sub)
+            rt_sub = unifier.unify(self.proxy_rt_arg_tid, self.proxy_ret_tid)
+            update_with_sub(rt_sub)
 
         # Returning:
-        return (
-            True,
-            sub
-        )
+        success = not no_new_info_this_pass
+        return success, sub
 
     def raise_call_error(self):
         binary_op = self.binary_op
         lt_arg_tid = self.proxy_lt_arg_tid
         rt_arg_tid = self.proxy_rt_arg_tid
 
-        binary_op_spelling = {
+        binary_op_spelling = self.get_bin_op_spelling(binary_op)
+
+        lt_arg_spelling = type.spelling.of(lt_arg_tid)
+        rt_arg_spelling = type.spelling.of(rt_arg_tid)
+
+        msg_suffix = f"invalid args for binary op call: {binary_op_spelling}({lt_arg_spelling}, {rt_arg_spelling})"
+
+        raise excepts.TyperCompilationError(msg_suffix)
+
+    @staticmethod
+    def get_bin_op_spelling(binary_op):
+        return {
             ast.node.BinaryOp.Pow: '^',
             ast.node.BinaryOp.Mul: '*',
             ast.node.BinaryOp.Div: '/',
@@ -434,13 +498,6 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
             ast.node.BinaryOp.LogicalAnd: 'and',
             ast.node.BinaryOp.LogicalOr: 'or'
         }[binary_op]
-
-        lt_arg_spelling = type.spelling.of(lt_arg_tid)
-        rt_arg_spelling = type.spelling.of(rt_arg_tid)
-
-        msg_suffix = f"invalid args for binary op call: {binary_op_spelling}({lt_arg_spelling}, {rt_arg_spelling})"
-
-        raise excepts.TyperCompilationError(msg_suffix)
 
     """
     Overload maps for symmetric binary operations are 'halved':

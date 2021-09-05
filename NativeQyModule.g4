@@ -173,11 +173,11 @@ eqBinaryExp
     ;
 logicalAndBinaryExp
     : through=eqBinaryExp
-    | lt=logicalAndBinaryExp op='&' rt=eqBinaryExp
+    | lt=logicalAndBinaryExp op='and' rt=eqBinaryExp
     ;
 logicalOrBinaryExp
     : through=logicalAndBinaryExp
-    | lt=logicalOrBinaryExp op='|' rt=logicalAndBinaryExp
+    | lt=logicalOrBinaryExp op='or' rt=logicalAndBinaryExp
     ;
 
 bulkyExp

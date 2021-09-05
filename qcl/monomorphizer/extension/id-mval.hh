@@ -2,6 +2,6 @@
 
 namespace monomorphizer::mval {
 
-    using ValueID = size_t;
+    using ValVarID = size_t;
     
 }

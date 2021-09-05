@@ -56,7 +56,7 @@ namespace monomorphizer::arg_list {
 
     ArgTrieNodeID get_atn_with_value_prepended(
         ArgTrieNodeID root, 
-        mval::ValueID appended_value_id
+        mval::ValVarID appended_value_id
     );
     ArgTrieNodeID get_atn_with_type_prepended(
         ArgTrieNodeID root, 
@@ -139,7 +139,7 @@ namespace monomorphizer::arg_list {
     }
     ArgTrieNodeID get_atn_with_value_prepended(
         ArgTrieNodeID root, 
-        mval::ValueID appended_value_id
+        mval::ValVarID appended_value_id
     ) {
         return help_get_atn_with_id_appended(
             root,
@@ -188,7 +188,7 @@ namespace monomorphizer::arg_list {
 
     ArgListID cons_val(
         ArgListID list,
-        mval::ValueID value_id
+        mval::ValVarID value_id
     ) {
         return static_cast<ArgListID>(
             get_atn_with_value_prepended(

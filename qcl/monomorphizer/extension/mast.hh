@@ -55,6 +55,7 @@ namespace monomorphizer::mast {
 
         // chain elements:
         ELEM_BIND1V,
+        ELEM_BIND1T,
         ELEM_DO,
     };
 
@@ -212,7 +213,11 @@ namespace monomorphizer::mast {
         intern::IntStr bound_id;
         mast::ExpID init_exp_id;
     };
-
+    struct Bind1TElemNodeInfo {
+        intern::IntStr bound_id;
+        mast::ExpID init_ts_id;
+    };
+    
     struct DoElemNodeInfo {
         mast::ExpID eval_exp_id;
     };
@@ -264,6 +269,7 @@ namespace monomorphizer::mast {
 
         // elements:
         Bind1VElemNodeInfo elem_bind1v;
+        Bind1TElemNodeInfo elem_bind1t;
         DoElemNodeInfo elem_do;
     };
 
@@ -365,7 +371,7 @@ namespace monomorphizer::mast {
     );
     mast::ExpID new_chain_exp(
         size_t prefix_elem_id_count,
-        mast::ElemID* prefix_elem_id_array,
+        mast::ElemID* mv_prefix_elem_id_array,
         mast::ExpID ret_exp_id
     );
     mast::ExpID new_get_mono_module_field_exp(
@@ -383,6 +389,10 @@ namespace monomorphizer::mast {
     mast::ElemID new_bind1v_elem(
         intern::IntStr bound_id,
         mast::ExpID init_exp_id
+    );
+    mast::ElemID new_bind1t_elem(
+        intern::IntStr bound_id,
+        mast::TypeSpecID init_ts_id
     );
     mast::ElemID new_do_elem(
         mast::ExpID eval_exp_id

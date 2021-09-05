@@ -12,7 +12,7 @@
 namespace monomorphizer::mtype {
 
     using MemWindowKey = std::pair<mtype::TID, bool>;
-    using ArrayKey = std::tuple<mtype::TID, mval::ValueID, bool>;
+    using ArrayKey = std::tuple<mtype::TID, mval::ValVarID, bool>;
     using FuncKey = std::tuple<mtype::TID, mtype::TID, SES>;
 
     static bool s_is_init = false;
@@ -128,7 +128,7 @@ namespace monomorphizer::mtype {
 
     TID get_array_tid(
         TID ptd_tid, 
-        mval::ValueID count_val_id, 
+        mval::ValVarID count_val_id, 
         bool contents_is_mut
     ) {
         ArrayKey const key = {ptd_tid, count_val_id, contents_is_mut};

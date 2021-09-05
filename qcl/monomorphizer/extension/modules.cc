@@ -303,7 +303,7 @@ namespace monomorphizer::modules {
                 switch (poly_field_def_kind) {
                     case gdef::DefKind::CONST_EXP: {
                         mast::ExpID poly_field_target = raw_poly_field_target;
-                        mval::ValueID mono_field_target = eval::eval_exp(poly_field_target, instantiating_sub);
+                        mval::ValVarID mono_field_target = eval::eval_exp(poly_field_target, instantiating_sub);
                         raw_mono_field_target = mono_field_target;
                     } break;
                     case gdef::DefKind::CONST_TS: {

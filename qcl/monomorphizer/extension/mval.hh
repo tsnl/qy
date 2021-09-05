@@ -1,3 +1,5 @@
+// this module models global value variables (each with a `ValVarID`)
+
 #pragma once
 
 #include <cstddef>
@@ -11,11 +13,13 @@
 
 namespace monomorphizer::mval {
 
-    extern ValueID const NULL_VID;
+    extern ValVarID const NULL_VID;
     extern size_t const MAX_VAL_HASH_BYTE_COUNT;
 
     enum ValueKind {
         VK_ERROR = 0,
+
+        // immutable body types:
         VK_UNIT,
         VK_U1, VK_U8, VK_U16, VK_U32, VK_U64,
         VK_S8, VK_S16, VK_S32, VK_S64,
@@ -26,7 +30,7 @@ namespace monomorphizer::mval {
         VK_SLICE,
         VK_FUNCTION
 
-        // todo: add pointers
+        // todo: add pointers, mutation
     };
 
     union ValueInfo {
@@ -49,7 +53,7 @@ namespace monomorphizer::mval {
     struct CtxEnclosedId {
         intern::IntStr name;
         size_t target;
-        // NOTE: `target` is either an mtype::TID or an mval::ValueID
+        // NOTE: `target` is either an mtype::TID or an mval::ValVarID
 
         inline
         CtxEnclosedId()
@@ -92,21 +96,21 @@ namespace monomorphizer::mval {
 namespace monomorphizer::mval {
 
     // value constructors:
-    ValueID get_unit();
-    ValueID push_u1(bool v);
-    ValueID push_u8(uint8_t v);
-    ValueID push_u16(uint16_t v);
-    ValueID push_u32(uint32_t v);
-    ValueID push_u64(uint64_t v);
-    ValueID push_s8(int8_t v);
-    ValueID push_s16(int16_t v);
-    ValueID push_s32(int32_t v);
-    ValueID push_s64(int64_t v);
-    ValueID push_f32(float v);
-    ValueID push_f64(double v);
-    ValueID push_str(size_t code_point_count, int* mv_code_point_array);
-    ValueID push_tuple(size_t elem_id_count, ValueID* mv_elem_id_array);
-    ValueID push_function(
+    ValVarID get_unit();
+    ValVarID push_u1(bool v);
+    ValVarID push_u8(uint8_t v);
+    ValVarID push_u16(uint16_t v);
+    ValVarID push_u32(uint32_t v);
+    ValVarID push_u64(uint64_t v);
+    ValVarID push_s8(int8_t v);
+    ValVarID push_s16(int16_t v);
+    ValVarID push_s32(int32_t v);
+    ValVarID push_s64(int64_t v);
+    ValVarID push_f32(float v);
+    ValVarID push_f64(double v);
+    ValVarID push_str(size_t code_point_count, int* mv_code_point_array);
+    ValVarID push_tuple(size_t elem_id_count, ValVarID* mv_elem_id_array);
+    ValVarID push_function(
         uint32_t arg_name_count,
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
@@ -115,12 +119,12 @@ namespace monomorphizer::mval {
     );
 
     // property accessors:
-    ValueKind value_kind(ValueID value_id);
-    ValueInfo value_info(ValueID value_id);
-    std::optional<ValueID> get_seq_elem(size_t sequence_info_index, size_t index);
+    ValueKind value_kind(ValVarID value_id);
+    ValueInfo value_info(ValVarID value_id);
+    std::optional<ValVarID> get_seq_elem(size_t sequence_info_index, size_t index);
     FuncInfo* get_func_info(size_t func_info_index);
 
     // equality:
-    bool equals(ValueID v1, ValueID v2);
+    bool equals(ValVarID v1, ValVarID v2);
 
 }
