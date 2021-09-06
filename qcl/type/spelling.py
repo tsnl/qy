@@ -87,6 +87,10 @@ def of(tid: identity.TID):
     elif type_kind in (kind.TK.BoundVar, kind.TK.FreeVar):
         return f"{tid}:{var_names[tid]}"
 
+    elif type_kind == kind.TK.Tuple:
+        content = ', '.join((of(elem.tid_of_field_ix(tid, i)) for i in range(elem.count(tid))))
+        return f"({content})"
+
     else:
         raise NotImplementedError(f"`spell` for type of kind {type_kind}")
 
@@ -96,7 +100,7 @@ def of_ses(ses: side_effects.SES):
         side_effects.SES.Tot: "TOT",
         side_effects.SES.Dv: "DV",
         side_effects.SES.ST: "ST",
-        side_effects.SES.Exn: "Exn",
+        side_effects.SES.Exn: "EXN",
         side_effects.SES.ML: "ML",
         side_effects.SES.Elim_AnyNonTot: "<AnyNonTot>"
     }.get(ses, "?")

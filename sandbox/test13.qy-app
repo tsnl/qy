@@ -5,7 +5,7 @@
 
 fibonacci ~ I32 -> I32;
 fibonacci = (x) -> {
-    if (x == 1 or x == 0) {
+    if (x == 0 or x == 1) {
         1
     } else {
         fibonacci(x - 1) + fibonacci(x - 2)

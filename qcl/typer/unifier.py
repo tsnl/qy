@@ -14,7 +14,7 @@ from . import substitution
 #
 
 
-def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
+def unify_tid(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
     # NOTE: `allow_u_mut_ptr` is a hack used to allow `*` to de-reference mutable as well as immutable pointers.
 
     #
@@ -81,8 +81,8 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
             if not ses_are_equal(t_ses, u_ses):
                 raise_unification_error(t, u, f"cannot unify two function types with incompatible SES")
 
-            s1 = unify(type.elem.tid_of_fn_arg(t), type.elem.tid_of_fn_arg(u))
-            s2 = unify(s1.rewrite_type(type.elem.tid_of_fn_ret(t)), s1.rewrite_type(type.elem.tid_of_fn_ret(u)))
+            s1 = unify_tid(type.elem.tid_of_fn_arg(t), type.elem.tid_of_fn_arg(u))
+            s2 = unify_tid(s1.rewrite_type(type.elem.tid_of_fn_ret(t)), s1.rewrite_type(type.elem.tid_of_fn_ret(u)))
 
             return s1.compose(s2)
 
@@ -107,7 +107,7 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
 
                 t_elem_tid = type.elem.tid_of_field_ix(t, i)
                 u_elem_tid = type.elem.tid_of_field_ix(u, i)
-                elem_sub = unify(t_elem_tid, u_elem_tid)
+                elem_sub = unify_tid(t_elem_tid, u_elem_tid)
                 sub = sub.compose(elem_sub)
 
             return sub
@@ -126,14 +126,14 @@ def unify(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False):
                     raise_unification_error(t, u, msg_suffix)
 
             if tk_t == type.kind.TK.Pointer:
-                return unify(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
+                return unify_tid(type.elem.tid_of_ptd(t), type.elem.tid_of_ptd(u))
             else:
                 assert tk_t in (type.kind.TK.Array, type.kind.TK.Slice)
-                s1 = unify(
+                s1 = unify_tid(
                     type.elem.tid_of_ptd(t),
                     type.elem.tid_of_ptd(u)
                 )
-                s2 = unify(
+                s2 = unify_tid(
                     type.elem.tid_of_size(t),
                     type.elem.tid_of_size(u)
                 )

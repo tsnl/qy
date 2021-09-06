@@ -63,18 +63,18 @@ def infer_project_types(
     for file_module_exp in all_file_module_list:
         sub, file_mod_tid = infer_file_mod_exp_tid(project, file_module_exp, deferred_list)
 
-    # TODO: iteratively and repeatedly attempt to resolve each DeferredOrder
+    # iteratively and repeatedly attempt to resolve each DeferredOrder:
     #   - DeferredOrder `solve` calls resolve overloaded type operations
     #   - can begin by simply printing each item in the DeferredList
     #   - simply call `solve`, and manage a list of stuff that is stalled.
-    #       - boolean ret field True if further iterations requested
+    #       - boolean ret field True if further iterations requested (since new info was obtained)
+    #       - iterate until fixed-point is reached, when system is stable
 
     any_solved = True
-    deferred_sub = substitution.empty
     while any_solved:
-        any_solved, deferred_sub = deferred_list.solve_step(deferred_sub)
-        if any_solved:
-            rewrite_system_with_sub(root_ctx, deferred_list, deferred_sub)
+        any_solved = deferred_list.solve_step(
+            lambda rw_sub: rewrite_system_with_sub(root_ctx, deferred_list, rw_sub)
+        )
 
     if not deferred_list.check_all_solved():
         unsolved = deferred_list.unsolved_str()
@@ -372,7 +372,7 @@ def infer_typing_elem_types(
         instantiate_sub, lhs_tid = lhs_def_obj.scheme.shallow_instantiate()
         sub = instantiate_sub.compose(sub)
 
-        unify_sub = unifier.unify(lhs_tid, rhs_tid)
+        unify_sub = unifier.unify_tid(lhs_tid, rhs_tid)
         sub = unify_sub.compose(sub)
 
         # sub.rewrite_contexts_everywhere(ctx)
@@ -390,7 +390,7 @@ def unify_existing_def(ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> sub
     # NOTE: the existing def can be immutable: internally promoted to mutable by unifier
     # NOTE: directly access body_tid to avoid instantiating free vars
     old_def_tid = lhs_def_obj.scheme.body_tid
-    unify_sub = unifier.unify(old_def_tid, new_def_tid, allow_u_mut_ptr=True)
+    unify_sub = unifier.unify_tid(old_def_tid, new_def_tid, allow_u_mut_ptr=True)
     sub = sub.compose(unify_sub)
 
     # NOTE: we need to rewrite contexts as soon as unifying definitions to avoid multiple subs of an old seed
@@ -594,7 +594,7 @@ def help_infer_exp_tid(
         actual_fn_tid = type.get_fn_type(formal_arg_tid, ret_tid, call_ses, closure_spec)
         actual_fn_tid = s12.rewrite_type(actual_fn_tid)
 
-        s3 = unifier.unify(actual_fn_tid, formal_fn_tid)
+        s3 = unifier.unify_tid(actual_fn_tid, formal_fn_tid)
 
         s123 = s3.compose(s12)
         ret_tid = s123.rewrite_type(ret_tid)
@@ -863,9 +863,9 @@ def help_infer_exp_tid(
         )
         sub = arg_exp_sub.compose(sub)
 
-        unify_sub_1 = unifier.unify(ptr_tid, arg_exp_tid)
+        unify_sub_1 = unifier.unify_tid(ptr_tid, arg_exp_tid)
         sub = unify_sub_1.compose(sub)
-        unify_sub_2 = unifier.unify(ptd_tid, val_exp_tid)
+        unify_sub_2 = unifier.unify_tid(ptd_tid, val_exp_tid)
         sub = unify_sub_2.compose(sub)
 
         exp_cs = unifier.unify_closure_spec(val_exp_cs, ptr_exp_cs)
@@ -923,7 +923,7 @@ def help_infer_exp_tid(
                     deferred_list,
                     exp.opt_initializer_exp
                 )
-                unify_sub = unifier.unify(ptd_ts_tid, ptd_tid)
+                unify_sub = unifier.unify_tid(ptd_ts_tid, ptd_tid)
                 sub = unify_sub.compose(sub)
                 ses = unifier.unify_ses(ses, initializer_ses)
                 cs = unifier.unify_closure_spec(cs, initializer_cs)
@@ -969,7 +969,7 @@ def help_infer_exp_tid(
             ses = unifier.unify_ses(ses, branch_exp_ses)
             cs = unifier.unify_closure_spec(cs, branch_exp_cs)
 
-            branch_unify_sub = unifier.unify(branch_exp_tid, ret_tid)
+            branch_unify_sub = unifier.unify_tid(branch_exp_tid, ret_tid)
             sub = branch_unify_sub.compose(sub)
 
         cond_exp_sub, cond_exp_tid, cond_exp_ses, cond_exp_cs = infer_exp_tid(
@@ -982,7 +982,7 @@ def help_infer_exp_tid(
         ses = unifier.unify_ses(ses, cond_exp_ses)
         cs = unifier.unify_closure_spec(cs, cond_exp_cs)
 
-        cond_unify_sub = unifier.unify(cond_exp_tid, type.get_int_type(1, is_unsigned=True))
+        cond_unify_sub = unifier.unify_tid(cond_exp_tid, type.get_int_type(1, is_unsigned=True))
         sub = cond_unify_sub.compose(sub)
 
         unify_branch_exp(exp.then_exp)
@@ -992,7 +992,65 @@ def help_infer_exp_tid(
 
         return sub, ret_tid, ses, cs
 
-    # TODO: TupleExp: should be very straightforward
+    # typing TupleExp
+    elif isinstance(exp, ast.node.TupleExp):
+        out_sub = substitution.empty
+        out_ses = SES.Tot
+        out_cs = CS.Maybe
+
+        elem_tid_list = []
+
+        for item_exp in exp.items:
+            item_sub, item_tid, item_ses, item_cs = infer_exp_tid(project, ctx, deferred_list, item_exp)
+            out_sub = item_sub.compose(out_sub)
+            out_ses = unifier.unify_ses(item_ses, out_ses)
+            out_cs = unifier.unify_closure_spec(item_cs, out_cs)
+            elem_tid_list.append(item_tid)
+
+        return out_sub, type.get_tuple_type(tuple(elem_tid_list)), out_ses, out_cs
+
+    # typing GetElementByDot{Index|Name}Exp
+    elif isinstance(exp, ast.node.GetElementByDotIndexExp):
+        container_sub, container_tid, container_ses, container_cs = infer_exp_tid(
+            project, ctx, deferred_list, exp.container
+        )
+
+        index_exp = exp.index
+        assert isinstance(index_exp, ast.node.NumberExp)
+        index_int = int(index_exp.value_text)
+
+        proxy_ret_tid = type.new_free_var(f"proxy_for_dot_index_exp")
+
+        deferred_order = deferred.DotIndexOpDeferredOrder(
+            exp.loc,
+            container_tid,
+            index_int,
+            proxy_ret_tid
+        )
+        deferred_list.add(deferred_order)
+
+        return container_sub, proxy_ret_tid, container_ses, container_cs
+
+    elif isinstance(exp, ast.node.GetElementByDotNameExp):
+        container_sub, container_tid, container_ses, container_cs = infer_exp_tid(
+            project, ctx, deferred_list, exp.container
+        )
+
+        field_name = exp.key_name
+        assert isinstance(field_name, str)
+
+        proxy_ret_tid = type.new_free_var(f"proxy_for_dot_name_exp")
+
+        deferred_list.add(
+            deferred_order=deferred.DotNameOpDeferredOrder(
+                exp.loc,
+                container_tid,
+                field_name,
+                proxy_ret_tid
+            )
+        )
+
+        return container_sub, proxy_ret_tid, container_ses, container_cs
 
     else:
         raise NotImplementedError(f"Type inference for {exp.__class__.__name__}")
@@ -1276,7 +1334,7 @@ def help_type_id_in_module_node(
                     sub = sub.compose(instantiate_sub)
 
                     # unifying value args:
-                    this_val_arg_sub = unifier.unify(
+                    this_val_arg_sub = unifier.unify_tid(
                         sub.rewrite_type(formal_value_arg_tid),
                         sub.rewrite_type(actual_arg_tid)
                     )
@@ -1331,7 +1389,7 @@ def help_type_id_in_module_node(
             assert len(actual_type_arg_tid_list) == len(instantiated_scheme.bound_vars)
             for passed_arg, formal_arg_var in zip(actual_type_arg_tid_list, instantiated_scheme.bound_vars):
                 placeholder_arg_var = instantiate_sub.rewrite_type(formal_arg_var)
-                unify_sub = unifier.unify(passed_arg, placeholder_arg_var)
+                unify_sub = unifier.unify_tid(passed_arg, placeholder_arg_var)
                 instantiate_sub = instantiate_sub.compose(unify_sub)
 
         sub = sub.compose(instantiate_sub)

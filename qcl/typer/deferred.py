@@ -24,11 +24,12 @@ class DeferredList(object):
         )
         self.unsolved_deferred_order_list.append(unsolved_tuple)
 
-    def solve_step(self, all_sub) -> t.Tuple[bool, substitution.Substitution]:
+    def solve_step(self, rewriter) -> t.Tuple[bool, substitution.Substitution]:
         any_solved = False
 
         if self.unsolved_deferred_order_list:
             still_unsolved_index_list = []
+            all_sub = substitution.empty
             for unsolved_tuple in self.unsolved_deferred_order_list:
                 original_index, deferred_order = unsolved_tuple
 
@@ -41,9 +42,10 @@ class DeferredList(object):
                 any_solved = any_solved or order_solved
                 all_sub = order_sub.compose(all_sub)
 
+            rewriter(all_sub)
             self.unsolved_deferred_order_list = still_unsolved_index_list
 
-        return any_solved, all_sub
+        return any_solved
 
     def check_all_solved(self):
         return not self.unsolved_deferred_order_list
@@ -82,8 +84,16 @@ class BaseDeferredOrder(object, metaclass=abc.ABCMeta):
         for i in range(len(self.elem_tid_list)):
             self.elem_tid_list[i] = sub.rewrite_type(self.elem_tid_list[i])
 
-    @abc.abstractmethod
     def solve(self, all_sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+        # first, updating all arguments so far with the latest sub:
+        for i, tid in enumerate(self.elem_tid_list):
+            self.elem_tid_list[i] = all_sub.rewrite_type(tid)
+
+        # then, invoking (and returning from) the sub-class-dependent virtual method, `on_solve`:
+        return self.on_solve(all_sub)
+
+    @abc.abstractmethod
+    def on_solve(self, all_sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         """
         :return: a tuple of...
             - True if solved, else False
@@ -114,7 +124,7 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
     def src_tid(self):
         return self.elem_tid_list[1]
 
-    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+    def on_solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         return self.cast(
             sub.rewrite_type(self.src_tid),
             sub.rewrite_type(self.dst_tid),
@@ -196,7 +206,7 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
 
             # attempting to unify content types => error if failed.
             if type.elem.tid_of_ptd(dst_tid) != type.get_unit_type():
-                ptd_unify_sub = unifier.unify(
+                ptd_unify_sub = unifier.unify_tid(
                     type.elem.tid_of_ptd(src_tid),
                     type.elem.tid_of_ptd(dst_tid)
                 )
@@ -258,7 +268,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
     def proxy_ret_tid(self):
         return self.elem_tid_list[1]
 
-    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+    def on_solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         # lazily initializing the static 'pos_neg_overload_map':
         #   - we cannot instantiate this in the global scope for Python module initialization reasons
         if UnaryOpDeferredOrder.pos_neg_overload_map is None:
@@ -266,6 +276,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             assert UnaryOpDeferredOrder.pos_neg_overload_map is not None
 
         # deferring if the argument TID is a variable:
+        #   - note that unlike BinaryOpDeferredOrder, we cannot infer the types of args based on return alone.
         if is_var_tid(self.proxy_arg_tid):
             return False, substitution.empty
 
@@ -277,7 +288,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             if opt_ret_tid is not None:
                 return (
                     True,
-                    unifier.unify(opt_ret_tid, self.proxy_ret_tid)
+                    unifier.unify_tid(opt_ret_tid, self.proxy_ret_tid)
                 )
             else:
                 self.raise_call_error()
@@ -290,7 +301,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             if arg_tk == type.kind.TK.Pointer:
                 # irrelevant whether pointer is mutable or not.
 
-                new_sub = unifier.unify(
+                new_sub = unifier.unify_tid(
                     self.proxy_ret_tid,
                     type.elem.tid_of_ptd(self.proxy_arg_tid)
                 )
@@ -356,7 +367,6 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
 
 
 class BinaryOpDeferredOrder(BaseDeferredOrder):
-    # FIXME: need to infer BinaryOp arguments based on either left or right, not both
     overload_map = None
     uniformly_typed_operators = None
 
@@ -391,7 +401,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
     def proxy_ret_tid(self, val):
         self.elem_tid_list[2] = val
 
-    def solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+    def on_solve(self, sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
         # Initializing overload map lazily:
         if BinaryOpDeferredOrder.overload_map is None:
             BinaryOpDeferredOrder.overload_map = BinaryOpDeferredOrder.new_half_overload_map()
@@ -415,7 +425,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
 
         # Whether lhs or rhs is var or not, we must still unify the types
         # of symmetrically typed binary operators, i.e. all of the binary operators.
-        new_sub = unifier.unify(self.proxy_lt_arg_tid, self.proxy_rt_arg_tid)
+        new_sub = unifier.unify_tid(self.proxy_lt_arg_tid, self.proxy_rt_arg_tid)
         sub = new_sub.compose(sub)
 
         # first, assuming no new information was gained this pass:
@@ -439,7 +449,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
             ret_tid = BinaryOpDeferredOrder.overload_map.get(key, None)
             if ret_tid is None:
                 self.raise_call_error()
-            ret_sub = unifier.unify(self.proxy_ret_tid, ret_tid)
+            ret_sub = unifier.unify_tid(self.proxy_ret_tid, ret_tid)
             update_with_sub(ret_sub)
 
         # Trying to look and solve with the right argument:
@@ -451,15 +461,15 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
             ret_tid = BinaryOpDeferredOrder.overload_map.get(key, None)
             if ret_tid is None:
                 self.raise_call_error()
-            ret_sub = unifier.unify(self.proxy_ret_tid, ret_tid)
+            ret_sub = unifier.unify_tid(self.proxy_ret_tid, ret_tid)
             update_with_sub(ret_sub)
 
         # For arithmetic operators, we can infer the type of all arguments using just the return type,
         # since they form a closed group:
         if self.binary_op in self.uniformly_typed_operators:
-            lt_sub = unifier.unify(self.proxy_lt_arg_tid, self.proxy_ret_tid)
+            lt_sub = unifier.unify_tid(self.proxy_lt_arg_tid, self.proxy_ret_tid)
             update_with_sub(lt_sub)
-            rt_sub = unifier.unify(self.proxy_rt_arg_tid, self.proxy_ret_tid)
+            rt_sub = unifier.unify_tid(self.proxy_rt_arg_tid, self.proxy_ret_tid)
             update_with_sub(rt_sub)
 
         # Returning:
@@ -641,6 +651,88 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 ast.node.BinaryOp.LogicalOr
             )
         }
+
+
+class DotIndexOpDeferredOrder(BaseDeferredOrder):
+    def __init__(self, loc, container_tid, index: int, ret_tid):
+        super().__init__(loc, [container_tid, ret_tid])
+        self.index = index
+
+    @property
+    def container_tid(self):
+        return self.elem_tid_list[0]
+
+    @property
+    def ret_tid(self):
+        return self.elem_tid_list[1]
+
+    def on_solve(self, all_sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+        if is_var_tid(self.container_tid):
+            return False, all_sub
+        else:
+            # checking that the container is a struct or tuple:
+            if type.kind.of(self.container_tid) not in (type.kind.TK.Tuple, type.kind.TK.Struct):
+                msg_suffix = f"`<container>.<index>` expressions inapplicable when container not Tuple or Struct"
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            # checking that the index is within bounds:
+            elem_count = type.elem.count(self.container_tid)
+            if self.index > elem_count:
+                msg_suffix = f"`<container>.<index>` expression has index out of bounds: must be <{elem_count}"
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            # acquiring the true field TID:
+            field_tid = type.elem.tid_of_field_ix(self.container_tid, self.index)
+
+            # unifying the true field TID with the proxy, and composing the sub with 'all_sub':
+            sol_sub = unifier.unify_tid(field_tid, self.ret_tid)
+            all_sub = sol_sub.compose(all_sub)
+
+            # returning the all-OK:
+            return True, all_sub
+
+
+class DotNameOpDeferredOrder(BaseDeferredOrder):
+    def __init__(self, loc, container_tid, field_name: str, ret_tid):
+        super().__init__(loc, [container_tid, ret_tid])
+        self.field_name = field_name
+
+    @property
+    def container_tid(self):
+        return self.elem_tid_list[0]
+
+    @property
+    def ret_tid(self):
+        return self.elem_tid_list[1]
+
+    def on_solve(self, all_sub: substitution.Substitution) -> t.Tuple[bool, substitution.Substitution]:
+        if is_var_tid(self.container_tid):
+            return False, all_sub
+        else:
+            # checking that the container is a struct:
+            if type.kind.of(self.container_tid) != type.kind.TK.Struct:
+                msg_suffix = f"`<container>.<name>` expressions inapplicable when container not Struct"
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            # acquiring an index from the name, or raising an error if the name does not exist:
+            opt_field_index = type.elem.field_ix_of_name(self.container_tid, self.field_name)
+            if opt_field_index is None:
+                msg_suffix = (
+                    f"`<container>.<name>` references a field in a struct that does not exist: "
+                    f"is `{self.field_name}` a typo?"
+                )
+                raise excepts.TyperCompilationError(msg_suffix)
+
+            # acquiring the true field TID:
+            assert opt_field_index is not None
+            field_tid = type.elem.tid_of_field_ix(self.container_tid, opt_field_index)
+
+            # unifying the true field TID with the proxy, and composing the sub with `all_sub`:
+            sol_sub = unifier.unify_tid(field_tid, self.ret_tid)
+            all_sub = sol_sub.compose(all_sub)
+
+            # returning the all-OK
+            return True, all_sub
 
 
 def is_var_tid(tid):
