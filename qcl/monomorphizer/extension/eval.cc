@@ -574,6 +574,33 @@ namespace monomorphizer::eval {
                 return mast::new_chain_exp(elem_count, new_elem_array, ret_exp_id);
             } break;
 
+            case mast::EXP_TUPLE:
+            {
+                auto info = &mast::get_info_ptr(mast_exp_id)->exp_tuple;
+                
+                auto item_count = info->item_count;
+                auto old_item_array = info->item_array;
+                auto new_item_array = new mast::ExpID[item_count];
+                for (size_t i = 0; i < item_count; i++) {
+                    new_item_array[i] = p2m_exp(old_item_array[i], s, st, ignored_gdef_id_set);
+                }
+
+                return mast::new_tuple_exp(item_count, new_item_array);
+            } break;
+
+            case mast::EXP_CAST:
+            {
+                auto info = &mast::get_info_ptr(mast_exp_id)->exp_cast;
+
+                auto old_ts_id = info->ts_id;
+                auto new_ts_id = p2m_ts(old_ts_id, s, st, ignored_gdef_id_set);
+
+                auto old_exp_id = info->exp_id;
+                auto new_exp_id = p2m_exp(old_exp_id, s, st, ignored_gdef_id_set);
+
+                return mast::new_cast_exp(new_ts_id, new_exp_id);
+            } break;
+
             default:
             {
                 throw new Panic("NotImplemented: p2m_exp for unknown exp kind");

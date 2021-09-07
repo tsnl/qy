@@ -195,6 +195,7 @@ cdef:
     ExpID w_new_lid_exp(IntStr int_str_id)
     ExpID w_new_gid_exp(GDefID def_id)
     ExpID w_new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot)
+    ExpID w_new_tuple_exp(size_t item_count, ExpID* mv_item_array);
     ExpID w_new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp)
     ExpID w_new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp)
     ExpID w_new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp)
@@ -219,6 +220,7 @@ cdef:
         PolyModID poly_mod_id, size_t exp_field_ix,
         size_t arg_count, NodeID* arg_array
     )
+    ExpID w_new_cast_exp(TypeSpecID ts_id, ExpID exp_id)
 
 # type-specs:
 # - TODO: consider supporting local and global IDs separately
@@ -341,3 +343,4 @@ cdef:
     TID w_get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut);
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);
+

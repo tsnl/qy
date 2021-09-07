@@ -571,7 +571,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitAllocatorHint(self, ctx):
         return {
-            'make': ast.node.Allocator.Heap,
+            'heap': ast.node.Allocator.Heap,
             'push': ast.node.Allocator.Stack
         }[ctx.getText()]
 

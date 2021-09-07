@@ -73,7 +73,7 @@ def infer_project_types(
     any_solved = True
     while any_solved:
         any_solved = deferred_list.solve_step(
-            lambda rw_sub: rewrite_system_with_sub(root_ctx, deferred_list, rw_sub)
+            lambda rw_sub: rewrite_system_with_sub(project, root_ctx, deferred_list, rw_sub)
         )
 
     if not deferred_list.check_all_solved():
@@ -144,10 +144,11 @@ def infer_file_mod_exp_tid(
         # creating a new module type:
         file_mod_tid = type.new_module_type(tuple(elem_info_list))
         out_sub = out_sub.compose(substitution.Substitution({seeded_file_mod_exp_tid: file_mod_tid}))
-        
+
         # applying the substitution:
         file_mod_tid = out_sub.rewrite_type(file_mod_tid)
         rewrite_system_with_sub(
+            project,
             any_ctx=file_mod_ctx,
             deferred_list=deferred_list,
             rw_sub=out_sub
@@ -276,7 +277,7 @@ def infer_binding_elem_types(
 
         lhs_def_obj = ctx.lookup(elem.id_name, shallow=True)
         if lhs_def_obj is not None:
-            def_sub = unify_existing_def(ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
+            def_sub = unify_existing_def(project, ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
             sub = def_sub.compose(sub)
         else:
             # un-seeded: bound inside a chain.
@@ -319,7 +320,7 @@ def infer_binding_elem_types(
         if opt_elem_info_list is not None:
             elem_info = type.elem.ElemInfo(elem.id_name, rhs_tid, is_type_field)
             opt_elem_info_list.append(elem_info)
-        
+
         # return bound TID, closure-spec, and optionally SES
         return opt_rhs_ses, rhs_cs, sub
 
@@ -363,7 +364,7 @@ def infer_typing_elem_types(
         #       at depth 2 (since formal args are defined in their own shell-context)
         lhs_def_obj = ctx.lookup(elem.id_name)
         if lhs_def_obj is not None:
-            def_sub = unify_existing_def(ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
+            def_sub = unify_existing_def(project, ctx, deferred_list, lhs_def_obj, rhs_tid, sub)
             sub = def_sub.compose(sub)
         else:
             msg_suffix = f"cannot type undefined symbol {elem.id_name}"
@@ -382,7 +383,7 @@ def infer_typing_elem_types(
         raise NotImplementedError("Typing any BaseTypingElem")
 
 
-def unify_existing_def(ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> substitution.Substitution:
+def unify_existing_def(project, ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> substitution.Substitution:
     # NOTE: since this ID is pre-seeded, we do not need to instantiate the scheme, rather unify body directly.
     assert not lhs_def_obj.scheme.bound_vars
     sub = sub.get_scheme_body_sub_without_bound_vars(lhs_def_obj.scheme)
@@ -396,7 +397,7 @@ def unify_existing_def(ctx, deferred_list, lhs_def_obj, new_def_tid, sub) -> sub
     # NOTE: we need to rewrite contexts as soon as unifying definitions to avoid multiple subs of an old seed
     #   - sub composition cannot handle such divergent mappings
     #   - this may rewrite `old_def_tid`
-    rewrite_system_with_sub(ctx, deferred_list, sub)
+    rewrite_system_with_sub(project, ctx, deferred_list, sub)
 
     # replacing existing def with better version if relevant:
     #   - functions with `AnyNonTot` SES should be eliminated if possible in favor of a non-TOT side-effects specifier.
@@ -1076,7 +1077,7 @@ def help_infer_type_spec_tid(
     if isinstance(ts, ast.node.IdTypeSpec):
         # looking up the definition:
         found_def_obj = ctx.lookup(ts.name)
-        
+
         # validating found, universe:
         if found_def_obj is None:
             msg_suffix = f"TypeID {ts.name} used but not defined."
@@ -1413,7 +1414,13 @@ def help_type_id_in_module_node(
     return sub, found_tid, out_ses, out_cs
 
 
+#
+# To resolve deferred orders, we would like to rewrite every
+# TID in the system when we have a sub.
+#
+
 def rewrite_system_with_sub(
+        project: "frontend.project.Project",
         any_ctx: "context.Context",
         deferred_list: "deferred.DeferredList",
         rw_sub: "substitution.Substitution"
@@ -1423,3 +1430,156 @@ def rewrite_system_with_sub(
 
     # 2. rewriting deferred orders:
     deferred_list.rewrite_orders_with(rw_sub)
+
+    # 3. rewriting AST properties:
+    rewrite_ast_tids(project, rw_sub)
+
+
+def rewrite_ast_tids(p, rw_sub):
+    for file_mod_exp in p.file_module_exp_list:
+        rewrite_ast_tids_in_file_mod_exp(file_mod_exp, rw_sub)
+
+
+def rewrite_ast_tids_in_file_mod_exp(file_mod_exp, rw_sub):
+    for sub_mod_name, sub_mod_exp in file_mod_exp.sub_module_map.items():
+        rewrite_ast_tids_in_sub_mod_exp(sub_mod_name, sub_mod_exp, rw_sub)
+
+
+def rewrite_ast_tids_in_sub_mod_exp(sub_mod_name, sub_mod_exp, rw_sub):
+    help_rw_ast_tids_in_table(sub_mod_exp.table, rw_sub)
+
+
+def rewrite_ast_tids_in_elem(elem, rw_sub):
+    assert isinstance(elem, ast.node.BaseElem)
+    if isinstance(elem, ast.node.Type1VElem):
+        rewrite_ast_tids_in_ts(elem.type_spec, rw_sub)
+    elif isinstance(elem, ast.node.Bind1VElem):
+        rewrite_ast_tids_in_exp(elem.bound_exp, rw_sub)
+    elif isinstance(elem, ast.node.Bind1TElem):
+        rewrite_ast_tids_in_ts(elem.bound_type_spec, rw_sub)
+    elif isinstance(elem, ast.node.ForceEvalElem):
+        rewrite_ast_tids_in_exp(elem.discarded_exp, rw_sub)
+    else:
+        raise NotImplementedError(f"Unknown element kind: {elem}")
+
+
+def rewrite_ast_tids_in_ts(ts, rw_sub):
+    assert isinstance(ts, ast.node.BaseTypeSpec)
+    help_rw_base_typed_node_tid(ts, rw_sub)
+
+    atomic_ts_classes = (
+        ast.node.UnitTypeSpec,
+        ast.node.IdTypeSpec,
+    )
+    if isinstance(ts, atomic_ts_classes):
+        return
+
+    elif isinstance(ts, ast.node.IdTypeSpecInModule):
+        help_rw_ast_tids_in_id_node_in_module(ts.data, rw_sub)
+
+    elif isinstance(ts, ast.node.TupleTypeSpec):
+        for item_ts in ts.items:
+            rewrite_ast_tids_in_ts(item_ts, rw_sub)
+
+    elif isinstance(ts, ast.node.FnSignatureTypeSpec):
+        rewrite_ast_tids_in_ts(ts.arg_type_spec, rw_sub)
+        rewrite_ast_tids_in_ts(ts.return_type_spec, rw_sub)
+
+    elif isinstance(ts, ast.node.PtrTypeSpec):
+        rewrite_ast_tids_in_ts(ts.ptd_ts, rw_sub)
+
+    elif isinstance(ts, ast.node.ArrayTypeSpec):
+        rewrite_ast_tids_in_ts(ts.elem_ts, rw_sub)
+        rewrite_ast_tids_in_exp(ts.array_count, rw_sub)
+
+    elif isinstance(ts, ast.node.SliceTypeSpec):
+        rewrite_ast_tids_in_ts(ts.elem_ts, rw_sub)
+
+    elif isinstance(ts, ast.node.AdtTypeSpec):
+        help_rw_ast_tids_in_table(ts.table, rw_sub)
+
+    else:
+        raise NotImplementedError(f"Unknown type-spec: {ts}")
+
+
+def rewrite_ast_tids_in_exp(exp, rw_sub):
+    assert isinstance(exp, ast.node.BaseExp)
+    help_rw_base_typed_node_tid(exp, rw_sub)
+
+    atomic_exp_classes = (
+        ast.node.UnitExp,
+        ast.node.NumberExp,
+        ast.node.StringExp,
+        ast.node.IdExp
+    )
+    if isinstance(exp, atomic_exp_classes):
+        return
+
+    elif isinstance(exp, ast.node.LambdaExp):
+        rewrite_ast_tids_in_exp(exp.body, rw_sub)
+
+    elif isinstance(exp, ast.node.UnaryExp):
+        rewrite_ast_tids_in_exp(exp.arg_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.BinaryExp):
+        rewrite_ast_tids_in_exp(exp.lt_arg_exp, rw_sub)
+        rewrite_ast_tids_in_exp(exp.rt_arg_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.PostfixVCallExp):
+        rewrite_ast_tids_in_exp(exp.called_exp, rw_sub)
+        rewrite_ast_tids_in_exp(exp.arg_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.AssignExp):
+        rewrite_ast_tids_in_exp(exp.src_exp, rw_sub)
+        rewrite_ast_tids_in_exp(exp.dst_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.IfExp):
+        rewrite_ast_tids_in_exp(exp.cond_exp, rw_sub)
+        rewrite_ast_tids_in_exp(exp.then_exp, rw_sub)
+        if exp.opt_else_exp is not None:
+            rewrite_ast_tids_in_exp(exp.opt_else_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.ChainExp):
+        help_rw_ast_tids_in_table(exp.table, rw_sub)
+        rewrite_ast_tids_in_exp(exp.opt_tail, rw_sub)
+
+    elif isinstance(exp, ast.node.CastExp):
+        rewrite_ast_tids_in_ts(exp.constructor_ts, rw_sub)
+        rewrite_ast_tids_in_exp(exp.initializer_data, rw_sub)
+
+    elif isinstance(exp, ast.node.TupleExp):
+        for item_exp in exp.items:
+            rewrite_ast_tids_in_exp(item_exp, rw_sub)
+
+    elif isinstance(exp, ast.node.IdExpInModule):
+        help_rw_ast_tids_in_id_node_in_module(exp.data, rw_sub)
+
+    elif isinstance(exp, ast.node.GetElementByDotIndexExp):
+        rewrite_ast_tids_in_exp(exp.container, rw_sub)
+
+    elif isinstance(exp, ast.node.GetElementByDotNameExp):
+        rewrite_ast_tids_in_exp(exp.container, rw_sub)
+
+    else:
+        raise NotImplementedError(f"Unknown BaseExp: {exp}")
+
+
+
+def help_rw_base_typed_node_tid(tn, rw_sub):
+    assert isinstance(tn, ast.node.TypedBaseNode)
+    if tn.x_tid is not None:
+        tn.x_tid = rw_sub.rewrite_type(tn.x_tid)
+
+def help_rw_ast_tids_in_table(table, rw_sub):
+    for elem in table.elements:
+        rewrite_ast_tids_in_elem(elem, rw_sub)
+
+def help_rw_ast_tids_in_id_node_in_module(id_node_data, rw_sub):
+    for arg_node in id_node_data.elem_args:
+        if isinstance(arg_node, ast.node.BaseTypeSpec):
+            rewrite_ast_tids_in_ts(arg_node, rw_sub)
+        elif isinstance(arg_node, ast.node.BaseExp):
+            rewrite_ast_tids_in_exp(arg_node, rw_sub)
+        else:
+            raise NotImplementedError(f"Unknown arg_node: {arg_node}")
+

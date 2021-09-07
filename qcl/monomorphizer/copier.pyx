@@ -629,9 +629,46 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             chain_ret_exp_id
         )
 
+    elif isinstance(e, ast.node.TupleExp):
+        item_count = <size_t> len(e.items)
+        item_array = <wrapper.ExpID*> malloc(sizeof(wrapper.ExpID) * item_count)
+        for i, it_exp in enumerate(e.items):
+            item_array[i] = ast_to_mast_exp(it_exp) 
+
+        return wrapper.w_new_tuple_exp(item_count, item_array)
+
+    elif isinstance(e, ast.node.GetElementByDotIndexExp):
+        tuple_exp_id = ast_to_mast_exp(e.container)
+        index_exp = e.index
+        assert isinstance(index_exp, ast.node.NumberExp)
+        index_int = <size_t> int(index_exp.value_text)
+
+        return wrapper.w_new_get_tuple_field_by_index_exp(
+            tuple_exp_id,
+            index_int
+        )
+
+    elif isinstance(e, ast.node.GetElementByDotNameExp):
+        tuple_exp_id = ast_to_mast_exp(e.container)
+        tuple_py_tid = e.container.x_tid
+        field_name_py_str = e.key_name
+        field_index = type.elem.field_ix_of_name(tuple_py_tid, field_name_py_str)
+        assert tuple_py_tid is not None
+        assert field_name_py_str is not None
+        assert field_index is not None
+
+        return wrapper.w_new_get_tuple_field_by_index_exp(
+            tuple_exp_id,
+            field_index
+        )
+
+    elif isinstance(e, ast.node.CastExp):
+        ts_id = ast_to_mast_ts(e.constructor_ts)
+        exp_id = ast_to_mast_exp(e.initializer_data)
+        return wrapper.w_new_cast_exp(ts_id, exp_id)
+
     else:
         # TODO: translate AST to MAST using the following functions:
-        # ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
         # ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
         # ExpID w_new_allocate_many_exp(
         #     ExpID initializer_stored_val_exp_id,
@@ -639,7 +676,6 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         #     AllocationTarget allocation_target,
         #     bint allocation_is_mut
         # )
-        # ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID* prefix_elem_id_array, ExpID ret_exp_id)
         # ExpID w_new_get_mono_module_field_exp(MonoModID mono_mod_id, size_t exp_field_ix)
         # ExpID w_new_get_poly_module_field_exp(
         #     PolyModID poly_mod_id, size_t exp_field_ix,
@@ -786,3 +822,4 @@ cdef instantiate_entry_point(object proj: frontend.Project):
     #   - it acts as the root of all monomorphic global discovery
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
     wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
+

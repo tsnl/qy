@@ -92,7 +92,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         size_t actual_arg_count,
         NodeID* actual_arg_array
     );
-    
+
     # Expressions:
     ExpID get_unit_exp();
     ExpID new_int_exp(size_t mantissa, IntegerSuffix typing_suffix, bint is_neg);
@@ -101,6 +101,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ExpID new_gid_exp(GDefID def_id);
     ExpID new_lid_exp(IntStr int_str_id);
     ExpID new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot);
+    ExpID new_tuple_exp(size_t item_count, ExpID* mv_item_array);
     ExpID new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp);
     ExpID new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp);
     ExpID new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp);
@@ -124,7 +125,11 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ExpID new_get_poly_module_field_exp(
         PolyModID poly_mod_id, size_t exp_field_ix,
         size_t arg_count, NodeID* arg_array
-    );
+    )
+    ExpID new_cast_exp(
+        TypeSpecID ts_id,
+        ExpID exp_id
+    )
 
     # Element creation methods:
     ElemID new_bind1v_elem(IntStr bound_def_id, ExpID init_exp_id);
@@ -203,6 +208,8 @@ cdef:
         return new_gid_exp(def_id)
     ExpID w_new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot):
         return new_func_call_exp(called_fn, arg_exp, call_is_non_tot)
+    ExpID w_new_tuple_exp(size_t item_count, ExpID* mv_item_array):
+        return new_tuple_exp(item_count, mv_item_array)
     ExpID w_new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp):
         return new_unary_op_exp(unary_op, arg_exp)
     ExpID w_new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp):
@@ -249,7 +256,8 @@ cdef:
             poly_mod_id, exp_field_ix,
             arg_count, arg_array
         )
-
+    ExpID w_new_cast_exp(TypeSpecID ts_id, ExpID exp_id):
+        return new_cast_exp(ts_id, exp_id)
 
 # mast: type-specs:
 cdef:

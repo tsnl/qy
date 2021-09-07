@@ -5,7 +5,7 @@ main_for_v1_default_loader = () -> ML {0};
 --- sub helper ---
 
 j = 3 + 4 + 5;
-x = (1, 2Q, 3f, j);
+x = (1, 2L, 3f, j);
 y0 = x.0;
 y1 = x.1;
 y2 = x.2;

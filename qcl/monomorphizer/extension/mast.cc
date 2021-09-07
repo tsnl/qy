@@ -303,6 +303,18 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
+    mast::ExpID new_tuple_exp(
+        size_t tuple_item_count,
+        mast::ExpID* mv_tuple_item_array
+    ) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_TUPLE);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_tuple;
+        
+        info_ptr->item_count = tuple_item_count;
+        info_ptr->item_array = mv_tuple_item_array;
+
+        return new_node_id;
+    }
     mast::ExpID new_unary_op_exp(
         UnaryOp unary_op,
         mast::ExpID arg_exp
@@ -442,6 +454,18 @@ namespace monomorphizer::mast {
         info_ptr->field_index = field_index;
         info_ptr->arg_count = actual_arg_count;
         info_ptr->arg_array = mv_actual_arg_array;
+
+        return new_node_id;
+    }
+    mast::ExpID new_cast_exp(
+        mast::TypeSpecID ts_id,
+        mast::ExpID exp_id
+    ) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_CAST);
+        auto info_ptr = &get_info_ptr(new_node_id)->exp_cast;
+
+        info_ptr->ts_id = ts_id;
+        info_ptr->exp_id = exp_id;
 
         return new_node_id;
     }

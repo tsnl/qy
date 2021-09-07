@@ -201,7 +201,7 @@ allocateExp
     : hint=allocatorHint (is_mut='!')? (initializer=parenWrappedExp)
     | hint=allocatorHint (is_mut='!')? '[' collection_ts=typeSpec '*' (size=expr|'?') ']' (initializer=parenWrappedExp)?
     ;
-allocatorHint: 'make' | 'push' ;
+allocatorHint: 'heap' | 'push' ;
 assignExp
     : (is_st='ST')? dst=binaryExp ':=' src=bulkyExp
     ;

@@ -41,17 +41,19 @@ namespace monomorphizer::mast {
         EXP_STRING,
         EXP_LID,
         EXP_GID,
+        EXP_TUPLE,
         EXP_FUNC_CALL,
         EXP_UNARY_OP,
         EXP_BINARY_OP,
         EXP_IF_THEN_ELSE,
         EXP_GET_TUPLE_FIELD,
-        EXP_GET_POLY_MODULE_FIELD,
-        EXP_GET_MONO_MODULE_FIELD,
         EXP_LAMBDA,
         EXP_ALLOCATE_ONE,
         EXP_ALLOCATE_MANY,
         EXP_CHAIN,
+        EXP_GET_POLY_MODULE_FIELD,
+        EXP_GET_MONO_MODULE_FIELD,
+        EXP_CAST,
 
         // chain elements:
         ELEM_BIND1V,
@@ -138,6 +140,11 @@ namespace monomorphizer::mast {
         intern::IntStr int_str_id;
     };
 
+    struct TupleExpNodeInfo {
+        size_t item_count;
+        mast::ExpID* item_array;
+    };
+
     struct FuncCallExpNodeInfo {
         mast::ExpID called_fn;
         mast::ExpID arg_exp_id;
@@ -205,6 +212,11 @@ namespace monomorphizer::mast {
         size_t field_index;
     };
 
+    struct CastExpNodeInfo {
+        TypeSpecID ts_id;
+        ExpID exp_id;
+    };
+
     //
     // Element Node Info
     //
@@ -255,6 +267,7 @@ namespace monomorphizer::mast {
         StringExpNodeInfo exp_str;
         GlobalIdExpNodeInfo exp_gid;
         LocalIdExpNodeInfo exp_lid;
+        TupleExpNodeInfo exp_tuple;
         FuncCallExpNodeInfo exp_call;
         UnaryOpExpNodeInfo exp_unary;
         BinaryOpExpNodeInfo exp_binary;
@@ -266,6 +279,7 @@ namespace monomorphizer::mast {
         ChainExpNodeInfo exp_chain;
         GetMonoModuleFieldExpNodeInfo exp_get_mono_module_field;
         GetPolyModuleFieldExpNodeInfo exp_get_poly_module_field;
+        CastExpNodeInfo exp_cast;
 
         // elements:
         Bind1VElemNodeInfo elem_bind1v;
@@ -333,6 +347,10 @@ namespace monomorphizer::mast {
         mast::ExpID arg_exp,
         bool call_is_non_tot
     );
+    mast::ExpID new_tuple_exp(
+        size_t tuple_item_count,
+        mast::ExpID* mv_tuple_item_array
+    );
     mast::ExpID new_unary_op_exp(
         UnaryOp unary_op,
         mast::ExpID arg_exp
@@ -384,7 +402,11 @@ namespace monomorphizer::mast {
         size_t actual_arg_count,
         mast::NodeID* actual_arg_array
     );
-    
+    mast::ExpID new_cast_exp(
+        mast::TypeSpecID ts_id,
+        mast::ExpID exp_id
+    );
+
     // Element creation methods:
     mast::ElemID new_bind1v_elem(
         intern::IntStr bound_id,

@@ -121,8 +121,8 @@ class NumberExp(BaseExp):
         signed_int_suffix_iterable = ('b', 'h', 'i', 'l', 'q', 'n')
         float_suffix_iterable = ('f', 'd')
         all_suffices = (
-            unsigned_int_suffix_iterable + 
-            signed_int_suffix_iterable + 
+            unsigned_int_suffix_iterable +
+            signed_int_suffix_iterable +
             float_suffix_iterable
         )
         assert self.suffix is None or self.suffix in all_suffices
@@ -499,7 +499,7 @@ class FnSignatureTypeSpec(BaseTypeSpec):
         self.return_type_spec = return_type_spec
         self.opt_ses = opt_ses
 
-        # by default, the closure spec is `Yes`, since our language uses fat 
+        # by default, the closure spec is `Yes`, since our language uses fat
         # pointers internally.
         self.closure_spec = type.closure_spec.CS.Yes
 
