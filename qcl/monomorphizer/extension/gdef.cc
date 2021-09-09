@@ -3,6 +3,7 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <cassert>
 
 #include "shared-enums.hh"
 #include "id-gdef.hh"

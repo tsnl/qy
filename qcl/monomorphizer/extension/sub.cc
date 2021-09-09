@@ -2,6 +2,7 @@
 
 #include <map>
 #include <iostream>
+#include <cassert>
 
 #include "gdef.hh"
 #include "debug.hh"

@@ -7,7 +7,7 @@ REM @CD ..\..\
 
 REM: for `monomorphizer`
 CD qcl\monomorphizer\
-cmake .
-cmake --build .
-python3.9 setup.py build_ext --inplace
+cmake -DCMAKE_BUILD_TYPE=Release .
+cmake --build . --config Release
+python setup.py build_ext --inplace
 CD ..\..\
