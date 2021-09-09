@@ -2,6 +2,8 @@
 
 n ~ I32;
 
+number = n;
+
 --- sub abc ---
 
 abc = (x) -> TOT {
@@ -9,4 +11,9 @@ abc = (x) -> TOT {
     b = 42^a;
     a + b
 };
-truth = 7*7 == xyz[abc(24)]:n;
+truth = 7*7 == xyz[abc(24)]:number;
+
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};
