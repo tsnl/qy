@@ -8,6 +8,7 @@
 
 #include "id-mast.hh"
 #include "id-mval.hh"
+#include "id-mtype.hh"
 #include "id-intern.hh"
 #include "shared-enums.hh"
 
@@ -74,6 +75,8 @@ namespace monomorphizer::mval {
         intern::IntStr* arg_name_array;
         CtxEnclosedId* ctx_enclosed_id_array;
         mast::ExpID body_exp_id;
+        mtype::TID arg_tid;
+        mtype::TID ret_tid;
 
         inline
         FuncInfo(
@@ -81,13 +84,17 @@ namespace monomorphizer::mval {
             uint32_t new_ctx_enclosed_id_count,
             intern::IntStr* mv_arg_name_array,
             CtxEnclosedId* mv_ctx_enclosed_id_array,
-            mast::ExpID new_body_exp_id
+            mast::ExpID new_body_exp_id,
+            mtype::TID new_arg_tid,
+            mtype::TID new_ret_tid
         )
         :   arg_name_count(new_arg_name_count),
             ctx_enclosed_id_count(new_ctx_enclosed_id_count),
             arg_name_array(mv_arg_name_array),
             ctx_enclosed_id_array(mv_ctx_enclosed_id_array),
-            body_exp_id(new_body_exp_id)
+            body_exp_id(new_body_exp_id),
+            arg_tid(new_arg_tid),
+            ret_tid(new_ret_tid)
         {}
     };
 
@@ -115,7 +122,9 @@ namespace monomorphizer::mval {
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
         CtxEnclosedId* mv_ctx_enclosed_id_array,
-        mast::ExpID body_exp_id
+        mast::ExpID body_exp_id,
+        mtype::TID arg_tid,
+        mtype::TID ret_tid
     );
 
     // property accessors:

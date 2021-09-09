@@ -416,9 +416,15 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
         if adt_kind == ast.node.AdtKind.Union:
             panic("NotImplemented: ast_to_mast_ts for AdtKind.Union")
         elif adt_kind == ast.node.AdtKind.Structure:
-            panic("NotImplemented: ast_to_mast_ts for AdtKind.Struct")
+            item_count = len(ts.table.ordered_typing_elems)
+            item_array = <wrapper.TypeSpecID*> malloc(item_count * sizeof(wrapper.TypeSpecID))
+            for elem_index, elem in enumerate(ts.table.ordered_typing_elems):
+                assert isinstance(elem, ast.node.Type1VElem)
+                mast_elem_ts_id = ast_to_mast_ts(elem.type_spec)
+                item_array[elem_index] = mast_elem_ts_id
+            return wrapper.w_new_tuple_ts(item_count, item_array)
         else:
-            panic("NotImplemented: ast_to_mast_ts for AdtTypeSpec with unknown kind")
+            panic("NotImplemented: ast_to_mast_ts for AdtTypeSpec with unknown ADT kind")
 
     # error:
     else:
@@ -643,10 +649,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         assert isinstance(index_exp, ast.node.NumberExp)
         index_int = <size_t> int(index_exp.value_text)
 
-        return wrapper.w_new_get_tuple_field_by_index_exp(
-            tuple_exp_id,
-            index_int
-        )
+        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, index_int)
 
     elif isinstance(e, ast.node.GetElementByDotNameExp):
         tuple_exp_id = ast_to_mast_exp(e.container)
@@ -657,10 +660,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         assert field_name_py_str is not None
         assert field_index is not None
 
-        return wrapper.w_new_get_tuple_field_by_index_exp(
-            tuple_exp_id,
-            field_index
-        )
+        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, field_index)
 
     elif isinstance(e, ast.node.CastExp):
         ts_id = ast_to_mast_ts(e.constructor_ts)

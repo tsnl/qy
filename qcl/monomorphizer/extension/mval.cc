@@ -200,7 +200,9 @@ namespace monomorphizer::mval {
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
         CtxEnclosedId* mv_ctx_enclosed_id_array,
-        mast::ExpID body_exp_id
+        mast::ExpID body_exp_id,
+        mtype::TID arg_tid,
+        mtype::TID ret_tid
     ) {
         auto id = get_next_val_id();
 
@@ -210,7 +212,8 @@ namespace monomorphizer::mval {
             ctx_enclosed_id_count,
             mv_arg_name_array,
             mv_ctx_enclosed_id_array,
-            body_exp_id
+            body_exp_id,
+            arg_tid, ret_tid
         );
 
         ValueInfo vi; vi.func_info_index = function_info_index;

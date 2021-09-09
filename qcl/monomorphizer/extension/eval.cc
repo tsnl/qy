@@ -956,9 +956,9 @@ namespace monomorphizer::eval {
 
         // first, evaluating the argument and function in the outer stack frame:
         mval::ValVarID fun_vid = eval_mono_exp(info->called_fn, st);
-        mval::ValVarID arg_vid = eval_mono_exp(info->arg_exp_id, st);
-
-        // reaching inside the `fun` VID to retrieve the expression to evaluate, args to pass.
+        mval::ValVarID raw_arg_vid = eval_mono_exp(info->arg_exp_id, st);
+        
+        // reaching inside the `fun` VID to retrieve the body expression to evaluate, args to pass.
         assert(mval::value_kind(fun_vid) == mval::ValueKind::VK_FUNCTION);
         size_t func_info_index = mval::value_info(fun_vid).func_info_index;
         mval::FuncInfo* func_info_p = mval::get_func_info(func_info_index);
@@ -967,6 +967,11 @@ namespace monomorphizer::eval {
         auto fn_arg_name_array = func_info_p->arg_name_array;
         auto fn_arg_name_count = func_info_p->arg_name_count;
         auto fn_body_exp_id = func_info_p->body_exp_id;
+        auto fn_arg_tid = func_info_p->arg_tid;
+
+        // NOTE: we do not perform type conversion on the argument or return
+        //       type for calls-- types must be cast explicitly.
+        mval::ValVarID arg_vid = raw_arg_vid;
 
         // pushing a new frame to the stack, computing the return value:
         stack::push_stack_frame(st);
@@ -1328,7 +1333,10 @@ namespace monomorphizer::eval {
         GDefID field_def_id = modules::get_mono_mod_field_at(info->template_id, info->field_index);
         return eval_def_v(field_def_id, st);
     }
-    static mval::ValVarID eval_mono_lambda_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::ValVarID eval_mono_lambda_exp(
+        mast::ExpID exp_id, 
+        stack::Stack* st
+    ) {
         auto info = &mast::get_info_ptr(exp_id)->exp_lambda;
 
         // copying argument name array:
@@ -1366,7 +1374,8 @@ namespace monomorphizer::eval {
             copied_arg_name_array,
             enclosed_name_count,
             enclosed_bind_array,
-            body_exp
+            body_exp,
+            arg_tid, ret_tid
         );
     }
     mval::ValVarID eval_mono_chain_exp(mast::ExpID exp_id, stack::Stack* st) {
@@ -1386,6 +1395,59 @@ namespace monomorphizer::eval {
         stack::pop_stack_frame(st);
 
         return res;
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_int(
+        mval::ValVarID src_vid, 
+        int dst_width_in_bits,
+        bool dst_is_signed
+    ) {
+
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_float(
+        mval::ValVarID src_vid, 
+        int dst_width_in_bits
+    ) {
+
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_string(mval::ValVarID initializer_vid) {
+
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+
+    }
+    mval::ValVarID eval_mono_cast_exp(mast::ExpID exp_id, stack::Stack* st) {
+        auto info = &mast::get_info_ptr(exp_id)->exp_cast;
+
+        auto constructor_tid = eval_mono_ts(info->ts_id, st);
+        auto initializer_vid = eval_mono_exp(info->exp_id, st);
+
+        auto constructor_tid_kind = mtype::kind_of_tid(constructor_tid);
+        switch (constructor_tid_kind)
+        {
+            case mtype::TK_S8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, true);
+            case mtype::TK_S16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, true);
+            case mtype::TK_S32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, true);
+            case mtype::TK_S64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, true);
+            
+            case mtype::TK_U1: return help_eval_mono_cast_exp__to_int(initializer_vid, 1, false);
+            case mtype::TK_U8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, false);
+            case mtype::TK_U16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, false);
+            case mtype::TK_U32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, false);
+            case mtype::TK_U64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, false);
+            
+            case mtype::TK_F32: return help_eval_mono_cast_exp__to_float(initializer_vid, 32);
+            case mtype::TK_F64: return help_eval_mono_cast_exp__to_float(initializer_vid, 64);
+
+            // Unit, String: trivial cast works since passes type-check.
+            case mtype::TK_UNIT: return initializer_vid;
+            case mtype::TK_STRING: return initializer_vid;
+
+            case mtype::TK_ARRAY: return help_eval_mono_cast_exp__to_array(constructor_tid, initializer_vid);
+            case mtype::TK_SLICE: return help_eval_mono_cast_exp__to_slice(constructor_tid, initializer_vid);
+            case mtype::TK_POINTER: return help_eval_mono_cast_exp__to_pointer(constructor_tid, initializer_vid);
+
+            case mtype::TK_TUPLE: return help_eval_mono_cast_exp__to_tuple(constructor_tid, initializer_vid);
+        }
     }
     mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
         mast::NodeKind exp_kind = mast::get_node_kind(exp_id);
@@ -1441,6 +1503,10 @@ namespace monomorphizer::eval {
                 return eval_mono_chain_exp(exp_id, st);
             } break;
             
+            case mast::EXP_CAST: {
+                return eval_mono_cast_exp(exp_id, st);
+            }
+
             case mast::EXP_GET_POLY_MODULE_FIELD:
             {
                 throw new Panic("EXP_GET_POLY_MODULE_FIELD remains after `p2m`");
