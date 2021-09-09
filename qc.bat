@@ -6,4 +6,4 @@ REM if "%version:~7,10%" != "3.9"
 REM     ECHO "`python3` must refer to Python3.9. Use a `virtualenv`?"
 REM     EXIT 1
 
-python3.9 qc.py %*
+python3 qc.py %*

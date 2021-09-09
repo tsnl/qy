@@ -3,6 +3,8 @@
 #include <cmath>
 #include <iostream>
 #include <set>
+#include <cassert>
+#include <cstdint>
 
 #include "mast.hh"
 #include "panic.hh"
@@ -21,7 +23,9 @@
 //
 
 namespace monomorphizer::eval {
-    
+
+    using ssize_t = int64_t;
+
     mast::TypeSpecID p2m_ts(mast::TypeSpecID ts_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
     mast::ExpID p2m_exp(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
     mast::ElemID p2m_elem(mast::ElemID elem_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
@@ -886,28 +890,36 @@ namespace monomorphizer::eval {
                 return mval::push_u1(m);
             }
             case IS_U8: {
-                return mval::push_u8(m);
+                return mval::push_u8(static_cast<uint8_t>(m));
             }
             case IS_U16: {
-                return mval::push_u16(m);
+                return mval::push_u16(static_cast<uint16_t>(m));
             }
             case IS_U32: {
-                return mval::push_u32(m);
+                return mval::push_u32(static_cast<uint32_t>(m));
             }
             case IS_U64: {
-                return mval::push_u64(m);
+                return mval::push_u64(static_cast<uint64_t>(m));
             }
             case IS_S8: {
-                return mval::push_s8(signed_int_exp_val(m,b));
+                return mval::push_s8(
+                    static_cast<int8_t>(signed_int_exp_val(m,b))
+                );
             }
             case IS_S16: {
-                return mval::push_s16(signed_int_exp_val(m,b));
+                return mval::push_s16(
+                    static_cast<int16_t>(signed_int_exp_val(m,b))
+                );
             }
             case IS_S32: {
-                return mval::push_s32(signed_int_exp_val(m,b));
+                return mval::push_s32(
+                    static_cast<int32_t>(signed_int_exp_val(m,b))
+                );
             }
             case IS_S64: {
-                return mval::push_s64(signed_int_exp_val(m,b));
+                return mval::push_s64(
+                    static_cast<int64_t>(signed_int_exp_val(m,b))
+                );
             }
         }
     }

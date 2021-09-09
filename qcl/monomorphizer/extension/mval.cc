@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstddef>
 #include <cstdint>
+#include <cassert>
 
 #include "id-intern.hh"
 #include "id-mast.hh"

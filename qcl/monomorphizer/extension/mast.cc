@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <cassert>
 
 #include "panic.hh"
 #include "shared-enums.hh"
