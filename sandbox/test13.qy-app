@@ -5,11 +5,8 @@
 
 fibonacci ~ I32 -> I32;
 fibonacci = (x) -> {
-    if (x == 0 or x == 1) {
-        1
-    } else {
-        fibonacci(x - 1) + fibonacci(x - 2)
-    }
+    if (x == 0 or x == 1) {x} 
+    else {fibonacci(x - 1) + fibonacci(x - 2)}
 };
 
 --- sub entry_point_for_v1_default_loader ---

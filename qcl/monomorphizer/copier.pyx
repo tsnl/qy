@@ -44,6 +44,11 @@ PyBinaryOp = ast.node.BinaryOp
 
 cpdef void monomorphize_project(object proj: frontend.project.Project):
     print("--- BEG Monomorphizer ---")
+    print("... The Monomorphizer")
+    print("      * performs all compile-time evaluation")
+    print("      * expands all templates")
+    print("      * computes a constant value for each global sub-module binding")
+    print("    Since we must interpret your code, this may take some time.")
 
     # ensuring init:
     wrapper.w_ensure_init()

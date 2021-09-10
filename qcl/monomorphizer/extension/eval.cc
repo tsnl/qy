@@ -970,8 +970,8 @@ namespace monomorphizer::eval {
         );
     }
     static mval::ValVarID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
-        std::cout << "DEBUG: INTRODUCTION: eval_mono_func_call_exp" << std::endl;
-        std::cout.flush();
+        // std::cout << "DEBUG: INTRODUCTION: eval_mono_func_call_exp" << std::endl;
+        // std::cout.flush();
         
         auto info = &mast::get_info_ptr(exp_id)->exp_call;
 
@@ -985,8 +985,8 @@ namespace monomorphizer::eval {
         mval::ValVarID raw_arg_vid = eval_mono_exp(info->arg_exp_id, st);
         
         // reaching inside the `fun` VID to retrieve the body expression to evaluate, args to pass.
-        std::cout << "DEBUG: preparing to reach inside func value_info" << std::endl;
-        std::cout.flush();
+        // std::cout << "DEBUG: preparing to reach inside func value_info" << std::endl;
+        // std::cout.flush();
         assert(mval::value_kind(fun_vid) == mval::ValueKind::VK_FUNCTION);
         size_t func_info_index = mval::value_info(fun_vid).func_info_index;
         mval::FuncInfo* func_info_p = mval::get_func_info(func_info_index);
@@ -995,23 +995,24 @@ namespace monomorphizer::eval {
         auto fn_arg_name_array = func_info_p->arg_name_array;
         auto fn_arg_name_count = func_info_p->arg_name_count;
         auto fn_body_exp_id = func_info_p->body_exp_id;
-        std::cout << "DEBUG: ... done" << std::endl;
-        std::cout.flush();
+        // std::cout << "DEBUG: ... done" << std::endl;
+        // std::cout.flush();
 
         // NOTE: we do not perform type conversion on the argument or return
         //       type for calls-- types must be cast explicitly.
         mval::ValVarID arg_vid = raw_arg_vid;
 
         // pushing a new frame to the stack, computing the return value:
-        std::cout << "DEBUG: preparing to push stack frame" << std::endl;
+        // std::cout << "DEBUG: preparing to push stack frame" << std::endl;
+        // std::cout.flush();
         stack::push_stack_frame(st);
-        std::cout << "DEBUG: ... done" << std::endl;
-        std::cout.flush();
+        // std::cout << "DEBUG: ... done" << std::endl;
+        // std::cout.flush();
         mval::ValVarID ret_val_id;
         {
             // setting up the stack frame with ctx_enclosed_ids
-            std::cout << "DEBUG: preparing to set up stack frame with ctx_enclosed_ids (cf nonlocal)" << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: preparing to set up stack frame with ctx_enclosed_ids (cf nonlocal)" << std::endl;
+            // std::cout.flush();
             for (uint32_t i = 0; i < fn_enclosed_id_count; i++) {
                 auto enclosed_mapping = fn_enclosed_id_array[i];
                 if (intern::is_interned_string_tid_not_vid(enclosed_mapping.name)) {
@@ -1024,13 +1025,13 @@ namespace monomorphizer::eval {
                     stack::def_v_in_stack(st, enclosed_mapping.name, target);
                 }
             }
-            std::cout << "DEBUG: ... done" << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: ... done" << std::endl;
+            // std::cout.flush();
 
             // setting up the stack frame with arguments
-            std::cout << "DEBUG: preparing to set up stack frame with func args" << std::endl;
-            std::cout << "DEBUG: \targ-count: " << fn_arg_name_count << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: preparing to set up stack frame with func args" << std::endl;
+            // std::cout << "DEBUG: \targ-count: " << fn_arg_name_count << std::endl;
+            // std::cout.flush();
             if (fn_arg_name_count == 0) {
                 // no arguments need be bound
             } else if (fn_arg_name_count == 1) {
@@ -1042,27 +1043,27 @@ namespace monomorphizer::eval {
                     intern::IntStr arg_name = fn_arg_name_array[j];
                     mval::ValVarID arg_bound = mval::get_seq_elem1(arg_seq_info_index, j).value_or(mval::NULL_VID);
                     assert(arg_bound != mval::NULL_VID);
-                    std::cout << "DEBUG: get-seq-elem " << j << " OK" << std::endl;
-                    std::cout.flush();
+                    // std::cout << "DEBUG: get-seq-elem " << j << " OK" << std::endl;
+                    // std::cout.flush();
                     stack::def_v_in_stack(st, arg_name, arg_bound);
                 }
             }
-            std::cout << "DEBUG: ... done" << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: ... done" << std::endl;
+            // std::cout.flush();
 
-            std::cout << "DEBUG: Preparing to evaluate body in EXP_FUNC_CALL" << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: Preparing to evaluate body in EXP_FUNC_CALL" << std::endl;
+            // std::cout.flush();
 
             // evaluating the return expression in this stack frame:
             ret_val_id = eval_mono_exp(fn_body_exp_id, st);
 
-            std::cout << "DEBUG: ... done" << std::endl;
-            std::cout.flush();
+            // std::cout << "DEBUG: ... done" << std::endl;
+            // std::cout.flush();
         }
         stack::pop_stack_frame(st);
 
-        std::cout << "DEBUG: CONCLUSION: EXP_FUNC_CALL ret_val_id = " << ret_val_id << std::endl;
-        std::cout.flush();
+        // std::cout << "DEBUG: CONCLUSION: EXP_FUNC_CALL ret_val_id = " << ret_val_id << std::endl;
+        // std::cout.flush();
 
         return ret_val_id;
     }

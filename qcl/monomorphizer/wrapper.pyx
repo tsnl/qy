@@ -418,6 +418,3 @@ cdef:
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses):
         return get_function_tid(arg_tid, ret_tid, ses)
 
-
-
-
