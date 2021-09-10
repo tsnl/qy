@@ -26,21 +26,25 @@ add = (v, w) -> Vec2f {
     Vec2f(v.0 + w.0, v.1 + w.1)
 };
 
-// add2 ~ (F32, F32) -> F32;
-// add2 = (a, b) -> {a + b};
+add2 ~ (F32, F32) -> F32;
+add2 = (a, b) -> {a + b};
 
 a = Vec2f (0, 5.5);
 b = Vec2f (1, 2);
-// c0_x = add2(a.x, b.x);
-// a_x = a.x;
-// a_y = a.y;
+
+c0_x = add2(a.x, b.x);
+
 // c0_x = a.x + b.x;
+
 c1 = add(a, b);
 c1_x = c1.x;
 c1_y = c1.y;
-// c2 = Vec2f (a.x + b.x, a.y + b.y);
-// c3 = Vec2f (add2(a.x, b.x), add2(a.y, b.y));
-// c3_x = c3.x;
-// c3_y = c3.y;
-// c2_x = c2.x;
-// c2_y = c2.y;
+
+c2 = Vec2f (a.x + b.x, a.y + b.y);
+c2_x = c2.x;
+c2_y = c2.y;
+
+
+c3 = Vec2f (add2(a.x, b.x), add2(a.y, b.y));
+c3_x = c3.x;
+c3_y = c3.y;

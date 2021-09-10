@@ -1,4 +1,9 @@
 // this module models global value variables (each with a `ValVarID`)
+// FIXME: 
+//  - rename ValVarID to ValID
+//  - create a Mutator object that stores a changing ValVarID
+//  - require array, pointer, and slice to be composed of a vector of Mutator objects
+//  - this way, contents of ValIDs are immutable, whereas Mutators encapsulate all changes.
 
 #pragma once
 
