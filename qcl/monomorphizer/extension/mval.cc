@@ -232,16 +232,19 @@ namespace monomorphizer::mval {
     size_t get_seq_count(size_t sequence_info_index) {
         return s_value_sequence_info_table[sequence_info_index].elem_id_count;
     }
-    std::optional<ValVarID> get_seq_elem(ValVarID tuple_val_id, size_t elem_index) {
-        size_t sequence_info_index = s_value_info_table[tuple_val_id].sequence_info_index;
-        SequenceInfo elem_info = s_value_sequence_info_table[sequence_info_index];
+    std::optional<ValVarID> get_seq_elem1(size_t seq_info_index, size_t index) {
+        SequenceInfo elem_info = s_value_sequence_info_table[seq_info_index];
         ValVarID* elem_array = elem_info.elem_id_array;
         size_t elem_count = elem_info.elem_id_count;
-        if (elem_index < elem_count) {
-            return elem_array[elem_index];
+        if (index < elem_count) {
+            return elem_array[index];
         } else {
             return {};
         }
+    }
+    std::optional<ValVarID> get_seq_elem2(ValVarID tuple_val_id, size_t elem_index) {
+        size_t sequence_info_index = s_value_info_table[tuple_val_id].sequence_info_index;
+        return get_seq_elem1(sequence_info_index, elem_index);
     }
     FuncInfo* get_func_info(size_t func_info_index) {
         return &s_func_info_table[func_info_index];

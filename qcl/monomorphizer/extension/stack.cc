@@ -44,8 +44,7 @@ namespace monomorphizer::stack {
     }
 
     void push_stack_frame(Stack* stack) {
-        Frame new_frame{};
-        stack->frames.push_back(new_frame);
+        stack->frames.emplace_back();
     }
     void pop_stack_frame(Stack* stack) {
         stack->frames.pop_back();
@@ -57,11 +56,7 @@ namespace monomorphizer::stack {
     void def_v_in_stack(Stack* stack, intern::IntStr int_str_id, mval::ValVarID vid) {
         stack->frames.back().id_map[int_str_id] = vid;
     }
-    mval::ValVarID lookup_v_in_stack(Stack* stack, intern::IntStr int_str_id) {
-        return lookup(stack, int_str_id);
-    }
-    mtype::TID lookup_t_in_stack(Stack* stack, intern::IntStr int_str_id) {
-        return lookup(stack, int_str_id);
-    }
+    mval::ValVarID lookup_v_in_stack(Stack* stack, intern::IntStr int_str_id) { return lookup(stack, int_str_id); }
+    mtype::TID     lookup_t_in_stack(Stack* stack, intern::IntStr int_str_id) { return lookup(stack, int_str_id); }
 
 }

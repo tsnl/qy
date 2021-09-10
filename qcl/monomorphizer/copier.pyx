@@ -615,11 +615,20 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         )
 
     elif isinstance(e, ast.node.ChainExp):
-        # ast-to-mast for the prefix element list:
-        elem_id_count = <size_t> len(e.table.elements)
+        # ast-to-mast for the prefix element list
+
+        # first, we gather all non-ignored elements:
+        ignored_elem_class_tuple = (ast.node.Type1VElem,)
+        non_ignored_elem_list = [
+            element
+            for element in e.table.elements
+            if not isinstance(element, ignored_elem_class_tuple)
+        ]
+
+        elem_id_count = <size_t> len(non_ignored_elem_list)
         if elem_id_count:
             elem_id_array = <wrapper.ElemID*> malloc(sizeof(wrapper.ElemID) * elem_id_count)
-            for i, elem in enumerate(e.table.elements):
+            for i, elem in enumerate(non_ignored_elem_list):
                 elem_id_array[i] = ast_to_mast_elem(elem)
         else:
             elem_id_array = <wrapper.ElemID*> 0

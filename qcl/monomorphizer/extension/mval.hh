@@ -123,7 +123,8 @@ namespace monomorphizer::mval {
     ValueKind value_kind(ValVarID value_id);
     ValueInfo value_info(ValVarID value_id);
     size_t get_seq_count(size_t sequence_info_index);
-    std::optional<ValVarID> get_seq_elem(size_t sequence_info_index, size_t index);
+    std::optional<ValVarID> get_seq_elem1(size_t seq_info_index, size_t index);
+    std::optional<ValVarID> get_seq_elem2(ValVarID tuple_val_id, size_t index);
     FuncInfo* get_func_info(size_t func_info_index);
 
     // equality:

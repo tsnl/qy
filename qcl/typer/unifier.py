@@ -86,7 +86,7 @@ def unify_tid(t: type.identity.TID, u: type.identity.TID, allow_u_mut_ptr=False)
 
             return s1.compose(s2)
 
-        elif tk_t == tk_u and tk_t in (type.kind.TK.Tuple, type.kind.TK.Struct, type.kind.TK.Union):
+        elif tk_t == tk_u and tk_t in (type.kind.TK.Tuple, type.kind.TK.Struct):
             t_len = type.elem.count(t)
             u_len = type.elem.count(u)
 

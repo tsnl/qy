@@ -593,7 +593,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
 
     @staticmethod
     def new_float_arithmetic_half_overload_map():
-        return {
+        d = {
             (
                 binary_operator,
                 type.get_float_type(i)
@@ -613,6 +613,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 ast.node.BinaryOp.Sub
             )
         }
+        return d
 
     @staticmethod
     def new_float_comparison_half_overload_map():
@@ -628,12 +629,12 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
                 64
             )
             for binary_operator in (
-                ast.node.BinaryOp.Pow,
-                ast.node.BinaryOp.Mul,
-                ast.node.BinaryOp.Div,
-                ast.node.BinaryOp.Rem,
-                ast.node.BinaryOp.Add,
-                ast.node.BinaryOp.Sub
+                ast.node.BinaryOp.LT,
+                ast.node.BinaryOp.LEq,
+                ast.node.BinaryOp.GT,
+                ast.node.BinaryOp.GEq,
+                ast.node.BinaryOp.Eq,
+                ast.node.BinaryOp.NE
             )
         }
 
