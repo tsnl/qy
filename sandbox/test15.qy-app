@@ -14,14 +14,19 @@ y1 = x.1;
 y2 = x.2;
 y3 = x.3;
 
-// Hello = Struct {
-//     x ~ F32;
-//     y ~ F64;
+Vec2f = Struct {
+    x ~ F32;
+    y ~ F32;
+};
+
+// add ~ (Vec2f, Vec2f) -> Vec2f;
+// add = (v, w) -> Vec2f {
+//     (v.x + w.x, v.y + w.y)
 // };
-Hello = (F32, I32);
 
-// w = Hello (0.4f, 42);
-
-// w = Hello(0.4f, 0.4f);
-// m = w.x;
-// n = w.y;
+a = Vec2f (0, 5.5);
+b = Vec2f (1, 2);
+// c1 = add(a, b);
+c2 = Vec2f (a.x + b.x, a.y + b.y);
+c2_x = c2.x;
+c2_y = c2.y;

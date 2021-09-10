@@ -1424,6 +1424,8 @@ namespace monomorphizer::eval {
     static mval::ValVarID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
     static mval::ValVarID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
     static mval::ValVarID help_cast(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        // std::cout << "DEBUG: Invoking `help_cast`" << std::endl;
+        
         auto constructor_tid_kind = mtype::kind_of_tid(constructor_tid);
         switch (constructor_tid_kind)
         {
@@ -1591,7 +1593,7 @@ namespace monomorphizer::eval {
             remaining_arg_list = arg_list::tail(remaining_arg_list);
 
             // acquiring the corresponding VID from the initializer:
-            mval::ValVarID this_arg_vid = mval::get_seq_elem(seq_info_index, i).value_or(mval::NULL_VID);
+            mval::ValVarID this_arg_vid = mval::get_seq_elem(initializer_vid, i).value_or(mval::NULL_VID);
             assert(this_arg_vid != mval::NULL_VID);
 
             // converting and storing on `elem_item_array`, the output array:
@@ -1616,9 +1618,16 @@ namespace monomorphizer::eval {
     mval::ValVarID eval_mono_cast_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_cast;
 
+        // std::cout << "DEBUG: CastExp (1/3) Evaluating constructor_tid" << std::endl;
         auto constructor_tid = eval_mono_ts(info->ts_id, st);
-        auto initializer_vid = eval_mono_exp(info->exp_id, st);
+        // std::cout.flush();
 
+        // std::cout << "DEBUG: CastExp (2/3) Evaluating initializer_vid" << std::endl;
+        auto initializer_vid = eval_mono_exp(info->exp_id, st);
+        // std::cout.flush();
+
+        // std::cout << "DEBUG: CastExp (3/3) Invoking `help_cast` to do the rest..." << std::endl;
+        // std::cout.flush();
         return help_cast(constructor_tid, initializer_vid);
     }
     mval::ValVarID eval_mono_tuple_exp(mast::ExpID exp_id, stack::Stack* st) {
