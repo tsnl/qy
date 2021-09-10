@@ -14,6 +14,8 @@ j = 3 + 4 + 5;
 // y2 = x.2;
 // y3 = x.3;
 
+// Vec2f = (F32, F32);
+
 Vec2f = Struct {
     x ~ F32;
     y ~ F32;
@@ -21,7 +23,7 @@ Vec2f = Struct {
 
 add ~ (Vec2f, Vec2f) -> Vec2f;
 add = (v, w) -> Vec2f {
-    (v.x + w.x, v.y + w.y)
+    Vec2f(v.0 + w.0, v.1 + w.1)
 };
 
 // add2 ~ (F32, F32) -> F32;
@@ -37,7 +39,7 @@ c1 = add(a, b);
 c1_x = c1.x;
 c1_y = c1.y;
 // c2 = Vec2f (a.x + b.x, a.y + b.y);
-// c3 = Vec2f (, add2(a.y, b.y));
+// c3 = Vec2f (add2(a.x, b.x), add2(a.y, b.y));
 // c3_x = c3.x;
 // c3_y = c3.y;
 // c2_x = c2.x;

@@ -16,6 +16,7 @@ class DeferredList(object):
         self.unsolved_deferred_order_list = []
 
     def add(self, deferred_order):
+        deferred_order.deferred_list = self
         self.deferred_order_list.append(deferred_order)
 
         unsolved_tuple = (
@@ -79,6 +80,9 @@ class BaseDeferredOrder(object, metaclass=abc.ABCMeta):
         super().__init__()
         self.loc = loc
         self.elem_tid_list = elem_tid_list
+        
+        # This property is set by the `DeferredList` object when an order is added to a list.
+        self.deferred_list = None
 
     def rw(self, sub):
         for i in range(len(self.elem_tid_list)):
@@ -113,8 +117,10 @@ class BaseDeferredOrder(object, metaclass=abc.ABCMeta):
 
 
 class TypeCastDeferredOrder(BaseDeferredOrder):
-    def __init__(self, loc, dst_tid, src_tid):
+    def __init__(self, loc, dst_tid, src_tid, opt_parent_deferred_order=None):
         super().__init__(loc, [dst_tid, src_tid])
+        self.field_cast_ops_generated = False 
+        self.opt_parent_deferred_order = opt_parent_deferred_order
 
     @property
     def dst_tid(self):
@@ -131,8 +137,7 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
             sub
         )
 
-    @staticmethod
-    def cast(src_tid, dst_tid, sub):
+    def cast(self, src_tid, dst_tid, sub):
         solved = True
 
         src_tk = type.kind.of(src_tid)
@@ -158,6 +163,10 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
         var_tk_set = {
             type.kind.TK.FreeVar,
             type.kind.TK.BoundVar,
+        }
+        product_tk_set = {
+            type.kind.TK.Tuple,
+            type.kind.TK.Struct
         }
 
         # comparing src_tid and dst_tid to ensure they can be inter-converted.
@@ -227,17 +236,37 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
 
             # TODO: verify that index types are convertible using `cast`
 
-        # TODO: handle tuples/structs (using recursive conversion)
-        elif dst_tk == type.kind.TK.Tuple:
-            raise NotImplementedError("Handling TypeCastDeferredOrder for tuple")
-        elif dst_tk == type.kind.TK.Struct:
-            raise NotImplementedError("Handling TypeCastDeferredOrder for struct")
+        # case 5: handle tuples/structs (using recursive conversion)
+        elif dst_tk in product_tk_set:
+            dst_elem_count = type.elem.count(dst_tid)
+            src_elem_count = type.elem.count(src_tid)
+            if src_elem_count != dst_elem_count:
+                TypeCastDeferredOrder.raise_cast_error(
+                    src_tid, dst_tid, 
+                    more=f"mismatched elem counts: {src_elem_count}-tuple to {dst_elem_count}-tuple"
+                )
+            elem_count = dst_elem_count
 
-        # case 5: still variables: defer
+            if not self.field_cast_ops_generated:
+                self.field_cast_ops_generated = True
+                for field_index in range(elem_count):
+                    src_field_tid = type.elem.tid_of_field_ix(src_tid, field_index)
+                    dst_field_tid = type.elem.tid_of_field_ix(dst_tid, field_index)
+                    
+                    order = TypeCastDeferredOrder(
+                        self.loc, 
+                        dst_field_tid, src_field_tid, 
+                        opt_parent_deferred_order=self
+                    )
+                    self.deferred_list.add(order)
+
+            return True, sub
+
+        # case 6: still variables: defer
         elif src_tk in var_tk_set or dst_tk in var_tk_set:
             solved = False
 
-        # case 6: ensure no inference errors
+        # case 7: ensure no inference errors
         else:
             TypeCastDeferredOrder.raise_cast_error(src_tid, dst_tid)
 

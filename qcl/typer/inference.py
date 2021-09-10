@@ -643,12 +643,10 @@ def help_infer_exp_tid(
         dst_tid = s1.rewrite_type(dst_tid)
         ret_sub = s1.compose(s2)
 
-        # TODO: use a DeferredOrder
+        # use a DeferredOrder to check that the cast operation will succeed
+        deferred_list.add(deferred.TypeCastDeferredOrder(exp.loc, dst_tid, src_tid))
 
-        #
         # all OK!
-        #
-
         return ret_sub, ret_sub.rewrite_type(dst_tid), exp_ses, exp_cs
 
     elif isinstance(exp, ast.node.LambdaExp):
