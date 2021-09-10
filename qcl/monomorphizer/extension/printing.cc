@@ -13,10 +13,14 @@
 namespace monomorphizer::printing {
 
     static void print_exp(mast::ExpID exp_id) {
-        std::cout << exp_id << "/";
         if (exp_id == mast::NULL_NODE_ID) {
             std::cout << "<NULL_NODE_ID>";
         } else {
+            std::cout << "{";
+
+            std::cout << "id: " << exp_id << ", ";
+
+            std::cout << "kind: ";
             mast::NodeKind nk = mast::get_node_kind(exp_id);
             switch (nk) {
                 case mast::EXP_UNIT: { std::cout << "EXP_UNIT"; break; }
@@ -38,15 +42,21 @@ namespace monomorphizer::printing {
                 case mast::EXP_CHAIN: { std::cout << "EXP_CHAIN"; break; }
                 case mast::EXP_CAST: { std::cout << "EXP_CAST"; break; }
                 case mast::EXP_TUPLE: { std::cout << "EXP_TUPLE"; break; }
-                default: { std::cout << "<!!ERROR_EXP:nk=" << (size_t)nk << ">"; break; }
+                default: { std::cout << "<!!ERROR_EXP_KIND/" << (size_t)nk << ">"; break; }
             }
+
+            std::cout << "}";
         }
     }
     static void print_ts(mast::TypeSpecID ts_id) {
-        std::cout << ts_id << "/";
         if (ts_id == mast::NULL_NODE_ID) {
             std::cout << "<NULL_NODE_ID>";
         } else {
+            std::cout << "{";
+
+            std::cout << "id: " << ts_id << ", ";
+
+            std::cout << "kind: ";
             mast::NodeKind nk = mast::get_node_kind(ts_id);
             switch (nk) {
                 case mast::TS_UNIT: { std::cout << "TS_UNIT"; } break;
@@ -59,19 +69,22 @@ namespace monomorphizer::printing {
                 case mast::TS_TUPLE: { std::cout << "TS_TUPLE"; } break;
                 case mast::TS_GET_POLY_MODULE_FIELD: { std::cout << "TS_GET_POLY_MODULE_FIELD"; } break;
                 case mast::TS_GET_MONO_MODULE_FIELD: { std::cout << "TS_GET_MONO_MODULE_FIELD"; } break;
-                default: { std::cout << "<!!ERROR_TS:nk=" << (size_t)nk << ">"; } break;
+                default: { std::cout << "<!!ERROR_TS_KIND/" << (size_t)nk << ">"; } break;
             }
+
+            std::cout << "}";
         }
     }
     static void print_val(mval::ValVarID val_id) {
         if (val_id == mval::NULL_VID) {
             std::cout << "<NULL_VID>";
         } else {
-            std::cout << val_id;
+            std::cout << "{";
 
+            std::cout << "id: " << val_id << ", ";
+
+            std::cout << "kind: ";
             mval::ValueKind vk = mval::value_kind(val_id);
-            
-            std::cout << "/";
             switch (vk) {
                 case mval::VK_ERROR: { std::cout << "TK_ERROR"; } break;
                 case mval::VK_S8: { std::cout << "VK_S8"; } break;
@@ -88,36 +101,41 @@ namespace monomorphizer::printing {
                 case mval::VK_STRING: { std::cout << "VK_STRING"; } break;
                 case mval::VK_TUPLE: { std::cout << "VK_TUPLE"; } break;
                 case mval::VK_FUNCTION: { std::cout << "VK_FUNCTION"; } break;
-                default: { std::cout << "<!!ERROR_VID:vk=" << (size_t)vk << ">"; } break;
+                default: { std::cout << "<!!ERROR_VID_KIND/" << (size_t)vk << ">"; } break;
             }
+            std::cout << ", ";
 
+            std::cout << "value: ";
             auto vi = mval::value_info(val_id);
             switch (vk) {
-                case mval::VK_S8: { std::cout << "=" << vi.s8; } break;
-                case mval::VK_S16: { std::cout << "=" << vi.s16; } break;
-                case mval::VK_S32: { std::cout << "=" << vi.s32; } break;
-                case mval::VK_S64: { std::cout << "=" << vi.s64; } break;
-                case mval::VK_U1: { std::cout << "=" << vi.u1; } break;
-                case mval::VK_U8: { std::cout << "=" << vi.u8; } break;
-                case mval::VK_U16: { std::cout << "=" << vi.u16; } break;
-                case mval::VK_U32: { std::cout << "=" << vi.u32; } break;
-                case mval::VK_U64: { std::cout << "=" << vi.u64; } break;
-                case mval::VK_F32: { std::cout << "=" << vi.f32; } break;
-                case mval::VK_F64: { std::cout << "=" << vi.f64; } break;
+                case mval::VK_S8: { std::cout << vi.s8; } break;
+                case mval::VK_S16: { std::cout << vi.s16; } break;
+                case mval::VK_S32: { std::cout << vi.s32; } break;
+                case mval::VK_S64: { std::cout << vi.s64; } break;
+                case mval::VK_U1: { std::cout << vi.u1; } break;
+                case mval::VK_U8: { std::cout << vi.u8; } break;
+                case mval::VK_U16: { std::cout << vi.u16; } break;
+                case mval::VK_U32: { std::cout << vi.u32; } break;
+                case mval::VK_U64: { std::cout << vi.u64; } break;
+                case mval::VK_F32: { std::cout << vi.f32; } break;
+                case mval::VK_F64: { std::cout << vi.f64; } break;
                 
-                default: { std::cout << "=(...)"; } break;
+                default: { std::cout << "(...)"; } break;
             }
+
+            std::cout << "}";
         }
     }
     static void print_type(mtype::TID type_id) {
         if (type_id == UNIVERSAL_NULL_ID) {
             std::cout << "<NULL_TID>";
         } else {
-            std::cout << type_id;
+            std::cout << "{";
 
+            std::cout << "id: " << type_id << ", ";
+
+            std::cout << "kind: ";
             mtype::TypeKind tk = mtype::kind_of_tid(type_id);
-
-            std::cout << "/";
             switch (tk) {
                 case mtype::TK_ERROR: { std::cout << "TK_ERROR"; } break;
                 case mtype::TK_UNIT: { std::cout << "TK_UNIT"; } break;
@@ -138,37 +156,51 @@ namespace monomorphizer::printing {
                 case mtype::TK_ARRAY: { std::cout << "TK_ARRAY"; } break;
                 case mtype::TK_SLICE: { std::cout << "TK_SLICE"; } break;
                 case mtype::TK_FUNCTION: { std::cout << "TK_FUNCTION"; } break;
-                default: { std::cout << "<!!ERROR_TID:tk=" << tk << ">"; } break;
+                default: { std::cout << "<!!ERROR_TID_KIND/" << tk << ">"; } break;
             }
+            
+            std::cout << "}";
         }
     }
     static void print_def_id(GDefID def_id) {
         auto def_name = gdef::get_def_name(def_id);
-        std::cout << def_name << ": DefID=" << def_id << ", ";
+        std::cout << def_name << ": {";
         if (def_id == gdef::NULL_GDEF_ID) {
-            std::cout << "<NULL_DEF_ID>";
+            std::cout << "def_id: <NULL_DEF_ID>}";
         } else {
+            std::cout << "def_id: " << def_id << ", ";
+
+            std::cout << "def_kind: ";
             switch (gdef::get_def_kind(def_id)) {
                 case gdef::DefKind::BV_EXP: {std::cout << "BV_EXP";} break;
                 case gdef::DefKind::BV_TS: {std::cout << "BV_TS";} break;
                 case gdef::DefKind::CONST_EXP: {
-                    std::cout << "CONST_EXP=";
+                    std::cout << "CONST_EXP, ";
+
+                    std::cout << "target: (Exp) ";
                     print_exp(gdef::get_def_target(def_id));
                 } break;
                 case gdef::DefKind::CONST_TS: {
-                    std::cout << "CONST_TS=";
+                    std::cout << "CONST_TS, ";
+
+                    std::cout << "target: (TypeSpec) ";
                     print_ts(gdef::get_def_target(def_id));
                 } break;
                 case gdef::DefKind::CONST_TOT_VAL: {
-                    std::cout << "CONST_TOT_VAL=";
+                    std::cout << "CONST_TOT_VAL, ";
+
+                    std::cout << "target: (ValueVariable) ";
                     print_val(gdef::get_def_target(def_id));
                 } break;
                 case gdef::DefKind::CONST_TOT_TID: {
-                    std::cout << "CONST_TOT_TID=";
+                    std::cout << "CONST_TOT_TID, ";
+
+                    std::cout << "target: (MonomorphizerType) ";
                     print_type(gdef::get_def_target(def_id));
                 } break;
             }
         }
+        std::cout << "}";
     }
     void print_mono_mod(MonoModID mono_mod_id) {
         auto mod_name = modules::get_mono_mod_name(mono_mod_id);
