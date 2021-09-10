@@ -10,12 +10,12 @@ from Cython.Build import cythonize
 if sys.platform.startswith('win32'):
     extra_compile_args = ['/std:c++17']
     # TODO: replace with 'Release/CppMonomorphizerExt.lib' with a flag.
-    library_list = ["Release/CppMonomorphizerExt"]
-    library_dir_list = ["Debug/"]
+    library_list = ["./Release/CppMonomorphizerExt"]
+    library_dir_list = ["./Debug/", "./Release/"]
 else:
     extra_compile_args = ["-std=c++17"]
-    library_list = ["libCppMonomorphizerExt.a"]
-    library_dir_list = []
+    library_list = ["CppMonomorphizerExt"]
+    library_dir_list = ["."]
 
 
 def mk_wrapper_extension():
@@ -23,7 +23,7 @@ def mk_wrapper_extension():
         "wrapper",
         sources=["wrapper.pyx"],
         libraries=library_list,
-        library_dir_list=library_dir_list,
+        library_dirs=library_dir_list,
         extra_compile_args=extra_compile_args,
         language='c++'
     )

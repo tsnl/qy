@@ -70,5 +70,7 @@ namespace monomorphizer::mtype {
     );
 
     TypeKind kind_of_tid(TID tid);
+    size_t get_tuple_count(TID tuple_tid);
+    arg_list::ArgListID get_tuple_arg_list(TID tuple_tid);
 
 }

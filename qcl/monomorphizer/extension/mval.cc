@@ -181,16 +181,16 @@ namespace monomorphizer::mval {
     ValVarID push_tuple(size_t elem_id_count, ValVarID* mv_elem_id_array) {
         auto id = get_next_val_id();
 
-        auto string_info_index = s_value_string_info_table.size();
+        auto sequence_info_index = s_value_sequence_info_table.size();
         s_value_sequence_info_table.emplace_back(
             elem_id_count,
             mv_elem_id_array
         );
 
-        ValueInfo vi; vi.string_info_index = string_info_index;
-        s_value_kind_table.push_back(VK_S8);
-        s_value_info_table.push_back(vi);
+        ValueInfo vi; vi.sequence_info_index = sequence_info_index;
         
+        s_value_kind_table.push_back(VK_TUPLE);
+        s_value_info_table.push_back(vi);
         push_cached_serialized_data(id);
 
         return id;
@@ -200,9 +200,7 @@ namespace monomorphizer::mval {
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
         CtxEnclosedId* mv_ctx_enclosed_id_array,
-        mast::ExpID body_exp_id,
-        mtype::TID arg_tid,
-        mtype::TID ret_tid
+        mast::ExpID body_exp_id
     ) {
         auto id = get_next_val_id();
 
@@ -212,8 +210,7 @@ namespace monomorphizer::mval {
             ctx_enclosed_id_count,
             mv_arg_name_array,
             mv_ctx_enclosed_id_array,
-            body_exp_id,
-            arg_tid, ret_tid
+            body_exp_id
         );
 
         ValueInfo vi; vi.func_info_index = function_info_index;
@@ -231,6 +228,9 @@ namespace monomorphizer::mval {
     }
     ValueInfo value_info(ValVarID value_id) {
         return s_value_info_table[value_id];
+    }
+    size_t get_seq_count(size_t sequence_info_index) {
+        return s_value_sequence_info_table[sequence_info_index].elem_id_count;
     }
     std::optional<ValVarID> get_seq_elem(ValVarID tuple_val_id, size_t elem_index) {
         size_t sequence_info_index = s_value_info_table[tuple_val_id].sequence_info_index;

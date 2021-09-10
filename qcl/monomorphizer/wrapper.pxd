@@ -343,4 +343,3 @@ cdef:
     TID w_get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut);
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);
-

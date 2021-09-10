@@ -372,6 +372,7 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
         elem_ts_array = <wrapper.TypeSpecID*> malloc(sizeof(wrapper.TypeSpecID) * elem_ts_count)
         for i, elem_ts in enumerate(ts.items):
             elem_ts_array[i] = ast_to_mast_ts(elem_ts)
+        
         return wrapper.w_new_tuple_ts(
             elem_ts_count,
             elem_ts_array

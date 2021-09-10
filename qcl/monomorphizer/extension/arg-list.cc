@@ -25,6 +25,7 @@ namespace monomorphizer::arg_list {
         std::vector<ArgTrieEdge> m_forward_value_edges;
         ArgTrieNodeID m_parent_node_id;
         size_t m_incoming_edge_appended_id;
+        size_t m_count;
 
         ArgTrieNode(
             ArgTrieNodeID parent_node_id,
@@ -41,9 +42,9 @@ namespace monomorphizer::arg_list {
         );
     };
 
-    static std::deque<ArgTrieNode> s_atn_table = {};
-    static std::vector<ArgTrieEdge> s_atn_root_type_edges;
-    static std::vector<ArgTrieEdge> s_atn_root_value_edges;
+    static std::deque<ArgTrieNode> s_atn_table{};
+    static std::vector<ArgTrieEdge> s_atn_root_type_edges{};
+    static std::vector<ArgTrieEdge> s_atn_root_value_edges{};
 
     ArgTrieNodeID new_atn(
         ArgTrieNodeID parent_node_id, 
@@ -70,8 +71,15 @@ namespace monomorphizer::arg_list {
     :   m_forward_type_edges(),
         m_forward_value_edges(),
         m_parent_node_id(parent_node_id),
-        m_incoming_edge_appended_id(incoming_edge_appended_id)
-    {}
+        m_incoming_edge_appended_id(incoming_edge_appended_id),
+        m_count(0)
+    {
+        if (parent_node_id == EMPTY_ARG_LIST) {
+            m_count = 1;
+        } else {
+            m_count = 1 + s_atn_table[parent_node_id].m_count;
+        }
+    }
 
     ArgTrieEdge::ArgTrieEdge(
         size_t appended_id,
@@ -111,14 +119,14 @@ namespace monomorphizer::arg_list {
             (root == NULL_ATN_ID) ? 
             (
                 appended_id_is_value_not_type_id ?
-                    &s_atn_root_type_edges : 
-                    &s_atn_root_value_edges
+                    &s_atn_root_value_edges :
+                    &s_atn_root_type_edges      
             ) 
             :
             (
                 appended_id_is_value_not_type_id ?
-                    &s_atn_table[root].m_forward_type_edges :
-                    &s_atn_table[root].m_forward_value_edges
+                    &s_atn_table[root].m_forward_value_edges :
+                    &s_atn_table[root].m_forward_type_edges
             )
         );
         ArgTrieNodeID cached_dst_node_id = get_cached_dst(
@@ -129,11 +137,12 @@ namespace monomorphizer::arg_list {
         if (cached_dst_node_id != NULL_ATN_ID) {
             return cached_dst_node_id;
         } else {
+            // std::cout << "DEBUG: Suspicious branch alert." << std::endl;
+            // std::cout.flush();
             ArgTrieNodeID fresh_dst_id = new_atn(root, appended_id);
-            edges_vec_p->emplace_back(
-                appended_id,
-                fresh_dst_id
-            );
+            // std::cout << "DEBUG: New ATN created successfully." << std::endl;
+            // std::cout.flush();
+            edges_vec_p->emplace_back(appended_id, fresh_dst_id);
             return fresh_dst_id;
         }
     }
@@ -209,6 +218,14 @@ namespace monomorphizer::arg_list {
 
     ArgListID empty_arg_list_id() {
         return EMPTY_ARG_LIST;
+    }
+
+    size_t count_arg_list_items(ArgListID arg_list_id) {
+        if (arg_list_id == EMPTY_ARG_LIST) {
+            return 0;
+        } else {
+            return s_atn_table[arg_list_id].m_count;
+        }
     }
 
     static void print_arg_list_helper(ArgListID arg_list_id) {

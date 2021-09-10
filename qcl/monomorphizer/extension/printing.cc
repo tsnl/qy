@@ -36,6 +36,8 @@ namespace monomorphizer::printing {
                 case mast::EXP_ALLOCATE_ONE: { std::cout << "EXP_ALLOCATE_ONE"; break; }
                 case mast::EXP_ALLOCATE_MANY: { std::cout << "EXP_ALLOCATE_MANY"; break; }
                 case mast::EXP_CHAIN: { std::cout << "EXP_CHAIN"; break; }
+                case mast::EXP_CAST: { std::cout << "EXP_CAST"; break; }
+                case mast::EXP_TUPLE: { std::cout << "EXP_TUPLE"; break; }
                 default: { std::cout << "<!!ERROR_EXP:nk=" << (size_t)nk << ">"; break; }
             }
         }

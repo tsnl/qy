@@ -75,8 +75,6 @@ namespace monomorphizer::mval {
         intern::IntStr* arg_name_array;
         CtxEnclosedId* ctx_enclosed_id_array;
         mast::ExpID body_exp_id;
-        mtype::TID arg_tid;
-        mtype::TID ret_tid;
 
         inline
         FuncInfo(
@@ -84,17 +82,13 @@ namespace monomorphizer::mval {
             uint32_t new_ctx_enclosed_id_count,
             intern::IntStr* mv_arg_name_array,
             CtxEnclosedId* mv_ctx_enclosed_id_array,
-            mast::ExpID new_body_exp_id,
-            mtype::TID new_arg_tid,
-            mtype::TID new_ret_tid
+            mast::ExpID new_body_exp_id
         )
         :   arg_name_count(new_arg_name_count),
             ctx_enclosed_id_count(new_ctx_enclosed_id_count),
             arg_name_array(mv_arg_name_array),
             ctx_enclosed_id_array(mv_ctx_enclosed_id_array),
-            body_exp_id(new_body_exp_id),
-            arg_tid(new_arg_tid),
-            ret_tid(new_ret_tid)
+            body_exp_id(new_body_exp_id)
         {}
     };
 
@@ -122,14 +116,13 @@ namespace monomorphizer::mval {
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
         CtxEnclosedId* mv_ctx_enclosed_id_array,
-        mast::ExpID body_exp_id,
-        mtype::TID arg_tid,
-        mtype::TID ret_tid
+        mast::ExpID body_exp_id
     );
 
     // property accessors:
     ValueKind value_kind(ValVarID value_id);
     ValueInfo value_info(ValVarID value_id);
+    size_t get_seq_count(size_t sequence_info_index);
     std::optional<ValVarID> get_seq_elem(size_t sequence_info_index, size_t index);
     FuncInfo* get_func_info(size_t func_info_index);
 

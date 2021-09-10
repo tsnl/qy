@@ -30,6 +30,7 @@ namespace monomorphizer::arg_list {
     );
 
     ArgListID empty_arg_list_id();
+    size_t count_arg_list_items(ArgListID arg_list_id);
 
     void print_arg_list(ArgListID arg_list_id);
 

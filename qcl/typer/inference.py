@@ -1177,6 +1177,16 @@ def help_infer_type_spec_tid(
         ptr_tid = type.get_ptr_type(ptd_tid, ts.is_mut)
         return ptd_sub, ptr_tid
 
+    elif isinstance(ts, ast.node.TupleTypeSpec):
+        item_tid_list = []
+        sub = substitution.empty
+        for item_ts in ts.items:
+            item_sub, item_tid = infer_type_spec_tid(project, ctx, deferred_list, item_ts)
+            sub = item_sub.compose(sub)
+            item_tid_list.append(item_tid)
+        tuple_tid = type.get_tuple_type(tuple(item_tid_list))
+        return sub, tuple_tid
+
     raise NotImplementedError(f"Type inference for {ts.__class__.__name__}")
 
 

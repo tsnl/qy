@@ -1,8 +1,8 @@
 #include "eval.hh"
 
-#include <cmath>
 #include <iostream>
 #include <set>
+#include <cmath>
 #include <cassert>
 #include <cstdint>
 
@@ -806,22 +806,45 @@ namespace monomorphizer::eval {
             } break;
 
             case mast::TS_TUPLE: {
+                // std::cout << "DEBUG: eval_mono_ts for mast::TS_TUPLE" << std::endl;
+                // std::cout.flush();
+                
                 auto info = &mast::get_info_ptr(ts_id)->ts_tuple;
                 auto elem_count = info->elem_ts_count;
                 auto elem_array = info->elem_ts_array;
 
                 // constructing an arg-list in reverse order:
+                // In the future, iterating through this list should produce elements in original order.
                 auto made_arg_list = arg_list::EMPTY_ARG_LIST;
                 for (size_t i = 0; i < elem_count; i++) {
+                    // std::cout << "DEBUG: BP 1." << i << std::endl;
+                    // std::cout << "- elem_array = " << elem_array << std::endl;
+                    // std::cout.flush();
                     auto elem_index = elem_count - (i + 1);
                     auto elem_ts = elem_array[elem_index];
+                    // std::cout << "DEBUG: BP 2." << i << std::endl;
+                    // std::cout.flush();
                     auto elem_ts_tid = eval_mono_ts(elem_ts, st);
+                    // std::cout << "DEBUG: BP 3." << i << std::endl;
+                    // std::cout.flush();
                     made_arg_list = arg_list::cons_tid(
                         made_arg_list, 
                         elem_ts_tid
                     );
+                    // std::cout << "DEBUG: BP 4." << i << std::endl;
+                    // std::cout.flush();
                 }
-                return mtype::get_tuple_tid(made_arg_list);
+                assert(arg_list::count_arg_list_items(made_arg_list) == elem_count);
+                
+                // std::cout << "DEBUG: Constructed ArgList for TS_TUPLE" << std::endl;
+                // std::cout.flush();
+
+                auto ret_id = mtype::get_tuple_tid(made_arg_list);
+
+                // std::cout << "DEBUG: Ret-ID: " << ret_id << std::endl;
+                // std::cout.flush();
+
+                return ret_id;
             } break;
             
             case mast::TS_GET_MONO_MODULE_FIELD: {
@@ -967,7 +990,6 @@ namespace monomorphizer::eval {
         auto fn_arg_name_array = func_info_p->arg_name_array;
         auto fn_arg_name_count = func_info_p->arg_name_count;
         auto fn_body_exp_id = func_info_p->body_exp_id;
-        auto fn_arg_tid = func_info_p->arg_tid;
 
         // NOTE: we do not perform type conversion on the argument or return
         //       type for calls-- types must be cast explicitly.
@@ -1374,8 +1396,7 @@ namespace monomorphizer::eval {
             copied_arg_name_array,
             enclosed_name_count,
             enclosed_bind_array,
-            body_exp,
-            arg_tid, ret_tid
+            body_exp
         );
     }
     mval::ValVarID eval_mono_chain_exp(mast::ExpID exp_id, stack::Stack* st) {
@@ -1396,24 +1417,201 @@ namespace monomorphizer::eval {
 
         return res;
     }
+    static mval::ValVarID help_eval_mono_cast_exp__to_float(mval::ValVarID src_vid, int dst_width_in_bits);
+    static mval::ValVarID help_eval_mono_cast_exp__to_int(mval::ValVarID src_vid, int dst_width_in_bits, bool dst_is_signed);
+    static mval::ValVarID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
+    static mval::ValVarID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
+    static mval::ValVarID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
+    static mval::ValVarID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
+    static mval::ValVarID help_cast(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        auto constructor_tid_kind = mtype::kind_of_tid(constructor_tid);
+        switch (constructor_tid_kind)
+        {
+            // Unit, String: trivial cast works since passes type-check.
+            case mtype::TK_UNIT: return initializer_vid;
+            case mtype::TK_STRING: return initializer_vid;
+
+            // Cast_ToInt:
+            case mtype::TK_S8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, true);
+            case mtype::TK_S16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, true);
+            case mtype::TK_S32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, true);
+            case mtype::TK_S64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, true);   
+            case mtype::TK_U1: return help_eval_mono_cast_exp__to_int(initializer_vid, 1, false);
+            case mtype::TK_U8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, false);
+            case mtype::TK_U16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, false);
+            case mtype::TK_U32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, false);
+            case mtype::TK_U64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, false);
+            
+            // Cast_ToFloat:
+            case mtype::TK_F32: return help_eval_mono_cast_exp__to_float(initializer_vid, 32);
+            case mtype::TK_F64: return help_eval_mono_cast_exp__to_float(initializer_vid, 64);
+
+            // Cast_To{Array|Slice|Pointer}:
+            case mtype::TK_ARRAY: return help_eval_mono_cast_exp__to_array(constructor_tid, initializer_vid);
+            case mtype::TK_SLICE: return help_eval_mono_cast_exp__to_slice(constructor_tid, initializer_vid);
+            case mtype::TK_POINTER: return help_eval_mono_cast_exp__to_pointer(constructor_tid, initializer_vid);
+
+            // Cast_ToTuple:
+            case mtype::TK_TUPLE: return help_eval_mono_cast_exp__to_tuple(constructor_tid, initializer_vid);
+
+            case mtype::TK_ERROR:
+            default:
+            {
+                throw new Panic("Unknown/invalid constructor type-kind in CastOp");
+            }
+        }
+    }
     mval::ValVarID help_eval_mono_cast_exp__to_int(
         mval::ValVarID src_vid, 
-        int dst_width_in_bits,
+        int dst_width_in_bits, 
         bool dst_is_signed
     ) {
+        mval::ValueKind src_val_kind = mval::value_kind(src_vid);
+        
+        // first, loading the value to convert into a `size_t` word:
+        size_t val_bit_pattern; {
+            switch (src_val_kind) {
+                case mval::VK_S8: { val_bit_pattern = mval::value_info(src_vid).s8; } break;
+                case mval::VK_S16: { val_bit_pattern = mval::value_info(src_vid).s16; } break;
+                case mval::VK_S32: { val_bit_pattern = mval::value_info(src_vid).s32; } break;
+                case mval::VK_S64: { val_bit_pattern = mval::value_info(src_vid).s64; } break;
 
+                case mval::VK_U1: { val_bit_pattern = mval::value_info(src_vid).u1; } break;
+                case mval::VK_U8: { val_bit_pattern = mval::value_info(src_vid).u8; } break;
+                case mval::VK_U16: { val_bit_pattern = mval::value_info(src_vid).u16; } break;
+                case mval::VK_U32: { val_bit_pattern = mval::value_info(src_vid).u32; } break;
+                case mval::VK_U64: { val_bit_pattern = mval::value_info(src_vid).u64; } break;
+                
+                case mval::VK_F32: { val_bit_pattern = static_cast<size_t>(mval::value_info(src_vid).f32); } break;
+                case mval::VK_F64: { val_bit_pattern = static_cast<size_t>(mval::value_info(src_vid).f64); } break;
+
+                default:
+                {
+                    throw new Panic("NotImplemented: invalid Cast_ToInt operation");
+                }
+            }
+        }
+
+        // next, converting this word into the desired type and returning:
+        if (dst_is_signed) {
+            switch (dst_width_in_bits) {
+                case 8: return mval::push_s8(static_cast<int8_t>(val_bit_pattern));
+                case 16: return mval::push_s16(static_cast<int16_t>(val_bit_pattern));
+                case 32: return mval::push_s32(static_cast<int32_t>(val_bit_pattern));
+                case 64: return mval::push_s64(static_cast<int64_t>(val_bit_pattern));
+                default: 
+                {
+                    throw new Panic("NotImplemented: unknown dst_width_in_bits for Cast op with SignedInt dst");
+                }
+            }
+        } else {
+            switch (dst_width_in_bits) {
+                case 1: return mval::push_u1(!!val_bit_pattern);
+                case 8: return mval::push_u8(static_cast<uint8_t>(val_bit_pattern));
+                case 16: return mval::push_u16(static_cast<uint16_t>(val_bit_pattern));
+                case 32: return mval::push_u32(static_cast<uint32_t>(val_bit_pattern));
+                case 64: return mval::push_u64(static_cast<uint64_t>(val_bit_pattern));
+                default:
+                {
+                    throw new Panic("NotImplemented: unknown dst_width_in_bits for Cast op with UnsignedInt dst");
+                }
+            }
+        }
     }
     mval::ValVarID help_eval_mono_cast_exp__to_float(
         mval::ValVarID src_vid, 
         int dst_width_in_bits
     ) {
+        mval::ValueKind src_val_kind = mval::value_kind(src_vid);
+        
+        // first, loading the value to convert into a `size_t` word:
+        double val_bit_pattern; {
+            switch (src_val_kind) {
+                case mval::VK_S8: { val_bit_pattern = double(mval::value_info(src_vid).s8); } break;
+                case mval::VK_S16: { val_bit_pattern = double(mval::value_info(src_vid).s16); } break;
+                case mval::VK_S32: { val_bit_pattern = double(mval::value_info(src_vid).s32); } break;
+                case mval::VK_S64: { val_bit_pattern = double(mval::value_info(src_vid).s64); } break;
 
-    }
-    mval::ValVarID help_eval_mono_cast_exp__to_string(mval::ValVarID initializer_vid) {
+                case mval::VK_U1: { val_bit_pattern = double(mval::value_info(src_vid).u1); } break;
+                case mval::VK_U8: { val_bit_pattern = double(mval::value_info(src_vid).u8); } break;
+                case mval::VK_U16: { val_bit_pattern = double(mval::value_info(src_vid).u16); } break;
+                case mval::VK_U32: { val_bit_pattern = double(mval::value_info(src_vid).u32); } break;
+                case mval::VK_U64: { val_bit_pattern = double(mval::value_info(src_vid).u64); } break;
+                
+                case mval::VK_F32: { val_bit_pattern = double(mval::value_info(src_vid).f32); } break;
+                case mval::VK_F64: { val_bit_pattern = double(mval::value_info(src_vid).f64); } break;
 
+                default:
+                {
+                    throw new Panic("NotImplemented: invalid Cast_ToFloat operation");
+                }
+            }
+        }
+
+        // next, converting this word into the desired type and returning:
+        {
+            switch (dst_width_in_bits) {
+                case 32: return mval::push_f32(static_cast<float>(val_bit_pattern));
+                case 64: return mval::push_f64(static_cast<double>(val_bit_pattern));
+                default: 
+                {
+                    throw new Panic("NotImplemented: unknown dst_width_in_bits for Cast op with SignedInt dst");
+                }
+            }
+        }
     }
     mval::ValVarID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        mval::ValueKind initializer_value_kind = mval::value_kind(initializer_vid);
 
+        if (initializer_value_kind != mval::VK_TUPLE) {
+            throw new Panic("Invalid Cast_ToTuple exp argument");
+        }
+        
+        auto seq_info_index = mval::value_info(initializer_vid).sequence_info_index;
+
+        // verifying that the constructor type and initializer value have the same element-count:
+        auto initializer_count = mval::get_seq_count(seq_info_index);
+        auto constructor_count = mtype::get_tuple_count(constructor_tid);
+        if (initializer_count != constructor_count) {
+            std::cout 
+                << "Initializer count: " << initializer_count << std::endl
+                << "Constructor count: " << constructor_count << std::endl;
+            std::cout.flush();
+            throw new Panic("Invalid Cast_ToTuple exp argument: mismatched tuple counts");
+        }
+        
+        // recursively converting each element data-type:
+        auto elem_item_count = initializer_count;
+        auto elem_item_array = new mval::ValVarID[elem_item_count];
+        arg_list::ArgListID remaining_arg_list = mtype::get_tuple_arg_list(constructor_tid);
+        for (size_t i = 0; i < elem_item_count; i++) {
+            // removing the next TID from the arg-list, which stores IDs in reverse-order:
+            assert(remaining_arg_list != arg_list::EMPTY_ARG_LIST);
+            mtype::TID this_arg_tid = arg_list::head(remaining_arg_list);
+            remaining_arg_list = arg_list::tail(remaining_arg_list);
+
+            // acquiring the corresponding VID from the initializer:
+            mval::ValVarID this_arg_vid = mval::get_seq_elem(seq_info_index, i).value_or(mval::NULL_VID);
+            assert(this_arg_vid != mval::NULL_VID);
+
+            // converting and storing on `elem_item_array`, the output array:
+            elem_item_array[i] = help_cast(this_arg_tid, this_arg_vid);
+        }
+        return mval::push_tuple(elem_item_count, elem_item_array);
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_array");
+        // only accepts arrays
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_slice");
+        // only accepts slices
+        //  - cannot convert arrays to slices because of allocation constraints
+    }
+    mval::ValVarID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+        throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_pointer");
+        // only accepts pointers, BUT
+        // can be mutable or immutable.
     }
     mval::ValVarID eval_mono_cast_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_cast;
@@ -1421,33 +1619,19 @@ namespace monomorphizer::eval {
         auto constructor_tid = eval_mono_ts(info->ts_id, st);
         auto initializer_vid = eval_mono_exp(info->exp_id, st);
 
-        auto constructor_tid_kind = mtype::kind_of_tid(constructor_tid);
-        switch (constructor_tid_kind)
-        {
-            case mtype::TK_S8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, true);
-            case mtype::TK_S16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, true);
-            case mtype::TK_S32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, true);
-            case mtype::TK_S64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, true);
-            
-            case mtype::TK_U1: return help_eval_mono_cast_exp__to_int(initializer_vid, 1, false);
-            case mtype::TK_U8: return help_eval_mono_cast_exp__to_int(initializer_vid, 8, false);
-            case mtype::TK_U16: return help_eval_mono_cast_exp__to_int(initializer_vid, 16, false);
-            case mtype::TK_U32: return help_eval_mono_cast_exp__to_int(initializer_vid, 32, false);
-            case mtype::TK_U64: return help_eval_mono_cast_exp__to_int(initializer_vid, 64, false);
-            
-            case mtype::TK_F32: return help_eval_mono_cast_exp__to_float(initializer_vid, 32);
-            case mtype::TK_F64: return help_eval_mono_cast_exp__to_float(initializer_vid, 64);
+        return help_cast(constructor_tid, initializer_vid);
+    }
+    mval::ValVarID eval_mono_tuple_exp(mast::ExpID exp_id, stack::Stack* st) {
+        auto info = &mast::get_info_ptr(exp_id)->exp_tuple;
 
-            // Unit, String: trivial cast works since passes type-check.
-            case mtype::TK_UNIT: return initializer_vid;
-            case mtype::TK_STRING: return initializer_vid;
-
-            case mtype::TK_ARRAY: return help_eval_mono_cast_exp__to_array(constructor_tid, initializer_vid);
-            case mtype::TK_SLICE: return help_eval_mono_cast_exp__to_slice(constructor_tid, initializer_vid);
-            case mtype::TK_POINTER: return help_eval_mono_cast_exp__to_pointer(constructor_tid, initializer_vid);
-
-            case mtype::TK_TUPLE: return help_eval_mono_cast_exp__to_tuple(constructor_tid, initializer_vid);
+        size_t item_count = info->item_count;
+        mast::ExpID* old_item_array = info->item_array;
+        mval::ValVarID* new_item_array = new mval::ValVarID[item_count];
+        for (size_t i = 0; i < item_count; i++) {
+            new_item_array[i] = eval_mono_exp(old_item_array[i], st);
         }
+
+        return mval::push_tuple(item_count, new_item_array);
     }
     mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
         mast::NodeKind exp_kind = mast::get_node_kind(exp_id);
@@ -1507,13 +1691,17 @@ namespace monomorphizer::eval {
                 return eval_mono_cast_exp(exp_id, st);
             }
 
+            case mast::EXP_TUPLE: {
+                return eval_mono_tuple_exp(exp_id, st);
+            }
+
             case mast::EXP_GET_POLY_MODULE_FIELD:
             {
                 throw new Panic("EXP_GET_POLY_MODULE_FIELD remains after `p2m`");
             }
             default: 
             {
-                // std::cout << "INFO: Invalid arg exp kind = " << exp_kind << std::endl;
+                std::cout << "INFO: Invalid arg exp kind = " << exp_kind << std::endl;
                 throw new Panic("Invalid arg exp to eval_mono_exp");
             }
         }
