@@ -53,10 +53,10 @@ namespace monomorphizer::stack {
     void def_t_in_stack(Stack* stack, intern::IntStr int_str_id, mtype::TID tid) {
         stack->frames.back().id_map[int_str_id] = tid;
     }
-    void def_v_in_stack(Stack* stack, intern::IntStr int_str_id, mval::ValVarID vid) {
+    void def_v_in_stack(Stack* stack, intern::IntStr int_str_id, mval::VID vid) {
         stack->frames.back().id_map[int_str_id] = vid;
     }
-    mval::ValVarID lookup_v_in_stack(Stack* stack, intern::IntStr int_str_id) { return lookup(stack, int_str_id); }
+    mval::VID lookup_v_in_stack(Stack* stack, intern::IntStr int_str_id) { return lookup(stack, int_str_id); }
     mtype::TID     lookup_t_in_stack(Stack* stack, intern::IntStr int_str_id) { return lookup(stack, int_str_id); }
 
 }

@@ -1,7 +1,7 @@
-// this module models global value variables (each with a `ValVarID`)
+// this module models global value variables (each with a `VID`)
 // FIXME: 
-//  - rename ValVarID to ValID
-//  - create a Mutator object that stores a changing ValVarID
+//  - rename VID to ValID
+//  - create a Mutator object that stores a changing VID
 //  - require array, pointer, and slice to be composed of a vector of Mutator objects
 //  - this way, contents of ValIDs are immutable, whereas Mutators encapsulate all changes.
 
@@ -11,15 +11,16 @@
 #include <cstdint>
 #include <optional>
 
-#include "id-mast.hh"
 #include "id-mval.hh"
+#include "id-mast.hh"
 #include "id-mtype.hh"
 #include "id-intern.hh"
+#include "id-vcell.hh"
 #include "shared-enums.hh"
 
 namespace monomorphizer::mval {
 
-    extern ValVarID const NULL_VID;
+    extern VID const NULL_VID;
     extern size_t const MAX_VAL_HASH_BYTE_COUNT;
 
     enum ValueKind {
@@ -32,11 +33,15 @@ namespace monomorphizer::mval {
         VK_F32, VK_F64,
         VK_STRING,
         VK_TUPLE,
+        VK_POINTER,
         VK_ARRAY,
         VK_SLICE,
         VK_FUNCTION
 
-        // todo: add pointers, mutation
+        // add pointers, mutation
+        //  - each pointer contains a VCellID
+        //  - each array/slice contains numerous VCellIDs
+        //  - VCellIDs are only actually created in allocate expressions
     };
 
     union ValueInfo {
@@ -54,12 +59,15 @@ namespace monomorphizer::mval {
         size_t string_info_index;
         size_t sequence_info_index;
         size_t func_info_index;
+        size_t ptr_info_index;
+        size_t slice_info_index;
+        size_t array_info_index;
     };
 
     struct CtxEnclosedId {
         intern::IntStr name;
         size_t target;
-        // NOTE: `target` is either an mtype::TID or an mval::ValVarID
+        // NOTE: `target` is either an mtype::TID or an mval::VID
 
         inline
         CtxEnclosedId()
@@ -102,37 +110,54 @@ namespace monomorphizer::mval {
 namespace monomorphizer::mval {
 
     // value constructors:
-    ValVarID get_unit();
-    ValVarID push_u1(bool v);
-    ValVarID push_u8(uint8_t v);
-    ValVarID push_u16(uint16_t v);
-    ValVarID push_u32(uint32_t v);
-    ValVarID push_u64(uint64_t v);
-    ValVarID push_s8(int8_t v);
-    ValVarID push_s16(int16_t v);
-    ValVarID push_s32(int32_t v);
-    ValVarID push_s64(int64_t v);
-    ValVarID push_f32(float v);
-    ValVarID push_f64(double v);
-    ValVarID push_str(size_t code_point_count, int* mv_code_point_array);
-    ValVarID push_tuple(size_t elem_id_count, ValVarID* mv_elem_id_array);
-    ValVarID push_function(
+    VID get_unit();
+    VID push_u1(bool v);
+    VID push_u8(uint8_t v);
+    VID push_u16(uint16_t v);
+    VID push_u32(uint32_t v);
+    VID push_u64(uint64_t v);
+    VID push_s8(int8_t v);
+    VID push_s16(int16_t v);
+    VID push_s32(int32_t v);
+    VID push_s64(int64_t v);
+    VID push_f32(float v);
+    VID push_f64(double v);
+    VID push_str(size_t code_point_count, int* mv_code_point_array);
+    VID push_tuple(size_t elem_id_count, VID* mv_elem_id_array);
+    VID push_function(
         uint32_t arg_name_count,
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_id_count,
         CtxEnclosedId* mv_ctx_enclosed_id_array,
         mast::ExpID body_exp_id
     );
+    VID push_pointer(
+        vcell::VCellID vcell_id,
+        bool is_mut
+    );
+    VID push_array(
+        size_t vcell_id_count,
+        vcell::VCellID* mv_vcell_id_array,
+        bool is_mut
+    );
+    VID push_slice(
+        size_t vcell_id_count,
+        vcell::VCellID* mv_vcell_id_array,
+        bool is_mut
+    );
 
     // property accessors:
-    ValueKind value_kind(ValVarID value_id);
-    ValueInfo value_info(ValVarID value_id);
+    ValueKind value_kind(VID value_id);
+    ValueInfo value_info(VID value_id);
     size_t get_seq_count(size_t sequence_info_index);
-    std::optional<ValVarID> get_seq_elem1(size_t seq_info_index, size_t index);
-    std::optional<ValVarID> get_seq_elem2(ValVarID tuple_val_id, size_t index);
+    std::optional<VID> get_seq_elem1(size_t seq_info_index, size_t index);
+    std::optional<VID> get_seq_elem2(VID tuple_val_id, size_t index);
     FuncInfo* get_func_info(size_t func_info_index);
+    vcell::VCellID get_ptr_vcell(mval::VID val_id);
+    vcell::VCellID get_array_vcell(mval::VID val_id, size_t index);
+    vcell::VCellID get_slice_vcell(mval::VID val_id, size_t index);
 
     // equality:
-    bool equals(ValVarID v1, ValVarID v2);
+    bool equals(VID v1, VID v2);
 
 }

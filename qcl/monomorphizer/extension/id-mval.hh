@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
+
 namespace monomorphizer::mval {
 
-    using ValVarID = size_t;
+    using VID = size_t;
     
 }

@@ -19,7 +19,7 @@ namespace monomorphizer::arg_list {
     );
     ArgListID cons_val(
         ArgListID list,
-        mval::ValVarID value_id
+        mval::VID value_id
     );
 
     size_t head(

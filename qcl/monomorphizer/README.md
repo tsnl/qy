@@ -83,11 +83,11 @@ will only update in Python-land when Cython detects the linked Python extension 
         - creates kind-tagged ID mappings to any of...
           - template bound variables (to be replaced by other ID types)
           - AST nodes (mast::TypeSpecID, mast::ExpID)
-          - evaluated IDs (mtype::TID, mval::ValVarID)
+          - evaluated IDs (mtype::TID, mval::VID)
         - GDefIDs are used by global ID MAST nodes that refer to GDefID
-    - `eval`: convert `mast::NodeID` -> `(mtype::TID | mval::ValVarID)`
+    - `eval`: convert `mast::NodeID` -> `(mtype::TID | mval::VID)`
     - `arg-list`: uses tries to 'intern' strings of evaluated IDs
-        (`mtype::TID` and `mval::ValVarID`)
+        (`mtype::TID` and `mval::VID`)
     - `panic`: used to exit after something has gone wrong
     - `printing`: used to print data-structures to stdout for debug
     - `intern`: maps unique character strings to integer IDs (for local var 

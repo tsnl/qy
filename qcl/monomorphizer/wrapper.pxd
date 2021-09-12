@@ -104,7 +104,7 @@ cdef extern from "extension/id-arg-list.hh" namespace "monomorphizer::arg_list":
 #
 
 cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
-    ctypedef size_t ValVarID
+    ctypedef size_t VID
 
     void ensure_mval_init()
 
@@ -340,6 +340,6 @@ cdef:
     TID w_get_string_tid();
     TID w_get_tuple_tid(ArgListID arg_list_id);
     TID w_get_ptr_tid(TID ptd_tid, bint contents_is_mut);
-    TID w_get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut);
+    TID w_get_array_tid(TID ptd_tid, VID count_val_id, bint contents_is_mut);
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);

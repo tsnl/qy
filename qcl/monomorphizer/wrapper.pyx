@@ -169,7 +169,7 @@ cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
     TID get_string_tid();
     TID get_tuple_tid(ArgListID arg_list_id);
     TID get_ptr_tid(TID ptd_tid, bint contents_is_mut);
-    TID get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut);
+    TID get_array_tid(TID ptd_tid, VID count_val_id, bint contents_is_mut);
     TID get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID get_function_tid(TID arg_tid, TID ret_tid, SES ses);
 
@@ -411,7 +411,7 @@ cdef:
         return get_tuple_tid(arg_list_id)
     TID w_get_ptr_tid(TID ptd_tid, bint contents_is_mut):
         return get_ptr_tid(ptd_tid, contents_is_mut)
-    TID w_get_array_tid(TID ptd_tid, ValVarID count_val_id, bint contents_is_mut):
+    TID w_get_array_tid(TID ptd_tid, VID count_val_id, bint contents_is_mut):
         return get_array_tid(ptd_tid, count_val_id, contents_is_mut)
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut):
         return get_slice_tid(ptd_tid, contents_is_mut)

@@ -75,7 +75,7 @@ namespace monomorphizer::printing {
             std::cout << "}";
         }
     }
-    static void print_val(mval::ValVarID val_id) {
+    static void print_val(mval::VID val_id) {
         if (val_id == mval::NULL_VID) {
             std::cout << "<NULL_VID>";
         } else {

@@ -31,13 +31,13 @@ namespace monomorphizer::eval {
     mast::ElemID p2m_elem(mast::ElemID elem_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set);
 
     static mtype::TID eval_poly_ts_impl(mast::TypeSpecID poly_ts, sub::Substitution* s, stack::Stack* st);
-    static mval::ValVarID eval_poly_exp_impl(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st);
+    static mval::VID eval_poly_exp_impl(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st);
 
     static mtype::TID eval_poly_ts(mast::TypeSpecID poly_ts, sub::Substitution* s);
-    static mval::ValVarID eval_poly_exp(mast::ExpID exp_id, sub::Substitution* s);
+    static mval::VID eval_poly_exp(mast::ExpID exp_id, sub::Substitution* s);
     
     static mtype::TID eval_mono_ts(mast::TypeSpecID ts_id, stack::Stack* stack);
-    static mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* stack);
+    static mval::VID eval_mono_exp(mast::ExpID exp_id, stack::Stack* stack);
     
 }
 
@@ -676,7 +676,7 @@ namespace monomorphizer::eval {
         }
     }
 
-    mval::ValVarID eval_def_v(GDefID def_id, stack::Stack* st) {
+    mval::VID eval_def_v(GDefID def_id, stack::Stack* st) {
         gdef::DefKind def_kind = gdef::get_def_kind(def_id);
         switch (def_kind) {
             case gdef::DefKind::CONST_TOT_VAL: {
@@ -704,7 +704,7 @@ namespace monomorphizer::eval {
 namespace monomorphizer::eval {
 
     static mtype::TID eval_mono_ts(mast::TypeSpecID ts_id, stack::Stack* st);
-    static mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st);
+    static mval::VID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st);
     static void eval_mono_elem(mast::ElemID elem_id, stack::Stack* st);
 
     static mtype::TID eval_poly_ts_impl(
@@ -718,7 +718,7 @@ namespace monomorphizer::eval {
         }
         return eval_mono_ts(mono_ts, st);
     }
-    static mval::ValVarID eval_poly_exp_impl(
+    static mval::VID eval_poly_exp_impl(
         mast::ExpID exp_id,
         sub::Substitution* s,
         stack::Stack* st
@@ -785,7 +785,7 @@ namespace monomorphizer::eval {
             case mast::TS_ARRAY: {
                 auto info = &mast::get_info_ptr(ts_id)->ts_array;
                 mtype::TID ptd_tid = eval_mono_ts(info->ptd_ts, st);
-                mval::ValVarID count_val_id = eval_mono_exp(info->count_exp, st);
+                mval::VID count_val_id = eval_mono_exp(info->count_exp, st);
                 bool is_mut = info->contents_is_mut;
                 return mtype::get_array_tid(ptd_tid, count_val_id, is_mut);
             } break;
@@ -904,7 +904,7 @@ namespace monomorphizer::eval {
         ssize_t v = b ? -m : +m;
         return v;
     }
-    static mval::ValVarID eval_mono_int_exp(mast::ExpID exp_id) {
+    static mval::VID eval_mono_int_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_int;
         auto m = info->mantissa;
         auto b = info->is_neg;
@@ -946,7 +946,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValVarID eval_mono_float_exp(mast::ExpID exp_id) {
+    static mval::VID eval_mono_float_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_float;
         switch (info->suffix) {
             case FS_F32: {
@@ -957,7 +957,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValVarID eval_mono_string_exp(mast::ExpID exp_id) {
+    static mval::VID eval_mono_string_exp(mast::ExpID exp_id) {
         auto info = &mast::get_info_ptr(exp_id)->exp_str;
         auto code_point_count = info->code_point_count;
         auto code_point_array = new int[code_point_count];
@@ -969,7 +969,7 @@ namespace monomorphizer::eval {
             code_point_array
         );
     }
-    static mval::ValVarID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::VID eval_mono_func_call_exp(mast::ExpID exp_id, stack::Stack* st) {
         // std::cout << "DEBUG: INTRODUCTION: eval_mono_func_call_exp" << std::endl;
         // std::cout.flush();
         
@@ -981,8 +981,8 @@ namespace monomorphizer::eval {
         }
 
         // first, evaluating the argument and function in the outer stack frame:
-        mval::ValVarID fun_vid = eval_mono_exp(info->called_fn, st);
-        mval::ValVarID raw_arg_vid = eval_mono_exp(info->arg_exp_id, st);
+        mval::VID fun_vid = eval_mono_exp(info->called_fn, st);
+        mval::VID raw_arg_vid = eval_mono_exp(info->arg_exp_id, st);
         
         // reaching inside the `fun` VID to retrieve the body expression to evaluate, args to pass.
         // std::cout << "DEBUG: preparing to reach inside func value_info" << std::endl;
@@ -1000,7 +1000,7 @@ namespace monomorphizer::eval {
 
         // NOTE: we do not perform type conversion on the argument or return
         //       type for calls-- types must be cast explicitly.
-        mval::ValVarID arg_vid = raw_arg_vid;
+        mval::VID arg_vid = raw_arg_vid;
 
         // pushing a new frame to the stack, computing the return value:
         // std::cout << "DEBUG: preparing to push stack frame" << std::endl;
@@ -1008,7 +1008,7 @@ namespace monomorphizer::eval {
         stack::push_stack_frame(st);
         // std::cout << "DEBUG: ... done" << std::endl;
         // std::cout.flush();
-        mval::ValVarID ret_val_id;
+        mval::VID ret_val_id;
         {
             // setting up the stack frame with ctx_enclosed_ids
             // std::cout << "DEBUG: preparing to set up stack frame with ctx_enclosed_ids (cf nonlocal)" << std::endl;
@@ -1020,8 +1020,8 @@ namespace monomorphizer::eval {
                     mtype::TID target = enclosed_mapping.target;
                     stack::def_t_in_stack(st, enclosed_mapping.name, target);
                 } else {
-                    // target is an mval::ValVarID
-                    mval::ValVarID target = enclosed_mapping.target;
+                    // target is an mval::VID
+                    mval::VID target = enclosed_mapping.target;
                     stack::def_v_in_stack(st, enclosed_mapping.name, target);
                 }
             }
@@ -1041,7 +1041,7 @@ namespace monomorphizer::eval {
                 auto arg_seq_info_index = mval::value_info(arg_vid).sequence_info_index;
                 for (uint32_t j = 0; j < fn_arg_name_count; j++) {
                     intern::IntStr arg_name = fn_arg_name_array[j];
-                    mval::ValVarID arg_bound = mval::get_seq_elem1(arg_seq_info_index, j).value_or(mval::NULL_VID);
+                    mval::VID arg_bound = mval::get_seq_elem1(arg_seq_info_index, j).value_or(mval::NULL_VID);
                     assert(arg_bound != mval::NULL_VID);
                     // std::cout << "DEBUG: get-seq-elem " << j << " OK" << std::endl;
                     // std::cout.flush();
@@ -1067,10 +1067,10 @@ namespace monomorphizer::eval {
 
         return ret_val_id;
     }
-    static mval::ValVarID eval_mono_unary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::VID eval_mono_unary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_unary;
                 
-        mval::ValVarID arg_val_id = eval_mono_exp(info->arg_exp, st);
+        mval::VID arg_val_id = eval_mono_exp(info->arg_exp, st);
         auto vk = mval::value_kind(arg_val_id);
         auto vi = mval::value_info(arg_val_id);
 
@@ -1134,14 +1134,14 @@ namespace monomorphizer::eval {
         }
         return result;
     }
-    static mval::ValVarID eval_mono_binary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::VID eval_mono_binary_op_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_binary;
         
-        mval::ValVarID lt_arg_val_id = eval_mono_exp(info->lt_arg_exp, st);
+        mval::VID lt_arg_val_id = eval_mono_exp(info->lt_arg_exp, st);
         auto lt_vk = mval::value_kind(lt_arg_val_id);
         auto lt_vi = mval::value_info(lt_arg_val_id);
 
-        mval::ValVarID rt_arg_val_id = eval_mono_exp(info->rt_arg_exp, st);
+        mval::VID rt_arg_val_id = eval_mono_exp(info->rt_arg_exp, st);
         auto rt_vk = mval::value_kind(rt_arg_val_id);
         auto rt_vi = mval::value_info(rt_arg_val_id);
 
@@ -1356,7 +1356,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    static mval::ValVarID eval_mono_ite_exp(mast::ExpID ite_exp, stack::Stack* st) {
+    static mval::VID eval_mono_ite_exp(mast::ExpID ite_exp, stack::Stack* st) {
         auto info = &mast::get_info_ptr(ite_exp)->exp_if_then_else;
         auto cond_val_id = eval_mono_exp(info->cond_exp, st);
         auto cond_vk = mval::value_kind(cond_val_id);
@@ -1371,7 +1371,7 @@ namespace monomorphizer::eval {
             eval_mono_exp(info->else_exp, st)
         );
     }
-    static mval::ValVarID eval_mono_get_tuple_field_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::VID eval_mono_get_tuple_field_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_get_tuple_field;
         auto tuple_val_id = eval_mono_exp(info->tuple_exp_id, st);
         auto index = info->index;
@@ -1382,12 +1382,12 @@ namespace monomorphizer::eval {
             throw new Panic("ERROR: sequence index out of bounds");
         }
     }
-    static mval::ValVarID eval_mono_get_module_field_exp(mast::ExpID exp_id, stack::Stack* st) {
+    static mval::VID eval_mono_get_module_field_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_get_mono_module_field;
         GDefID field_def_id = modules::get_mono_mod_field_at(info->template_id, info->field_index);
         return eval_def_v(field_def_id, st);
     }
-    static mval::ValVarID eval_mono_lambda_exp(
+    static mval::VID eval_mono_lambda_exp(
         mast::ExpID exp_id, 
         stack::Stack* st
     ) {
@@ -1431,11 +1431,11 @@ namespace monomorphizer::eval {
             body_exp
         );
     }
-    mval::ValVarID eval_mono_chain_exp(mast::ExpID exp_id, stack::Stack* st) {
+    mval::VID eval_mono_chain_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_chain;
         
         stack::push_stack_frame(st);
-        mval::ValVarID res;
+        mval::VID res;
         {
             auto elem_count = info->prefix_elem_count;
             auto elem_array = info->prefix_elem_array;
@@ -1449,13 +1449,13 @@ namespace monomorphizer::eval {
 
         return res;
     }
-    static mval::ValVarID help_eval_mono_cast_exp__to_float(mval::ValVarID src_vid, int dst_width_in_bits);
-    static mval::ValVarID help_eval_mono_cast_exp__to_int(mval::ValVarID src_vid, int dst_width_in_bits, bool dst_is_signed);
-    static mval::ValVarID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
-    static mval::ValVarID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
-    static mval::ValVarID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
-    static mval::ValVarID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::ValVarID initializer_vid);
-    static mval::ValVarID help_cast(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+    static mval::VID help_eval_mono_cast_exp__to_float(mval::VID src_vid, int dst_width_in_bits);
+    static mval::VID help_eval_mono_cast_exp__to_int(mval::VID src_vid, int dst_width_in_bits, bool dst_is_signed);
+    static mval::VID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::VID initializer_vid);
+    static mval::VID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::VID initializer_vid);
+    static mval::VID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::VID initializer_vid);
+    static mval::VID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::VID initializer_vid);
+    static mval::VID help_cast(mtype::TID constructor_tid, mval::VID initializer_vid) {
         // std::cout << "DEBUG: Invoking `help_cast`" << std::endl;
         
         auto constructor_tid_kind = mtype::kind_of_tid(constructor_tid);
@@ -1495,8 +1495,8 @@ namespace monomorphizer::eval {
             }
         }
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_int(
-        mval::ValVarID src_vid, 
+    mval::VID help_eval_mono_cast_exp__to_int(
+        mval::VID src_vid, 
         int dst_width_in_bits, 
         bool dst_is_signed
     ) {
@@ -1552,8 +1552,8 @@ namespace monomorphizer::eval {
             }
         }
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_float(
-        mval::ValVarID src_vid, 
+    mval::VID help_eval_mono_cast_exp__to_float(
+        mval::VID src_vid, 
         int dst_width_in_bits
     ) {
         mval::ValueKind src_val_kind = mval::value_kind(src_vid);
@@ -1594,7 +1594,7 @@ namespace monomorphizer::eval {
             }
         }
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+    mval::VID help_eval_mono_cast_exp__to_tuple(mtype::TID constructor_tid, mval::VID initializer_vid) {
         mval::ValueKind initializer_value_kind = mval::value_kind(initializer_vid);
 
         if (initializer_value_kind != mval::VK_TUPLE) {
@@ -1616,7 +1616,7 @@ namespace monomorphizer::eval {
         
         // recursively converting each element data-type:
         auto elem_item_count = initializer_count;
-        auto elem_item_array = new mval::ValVarID[elem_item_count];
+        auto elem_item_array = new mval::VID[elem_item_count];
         arg_list::ArgListID remaining_arg_list = mtype::get_tuple_arg_list(constructor_tid);
         for (size_t i = 0; i < elem_item_count; i++) {
             // removing the next TID from the arg-list, which stores IDs in reverse-order:
@@ -1625,7 +1625,7 @@ namespace monomorphizer::eval {
             remaining_arg_list = arg_list::tail(remaining_arg_list);
 
             // acquiring the corresponding VID from the initializer:
-            mval::ValVarID this_arg_vid = mval::get_seq_elem2(initializer_vid, i).value_or(mval::NULL_VID);
+            mval::VID this_arg_vid = mval::get_seq_elem2(initializer_vid, i).value_or(mval::NULL_VID);
             assert(this_arg_vid != mval::NULL_VID);
 
             // converting and storing on `elem_item_array`, the output array:
@@ -1633,21 +1633,21 @@ namespace monomorphizer::eval {
         }
         return mval::push_tuple(elem_item_count, elem_item_array);
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+    mval::VID help_eval_mono_cast_exp__to_array(mtype::TID constructor_tid, mval::VID initializer_vid) {
         throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_array");
         // only accepts arrays
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+    mval::VID help_eval_mono_cast_exp__to_slice(mtype::TID constructor_tid, mval::VID initializer_vid) {
         throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_slice");
         // only accepts slices
         //  - cannot convert arrays to slices because of allocation constraints
     }
-    mval::ValVarID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::ValVarID initializer_vid) {
+    mval::VID help_eval_mono_cast_exp__to_pointer(mtype::TID constructor_tid, mval::VID initializer_vid) {
         throw new Panic("NotImplemented: help_eval_mono_cast_exp__to_pointer");
         // only accepts pointers, BUT
         // can be mutable or immutable.
     }
-    mval::ValVarID eval_mono_cast_exp(mast::ExpID exp_id, stack::Stack* st) {
+    mval::VID eval_mono_cast_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_cast;
 
         // std::cout << "DEBUG: CastExp (1/3) Evaluating constructor_tid" << std::endl;
@@ -1662,19 +1662,19 @@ namespace monomorphizer::eval {
         // std::cout.flush();
         return help_cast(constructor_tid, initializer_vid);
     }
-    mval::ValVarID eval_mono_tuple_exp(mast::ExpID exp_id, stack::Stack* st) {
+    mval::VID eval_mono_tuple_exp(mast::ExpID exp_id, stack::Stack* st) {
         auto info = &mast::get_info_ptr(exp_id)->exp_tuple;
 
         size_t item_count = info->item_count;
         mast::ExpID* old_item_array = info->item_array;
-        mval::ValVarID* new_item_array = new mval::ValVarID[item_count];
+        mval::VID* new_item_array = new mval::VID[item_count];
         for (size_t i = 0; i < item_count; i++) {
             new_item_array[i] = eval_mono_exp(old_item_array[i], st);
         }
 
         return mval::push_tuple(item_count, new_item_array);
     }
-    mval::ValVarID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
+    mval::VID eval_mono_exp(mast::ExpID exp_id, stack::Stack* st) {
         mast::NodeKind exp_kind = mast::get_node_kind(exp_id);
         switch (exp_kind) {
             case mast::EXP_UNIT: {
@@ -1760,7 +1760,7 @@ namespace monomorphizer::eval {
     mtype::TID eval_type(mast::TypeSpecID ts_id, sub::Substitution* s) {
         return eval_poly_ts(ts_id, s);
     }
-    mval::ValVarID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
+    mval::VID eval_exp(mast::ExpID exp_id, sub::Substitution* s) {
         return eval_poly_exp(exp_id, s);
     }
 
