@@ -8,7 +8,7 @@ z = 2;
 --- sub modernism ---
 
 a = 0x42;
-another_x = alphabet_soup[Str, 42Q]:u;
+another_x = alphabet_soup[Str, 42Q]:x;
 
 --- sub postmodernism ---
 
@@ -45,3 +45,7 @@ Vec2f = linalg[F32]:Vec2;
 
 Vec2i = linalg:Vec2i;
 Vec2f = linalg:Vec2f;
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};

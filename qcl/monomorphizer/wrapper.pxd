@@ -250,6 +250,7 @@ cdef:
 # shared:
 cdef:
     NodeKind w_get_node_kind(NodeID node_id)
+    # TODO: translate `get_node_info`, 
 
 #
 # Defs:
@@ -343,3 +344,6 @@ cdef:
     TID w_get_array_tid(TID ptd_tid, VID count_val_id, bint contents_is_mut);
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);
+
+# TODO: add an interface to query information about mval::VID
+#   - NOTE: must be able to iterate through all defined FUNCTIONS with associated MonoModID

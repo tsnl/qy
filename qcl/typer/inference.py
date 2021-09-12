@@ -1549,7 +1549,8 @@ def rewrite_ast_tids_in_exp(exp, rw_sub):
 
     elif isinstance(exp, ast.node.ChainExp):
         help_rw_ast_tids_in_table(exp.table, rw_sub)
-        rewrite_ast_tids_in_exp(exp.opt_tail, rw_sub)
+        if exp.opt_tail is not None:
+            rewrite_ast_tids_in_exp(exp.opt_tail, rw_sub)
 
     elif isinstance(exp, ast.node.CastExp):
         rewrite_ast_tids_in_ts(exp.constructor_ts, rw_sub)

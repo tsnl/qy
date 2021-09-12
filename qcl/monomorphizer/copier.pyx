@@ -455,7 +455,10 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             return wrapper.w_new_float_exp(value, float_suffix)
 
         elif e.is_unsigned_int:
-            if width_in_bits == 64:
+            if width_in_bits == 128:
+                # TODO: fix this by switching to a stack-based VM
+                panic("Sorry, but 128-bit integers are currently not supported by compile-time evaluation.")
+            elif width_in_bits == 64:
                 int_suffix = wrapper.IS_U64
             elif width_in_bits == 32:
                 int_suffix = wrapper.IS_U32

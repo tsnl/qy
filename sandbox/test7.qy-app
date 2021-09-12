@@ -1,5 +1,5 @@
 exports {
-    vec;
+    vec
 };
 
 --- sub vec[T] ---
@@ -28,3 +28,7 @@ help_apply_piecewise_bin_op = (v1, v2, bin_op_fn) -> {
 add = (v1, v2) -> {
     help_apply_piecewise_bin_op(v1, v2, (x, y) -> x + y)
 };
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};

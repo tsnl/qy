@@ -96,3 +96,11 @@ will only update in Python-land when Cython detects the linked Python extension 
     - `sub`: offers a `Substitution` object used for `p2m` in eval:
       polymorphic-2-monomorphic conversion.
     - `debug`: a header with a few debug macro definitions
+
+## Notes for next version
+
+Write a stack-based byte-code interpreter
+- would be better to use a stack-based bytecode than this abomination...
+- tap into Boehm GC to manage heap allocations (currently done by VCell)
+- would be able to support 128-bit integers without weirdly crashing
+- add debug reflection features and ship it as a debugger :)

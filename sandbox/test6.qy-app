@@ -9,3 +9,7 @@ Vector3f = Struct {
 new_vec3f = (x, y, z) -> TOT Vector3f {
     (x, y, z)
 };
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};

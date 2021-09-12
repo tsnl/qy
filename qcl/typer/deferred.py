@@ -329,16 +329,9 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
 
             if arg_tk == type.kind.TK.Pointer:
                 # irrelevant whether pointer is mutable or not.
-
-                new_sub = unifier.unify_tid(
-                    self.proxy_ret_tid,
-                    type.elem.tid_of_ptd(self.proxy_arg_tid)
-                )
-                sub = new_sub.compose(sub)
-
                 return (
-                    False,
-                    sub
+                    True,
+                    unifier.unify_tid(self.proxy_ret_tid, type.elem.tid_of_ptd(self.proxy_arg_tid))
                 )
             else:
                 self.raise_call_error()

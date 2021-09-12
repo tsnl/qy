@@ -23,7 +23,7 @@ moduleExports
     : 'exports' '{' lines+=exportLine (',' lines+=exportLine)* '}'
     ;
 exportLine
-    : name=VID ':' '*'
+    : name=VID
     ;
 
 moduleDef

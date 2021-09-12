@@ -156,9 +156,15 @@ class NumberExp(BaseExp):
         }[self.suffix]
 
         # calculating value:
+        if self.base == 10:
+            unprefixed_text = self.text
+        elif self.base == 16:
+            unprefixed_text = self.text[2:]
+        else:
+            raise NotImplementedError("Computing 'value_text' for NumberExp of unknown base")
         self.value_text = "".join((
             c
-            for c in self.text
+            for c in unprefixed_text
             if c != '_' and c not in all_suffices
         ))
 

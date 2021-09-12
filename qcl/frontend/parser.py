@@ -427,7 +427,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             'not': ast.node.UnaryOp.LogicalNot,
             '+': ast.node.UnaryOp.Pos,
             '-': ast.node.UnaryOp.Neg,
-            '@!': ast.node.UnaryOp.DeRef
+            '@': ast.node.UnaryOp.DeRef
         }[ctx.getText()]
 
     #

@@ -7,3 +7,7 @@ hello = (x, y) -> TOT {
 
 zero1 = hello(0, 42f);
 zero2 = hello(0, 42f);
+
+--- sub entry_point_for_v1_default_loader ---
+
+main_for_v1_default_loader = () -> ML {0};
