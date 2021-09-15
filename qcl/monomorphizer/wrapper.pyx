@@ -138,7 +138,9 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
 
     # Shared:
     NodeKind get_node_kind(NodeID node_id)
-
+    NodeInfo* get_info_ptr(NodeID node_id)
+    bint is_node_exp_not_ts(NodeID node_id)
+    
 # intern:
 cdef extern from "extension/intern.hh" namespace "monomorphizer::intern":
     IntStr intern_string(cpp_string s, bint is_tid_not_vid)
@@ -173,6 +175,18 @@ cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
     TID get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID get_function_tid(TID arg_tid, TID ret_tid, SES ses);
 
+# mval:
+cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
+    ValueKind value_kind(VID value_id)
+    ValueInfo value_info(VID value_id)
+    size_t get_seq_count(size_t seq_info_index)
+    bint get_seq_elem1_compatibility(size_t seq_info_index, size_t index, VID* out_vid)
+    bint get_seq_elem2_compatibility(VID tuple_val_id, size_t index, VID* out_vid)
+    FuncInfo* get_func_info(size_t func_info_index)
+    VCellID get_ptr_vcell(VID val_id)
+    VCellID get_array_vcell(VID val_id, size_t index)
+    VCellID get_slice_vcell(VID val_id, size_t index)
+    bint equals(VID v1, VID v2)
 
 
 #
@@ -307,6 +321,12 @@ cdef:
 cdef:
     NodeKind w_get_node_kind(NodeID node_id):
         return get_node_kind(node_id)
+    
+    NodeInfo* w_get_info_ptr(NodeID node_id):
+        return get_info_ptr(node_id)
+
+    bint w_is_node_exp_not_ts(NodeID node_id):
+        return is_node_exp_not_ts(node_id)
 
 # defs: global and unscoped
 cdef:
@@ -418,3 +438,25 @@ cdef:
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses):
         return get_function_tid(arg_tid, ret_tid, ses)
 
+# MVal:
+cdef:
+    ValueKind w_value_kind(VID value_id):
+        return value_kind(value_id)
+    ValueInfo w_value_info(VID value_id):
+        return value_info(value_id)
+    size_t w_get_seq_count(VID value_id):
+        return get_seq_count(value_id)
+    bint w_get_seq_elem1(size_t seq_info_index, size_t index, VID* out_vid):
+        return get_seq_elem1_compatibility(seq_info_index, index, out_vid)
+    bint w_get_seq_elem2(size_t tuple_val_id, size_t index, VID* out_vid):
+        return get_seq_elem2_compatibility(tuple_val_id, index, out_vid)
+    FuncInfo* w_get_func_info(size_t func_info_index):
+        return get_func_info(func_info_index)
+    VCellID w_get_ptr_vcell(VID val_id):
+        return get_ptr_vcell(val_id)
+    VCellID w_get_array_vcell(VID val_id, size_t index):
+        return get_array_vcell(val_id, index)
+    VCellID w_get_slice_vcell(VID val_id, size_t index):
+        return get_slice_vcell(val_id, index)
+    bint w_equals(VID v1, VID v2):
+        return equals(v1, v2)

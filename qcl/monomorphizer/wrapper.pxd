@@ -1,5 +1,5 @@
 from libc.stddef cimport size_t
-from libc.stdint cimport uint32_t
+from libc.stdint cimport *
 from libcpp.string cimport string as cpp_string
 
 #
@@ -151,13 +151,70 @@ cdef extern from "extension/id-mast.hh" namespace "monomorphizer::mast":
     ctypedef NodeID TypeSpecID
     ctypedef NodeID ElemID
 
-
 #
 # MType/TID
 #
 
 cdef extern from "extension/id-mtype.hh" namespace "monomorphizer::mtype":
     ctypedef size_t TID
+
+#
+# mval:
+#
+
+cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
+    enum ValueKind:
+        VK_ERROR,
+        VK_UNIT,
+        VK_U1, VK_U8, VK_U16, VK_U32, VK_U64,
+        VK_S8, VK_S16, VK_S32, VK_S64,
+        VK_F32, VK_F64,
+        VK_STRING,
+        VK_TUPLE,
+        VK_POINTER,
+        VK_ARRAY,
+        VK_SLICE,
+        VK_FUNCTION
+    
+    struct CtxEnclosedId:
+        IntStr name
+        size_t target
+
+    struct FuncInfo:
+        uint32_t arg_name_count
+        uint32_t ctx_enclosed_id_count
+        IntStr* arg_name_array
+        CtxEnclosedId* ctx_enclosed_id_array
+        ExpID body_exp_id
+        MonoModID mono_mod_id
+    
+    union ValueInfo:
+        bint U1
+        uint8_t u8
+        uint16_t u16
+        uint32_t u32
+        uint64_t u64
+        int8_t i8
+        int16_t s16
+        int32_t s32
+        int64_t s64
+        float f32
+        double f64
+        size_t string_info_index
+        size_t sequence_info_index
+        size_t func_info_index
+        size_t ptr_info_index
+        size_t slice_info_index
+        size_t array_info_index
+
+
+#
+# V-Cell
+#
+
+cdef extern from "extension/vcell.hh" namespace "monomorphizer::vcell":
+    ctypedef size_t VCellID
+
 
 #
 #
@@ -172,14 +229,6 @@ cdef extern from "extension/id-mtype.hh" namespace "monomorphizer::mtype":
 cdef:
     void w_ensure_init();
     void w_drop();
-
-#
-# TODO: add interface to `modules`
-#
-
-#
-# TODO: add interface to `eval`
-#
 
 #
 # MAST: create expressions, type specs, and elems:
@@ -247,10 +296,162 @@ cdef:
     ElemID w_new_bind1t_elem(IntStr bound_def_id, TypeSpecID init_ts_id)
     ElemID w_new_do_elem(ExpID eval_exp_id)
 
-# shared:
+# get-info:
+
+cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
+    # Type-spec node infos:
+    struct GlobalIdTypeSpecNodeInfo:
+        GDefID def_id
+    struct LocalIdTypeSpecNodeInfo:
+        IntStr int_str_id
+    struct PtrTypeSpecNodeInfo:
+        TypeSpecID ptd_ts
+        bint contents_is_mut
+    struct ArrayTypeSpecNodeInfo:
+        TypeSpecID ptd_ts
+        ExpID count_exp
+        bint contents_is_mut
+    struct SliceTypeSpecNodeInfo:
+        TypeSpecID ptd_ts
+        bint contents_is_mut
+    struct FuncSgnTypeSpecNodeInfo:
+        TypeSpecID arg_ts
+        TypeSpecID ret_ts
+        SES ret_ses
+    struct TupleTypeSpecNodeInfo:
+        TypeSpecID* elem_ts_array
+        size_t elem_ts_count
+    struct GetPolyModuleFieldTypeSpecNodeInfo:
+        size_t actual_arg_count
+        NodeID actual_arg_array
+        PolyModID template_id
+        size_t ts_field_index
+    struct GetMonoModuleFieldTypeSpecNodeInfo:
+        MonoModID template_id
+        size_t ts_field_index
+    
+    # Expression node infos:
+    struct IntExpNodeInfo:
+        size_t mantissa
+        IntegerSuffix suffix
+        int is_neg
+    struct FloatExpNodeInfo:
+        double value
+        FloatSuffix suffix
+    struct StringExpNodeInfo:
+        int* code_point_array
+        size_t code_point_count
+    struct GlobalIdExpNodeInfo:
+        GDefID def_id
+    struct LocalIdExpNodeInfo:
+        IntStr int_str_id
+    struct TupleExpNodeInfo:
+        size_t item_count
+        ExpID* item_array
+    struct FuncCallExpNodeInfo:
+        ExpID called_fn
+        ExpID arg_exp_id
+        int call_is_non_tot
+    struct UnaryOpExpNodeInfo:
+        ExpID arg_exp
+        UnaryOp unary_op
+    struct BinaryOpExpNodeInfo:
+        ExpID lt_arg_exp
+        ExpID rt_arg_exp
+        BinaryOp binary_op
+    struct IfThenElseExpNodeInfo:
+        ExpID cond_exp
+        ExpID then_exp
+        ExpID else_exp
+    struct GetTupleFieldExpNodeInfo:
+        ExpID tuple_exp_id
+        size_t index
+    struct LambdaExpNodeInfo:
+        uint32_t arg_name_count
+        uint32_t ctx_enclosed_name_count
+        IntStr arg_name_array
+        IntStr ctx_enclosed_name_array
+        ExpID body_exp
+    struct AllocateOneExpNodeInfo:
+        ExpID stored_val_exp_id
+        AllocationTarget allocation_target
+        bint allocation_is_mut
+    struct AllocateManyExpNodeInfo:
+        ExpID initializer_stored_val_exp_id
+        ExpID alloc_count_exp
+        AllocationTarget allocation_target
+        bint allocation_is_mut
+    struct ChainExpNodeInfo:
+        ElemID prefix_elem_array
+        size_t prefix_elem_count
+        ExpID ret_exp_id
+    struct GetPolyModuleFieldExpNodeInfo:
+        size_t arg_count
+        NodeID arg_array
+        PolyModID template_id
+        size_t field_index
+    struct GetMonoModuleFieldExpNodeInfo:
+        MonoModID template_id
+        size_t field_index
+    struct CastExpNodeInfo:
+        TypeSpecID ts_id
+        ExpID exp_id
+
+    # element node infos:
+    struct Bind1VElemNodeInfo:
+        TypeSpecID ts_id
+        ExpID exp_id
+    struct Bind1VElemNodeInfo:
+        IntStr bound_id
+        ExpID init_exp_id
+    struct Bind1TElemNodeInfo: 
+        IntStr bound_id
+        TypeSpecID init_ts_id
+    struct DoElemNodeInfo:
+        ExpID eval_exp_id
+    
+    # putting it all together:
+    union NodeInfo:
+        # type-specs:
+        GlobalIdTypeSpecNodeInfo ts_gid
+        LocalIdTypeSpecNodeInfo ts_lid
+        PtrTypeSpecNodeInfo ts_ptr
+        ArrayTypeSpecNodeInfo ts_array
+        SliceTypeSpecNodeInfo ts_slice
+        FuncSgnTypeSpecNodeInfo ts_func_sgn
+        TupleTypeSpecNodeInfo ts_tuple
+        GetMonoModuleFieldTypeSpecNodeInfo ts_get_mono_module_field
+        GetPolyModuleFieldTypeSpecNodeInfo ts_get_poly_module_field
+        
+        # expressions:
+        IntExpNodeInfo exp_int
+        FloatExpNodeInfo exp_float
+        StringExpNodeInfo exp_str
+        GlobalIdExpNodeInfo exp_gid
+        LocalIdExpNodeInfo exp_lid
+        TupleExpNodeInfo exp_tuple
+        FuncCallExpNodeInfo exp_call
+        UnaryOpExpNodeInfo exp_unary
+        BinaryOpExpNodeInfo exp_binary
+        IfThenElseExpNodeInfo exp_if_then_else
+        GetTupleFieldExpNodeInfo exp_get_tuple_field
+        LambdaExpNodeInfo exp_lambda
+        AllocateOneExpNodeInfo exp_allocate_one
+        AllocateManyExpNodeInfo exp_allocate_many
+        ChainExpNodeInfo exp_chain
+        GetMonoModuleFieldExpNodeInfo exp_get_mono_module_field
+        GetPolyModuleFieldExpNodeInfo exp_get_poly_module_field
+        CastExpNodeInfo exp_cast
+
+        # elements:
+        Bind1VElemNodeInfo elem_bind1v
+        Bind1TElemNodeInfo elem_bind1t
+        DoElemNodeInfo elem_do
+
 cdef:
     NodeKind w_get_node_kind(NodeID node_id)
-    # TODO: translate `get_node_info`, 
+    NodeInfo* w_get_info_ptr(NodeID node_id)
+    bint w_is_node_exp_not_ts(NodeID node_id)
 
 #
 # Defs:
@@ -345,5 +546,20 @@ cdef:
     TID w_get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID w_get_function_tid(TID arg_tid, TID ret_tid, SES ses);
 
-# TODO: add an interface to query information about mval::VID
-#   - NOTE: must be able to iterate through all defined FUNCTIONS with associated MonoModID
+#
+# mval
+#
+
+cdef:
+    ValueKind w_value_kind(VID value_id)
+    ValueInfo w_value_info(VID value_id)
+    size_t w_get_seq_count(VID value_id)
+    bint w_get_seq_elem1(size_t seq_info_index, size_t index, VID* out_vid)
+    bint w_get_seq_elem2(size_t tuple_val_id, size_t index, VID* out_vid)
+    FuncInfo* w_get_func_info(size_t func_info_index)
+    VCellID w_get_ptr_vcell(VID val_id)
+    VCellID w_get_array_vcell(VID val_id, size_t index)
+    VCellID w_get_slice_vcell(VID val_id, size_t index)
+    bint w_equals(VID v1, VID v2)
+
+    # TODO: must be able to iterate through all defined FUNCTIONS with associated MonoModID

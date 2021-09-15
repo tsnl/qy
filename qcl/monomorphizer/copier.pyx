@@ -17,7 +17,8 @@ PHASES
 This pass is broken into multiple phases:
 - P1: declarations: generating forward declarations for all global variables in polymorphic extension-space
 - P2: definitions: binding initial AST values for all global variables in polymorphic extension-space
-- P3: monomorphization: simply instantiate the entry-point module, 
+- P3: monomorphization: simply instantiate the entry-point module to instantiate all dependency modules too
+- P4: mapping: generate tables for subsequent compilers/analysis
 """
 
 import sys
@@ -95,6 +96,10 @@ cdef void panic(object msg: str):
     
     time.sleep(flush_wait_time_in_sec)      # allow stderr to flush this message
     exit(-1)                                # exit
+
+
+cdef void panic_because_128_bit_ints_unsupported():
+    panic("Sorry, but 128-bit integers are currently not supported by compile-time evaluation.")
 
 
 cdef extern from "extension/gdef.hh" namespace "monomorphizer::gdef":
@@ -314,6 +319,10 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
         #       - and finally collect them together to define each module
         #   - for LID nodes, straightforward interning of definition name
 
+        # Checking that this ID does not reference I128/U128, since these are not supported by compile-time eval yet.
+        if ts.x_tid in (type.get_int_type(128, is_unsigned=s) for s in (True, False)):
+            panic_because_128_bit_ints_unsupported()
+
         id_ts = ts
         found_def_rec = id_ts.found_def_rec
 
@@ -456,8 +465,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
 
         elif e.is_unsigned_int:
             if width_in_bits == 128:
-                # TODO: fix this by switching to a stack-based VM
-                panic("Sorry, but 128-bit integers are currently not supported by compile-time evaluation.")
+                panic_because_128_bit_ints_unsupported()
             elif width_in_bits == 64:
                 int_suffix = wrapper.IS_U64
             elif width_in_bits == 32:
@@ -841,3 +849,11 @@ cdef instantiate_entry_point(object proj: frontend.Project):
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
     wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
 
+#
+# Phase 4:
+#
+
+# TODO: use exposed methods from the wrapper to copy MAST data 
+#       into Python classes.
+# Use AoS + tuples to store data in tables rather than individual
+# objects.

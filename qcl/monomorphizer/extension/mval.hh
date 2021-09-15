@@ -157,6 +157,8 @@ namespace monomorphizer::mval {
     size_t get_seq_count(size_t sequence_info_index);
     std::optional<VID> get_seq_elem1(size_t seq_info_index, size_t index);
     std::optional<VID> get_seq_elem2(VID tuple_val_id, size_t index);
+    bool get_seq_elem1_compatibility(size_t seq_info_index, size_t index, VID* out_vid);
+    bool get_seq_elem2_compatibility(VID tuple_val_id, size_t index, VID* out_vid);
     FuncInfo* get_func_info(size_t func_info_index);
     vcell::VCellID get_ptr_vcell(mval::VID val_id);
     vcell::VCellID get_array_vcell(mval::VID val_id, size_t index);

@@ -315,6 +315,24 @@ namespace monomorphizer::mval {
         size_t sequence_info_index = s_value_info_table[tuple_val_id].sequence_info_index;
         return get_seq_elem1(sequence_info_index, elem_index);
     }
+    bool get_seq_elem1_compatibility(size_t seq_info_index, size_t index, VID* out_vid) {
+        auto opt_val = get_seq_elem1(seq_info_index, index);
+        if (opt_val.has_value()) {
+            *out_vid = opt_val.value();
+            return true;
+        } else {
+            return false;
+        }
+    }
+    bool get_seq_elem2_compatibility(VID tuple_val_id, size_t index, VID* out_vid) {
+        auto opt_val = get_seq_elem2(tuple_val_id, index);
+        if (opt_val.has_value()) {
+            *out_vid = opt_val.value();
+            return true;
+        } else {
+            return false;
+        }
+    }
     FuncInfo* get_func_info(size_t func_info_index) {
         return &s_func_info_table[func_info_index];
     }

@@ -227,7 +227,7 @@ namespace monomorphizer::mast {
     };
     struct Bind1TElemNodeInfo {
         intern::IntStr bound_id;
-        mast::ExpID init_ts_id;
+        mast::TypeSpecID init_ts_id;
     };
     
     struct DoElemNodeInfo {
