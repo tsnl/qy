@@ -76,20 +76,23 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         EXP_STRING,
         EXP_LID,
         EXP_GID,
+        EXP_TUPLE,
         EXP_FUNC_CALL,
         EXP_UNARY_OP,
         EXP_BINARY_OP,
         EXP_IF_THEN_ELSE,
         EXP_GET_TUPLE_FIELD,
-        EXP_GET_POLY_MODULE_FIELD,
-        EXP_GET_MONO_MODULE_FIELD,
         EXP_LAMBDA,
         EXP_ALLOCATE_ONE,
         EXP_ALLOCATE_MANY,
         EXP_CHAIN,
+        EXP_GET_POLY_MODULE_FIELD,
+        EXP_GET_MONO_MODULE_FIELD,
+        EXP_CAST,
 
         # chain elements:
         ELEM_BIND1V,
+        ELEM_BIND1T,
         ELEM_DO
 
 #
@@ -323,7 +326,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         size_t elem_ts_count
     struct GetPolyModuleFieldTypeSpecNodeInfo:
         size_t actual_arg_count
-        NodeID actual_arg_array
+        NodeID* actual_arg_array
         PolyModID template_id
         size_t ts_field_index
     struct GetMonoModuleFieldTypeSpecNodeInfo:
@@ -369,8 +372,8 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     struct LambdaExpNodeInfo:
         uint32_t arg_name_count
         uint32_t ctx_enclosed_name_count
-        IntStr arg_name_array
-        IntStr ctx_enclosed_name_array
+        IntStr* arg_name_array
+        IntStr* ctx_enclosed_name_array
         ExpID body_exp
     struct AllocateOneExpNodeInfo:
         ExpID stored_val_exp_id
@@ -382,12 +385,12 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         AllocationTarget allocation_target
         bint allocation_is_mut
     struct ChainExpNodeInfo:
-        ElemID prefix_elem_array
+        ElemID* prefix_elem_array
         size_t prefix_elem_count
         ExpID ret_exp_id
     struct GetPolyModuleFieldExpNodeInfo:
         size_t arg_count
-        NodeID arg_array
+        NodeID* arg_array
         PolyModID template_id
         size_t field_index
     struct GetMonoModuleFieldExpNodeInfo:
@@ -398,9 +401,6 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
         ExpID exp_id
 
     # element node infos:
-    struct Bind1VElemNodeInfo:
-        TypeSpecID ts_id
-        ExpID exp_id
     struct Bind1VElemNodeInfo:
         IntStr bound_id
         ExpID init_exp_id
@@ -493,8 +493,10 @@ cdef:
     # turn a PolyModID into a MonoModID using some template arguments.
     MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
 
-    # mono modules:
+    # reading back mono modules:
     size_t w_count_all_mono_modules()
+    size_t w_count_registered_lambdas(MonoModID mono_mod_id)
+    ExpID w_get_registered_lambda_at(MonoModID mono_mod_id, size_t index)
 
 #
 # Interning:

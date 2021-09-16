@@ -2,9 +2,14 @@
 This module wraps the `extension/` directory.
 """
 
+import typing as t
+from collections import namedtuple
+import enum
+
 from libc.stddef cimport size_t
 from libc.stdint cimport uint32_t
-# from qcl.monomorphizer cimport wrapper 
+
+from qcl import ast
 
 #
 #
@@ -66,6 +71,8 @@ cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
 
     # system info:
     size_t count_all_mono_modules()
+    size_t count_registered_lambdas(MonoModID mono_mod_id)
+    ExpID get_registered_lambda_at(MonoModID mono_mod_id, size_t index)
 
 # mast:
 cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
@@ -377,6 +384,12 @@ cdef:
     size_t w_count_all_mono_modules():
         return count_all_mono_modules()
 
+    size_t w_count_registered_lambdas(MonoModID mono_mod_id):
+        return count_registered_lambdas(mono_mod_id)
+    
+    ExpID w_get_registered_lambda_at(MonoModID mono_mod_id, size_t index):
+        return get_registered_lambda_at(mono_mod_id, index)
+
 
 # interning:
 cdef:
@@ -460,3 +473,465 @@ cdef:
         return get_slice_vcell(val_id, index)
     bint w_equals(VID v1, VID v2):
         return equals(v1, v2)
+
+
+#
+#
+# Python wrappers (for export) (once system is static)
+#
+#
+
+# `mast` wrappers for Python:
+# NOTE: shared enums are substituted for their Python variants from `ast.node` or string-coded tuples
+class PyMAST:
+    NodeID = int
+    ExpID = NodeID
+    TypeSpecID = NodeID
+    ElemID = NodeID
+    class PyNodeKind(enum.Enum):
+        TS_Unit = TS_UNIT
+        TS_GId = TS_GID
+        TS_LId = TS_LID
+        TS_Ptr = TS_PTR
+        TS_Array = TS_ARRAY
+        TS_Slice = TS_SLICE
+        TS_FuncSgn = TS_FUNC_SGN
+        TS_Tuple = TS_TUPLE
+        TS_GetPolyModuleField = TS_GET_POLY_MODULE_FIELD
+        TS_GetMonoModuleField = TS_GET_MONO_MODULE_FIELD
+        EXP_Unit = EXP_UNIT
+        EXP_Int = EXP_INT
+        EXP_Float = EXP_FLOAT
+        EXP_String = EXP_STRING
+        EXP_LId = EXP_LID
+        EXP_GId = EXP_GID
+        EXP_Tuple = EXP_TUPLE
+        EXP_FuncCall = EXP_FUNC_CALL
+        EXP_UnaryOp = EXP_UNARY_OP
+        EXP_BinaryOp = EXP_BINARY_OP
+        EXP_IfThenElse = EXP_IF_THEN_ELSE
+        EXP_GetTupleField = EXP_GET_TUPLE_FIELD
+        EXP_Lambda = EXP_LAMBDA
+        EXP_AllocOne = EXP_ALLOCATE_ONE
+        EXP_AllocMany = EXP_ALLOCATE_MANY
+        EXP_Chain = EXP_CHAIN
+        EXP_GetPolyModuleField = EXP_GET_POLY_MODULE_FIELD
+        EXP_GetMonoModuleField = EXP_GET_MONO_MODULE_FIELD
+        EXP_Cast = EXP_CAST
+        ELEM_Bind1V = ELEM_BIND1V
+        ELEM_Bind1T = ELEM_BIND1T
+        ELEM_Do = ELEM_DO
+    PyGlobalIdTypeSpecNodeInfo = namedtuple(
+        "GlobalIdTypeSpecNodeInfo",
+        ["def_id"]
+    )
+    PyLocalIdTypeSpecNodeInfo = namedtuple(
+        "LocalIdTypeSpecNodeInfo",
+        ["int_str_id"]
+    )
+    PyPtrTypeSpecNodeInfo = namedtuple(
+        "PtrTypeSpecNodeInfo",
+        ["ptd_ts", "contents_is_mut"]
+    )
+    PyArrayTypeSpecNodeInfo = namedtuple(
+        "ArrayTypeSpecNodeInfo",
+        ["ptd_ts", "count_exp", "contents_is_mut"]
+    )
+    PySliceTypeSpecNodeInfo = namedtuple(
+        "SliceTypeSpecNodeInfo",
+        ["ptd_ts", "contents_is_mut"]
+    )
+    PyFuncSgnTypeSpecNodeInfo = namedtuple(
+        "FuncSgnTypeSpecNodeInfo",
+        ["arg_ts", "ret_ts", "ret_ses"]
+    )
+    PyTupleTypeSpecNodeInfo = namedtuple(
+        "TupleTypeSpecNodeInfo",
+        ["elem_ts_id_list"]
+    )
+    PyGetPolyModuleFieldTypeSpecNodeInfo = namedtuple(
+        "GetPolyModuleFieldTypeSpecNodeInfo",
+        ["actual_arg_id_list", "template_id", "ts_field_index"]
+    )
+    PyGetMonoModuleFieldTypeSpecNodeInfo = namedtuple(
+        "GetMonoModuleFieldTypeSpecNodeInfo",
+        ["template_id", "ts_field_index"]
+    )
+    PyIntExpNodeInfo = namedtuple(
+        "IntExpNodeInfo",
+        ["mantissa", "suffix", "is_neg"]
+    )
+    PyFloatExpNodeInfo = namedtuple(
+        "FloatExpNodeInfo",
+        ["value", "suffix"]
+    )
+    PyStringExpNodeInfo = namedtuple(
+        "StringExpNodeInfo",
+        ["code_point_list"]
+    )
+    PyGlobalIdExpNodeInfo = namedtuple(
+        "GlobalIdExpNodeInfo",
+        ["def_id"]
+    )
+    PyLocalIdExpNodeInfo = namedtuple(
+        "LocalIdExpNodeInfo",
+        ["int_str_id"]
+    )
+    PyTupleExpNodeInfo = namedtuple(
+        "TupleExpNodeInfo",
+        ["item_list"]
+    )
+    PyFuncCallExpNodeInfo = namedtuple(
+        "FuncCallExpNodeInfo",
+        ["called_fn", "arg_exp_id", "call_is_non_tot"]
+    )
+    PyUnaryOpExpNodeInfo = namedtuple(
+        "UnaryOpExpNodeInfo",
+        ["arg_exp", "unary_op"]
+    )
+    PyBinaryOpExpNodeInfo = namedtuple(
+        "BinaryOpExpNodeInfo",
+        ["lt_arg_exp", "rt_arg_exp", "binary_op"]
+    )
+    PyIfThenElseExp = namedtuple(
+        "IfThenElseExp",
+        ["cond_exp", "then_exp", "else_exp"]
+    )
+    PyGetTupleFieldExpNodeInfo = namedtuple(
+        "GetTupleFieldExpNodeInfo",
+        ["tuple_exp_id", "index"]
+    )
+    PyLambdaExpNodeInfo = namedtuple(
+        "LambdaExpNodeInfo",
+        ["arg_name_list", "ctx_enclosed_name_list", "body_exp"]
+    )
+    PyAllocateOneExpNodeInfo = namedtuple(
+        "AllocateOneExpNodeInfo",
+        ["stored_val_exp_id", "allocation_target", "allocation_is_mut"]
+    )
+    PyAllocateManyExpNodeInfo = namedtuple(
+        "AllocateManyExpNodeInfo",
+        ["initializer_stored_val_exp_id", "alloc_count_exp", "allocation_target"]
+    )
+    PyChainExpNodeInfo = namedtuple(
+        "ChainExpNodeInfo",
+        ["prefix_elem_list", "ret_exp_id"]
+    )
+    PyGetPolyModuleFieldExpNodeInfo = namedtuple(
+        "GetPolyModuleFieldExpNodeInfo",
+        ["arg_list", "temmplate_id", "field_index"]
+    )
+    PyGetMonoModuleFieldExpNodeInfo = namedtuple(
+        "GetMonoModuleFieldExpNodeInfo",
+        ["template_id", "field_index"]
+    )
+    PyCastExpNodeInfo = namedtuple(
+        "CastExpNodeInfo",
+        ["ts_id", "exp_id"]
+    )
+    PyBind1VElemNodeInfo = namedtuple(
+        "Bind1VElemNodeInfo",
+        ["bound_id", "init_exp_id"]
+    )
+    PyBind1TElemNodeInfo = namedtuple(
+        "Bind1TElemNodeInfo",
+        ["bound_id", "init_ts_id"]
+    )
+    PyDoElemNodeInfo = namedtuple(
+        "DoElemNodeInfo",
+        ["eval_exp_id"]
+    )
+
+    get_unit_ts = py_mast_get_unit_ts
+    get_unit_exp = py_mast_get_unit_exp
+    get_node_kind = py_mast_get_node_kind
+    get_info = py_mast_get_info
+
+cpdef object py_mast_get_unit_ts():
+    # TODO: cache this
+    return w_get_unit_ts()
+
+cpdef object py_mast_get_unit_exp():
+    # TODO: cache this
+    return w_get_unit_exp()
+
+cpdef object py_mast_get_node_kind(node_id: "PyMAST.NodeID"):
+    # TODO: cache this
+    return {
+        TS_UNIT: PyMAST.PyNodeKind.TS_Unit,
+        TS_GID: PyMAST.PyNodeKind.TS_GId,
+        TS_LID: PyMAST.PyNodeKind.TS_LId,
+        TS_PTR: PyMAST.PyNodeKind.TS_Ptr,
+        TS_ARRAY: PyMAST.PyNodeKind.TS_Array,
+        TS_SLICE: PyMAST.PyNodeKind.TS_Slice,
+        TS_FUNC_SGN: PyMAST.PyNodeKind.TS_FuncSgn,
+        TS_GET_POLY_MODULE_FIELD: PyMAST.PyNodeKind.TS_GetPolyModuleField,
+        TS_GET_MONO_MODULE_FIELD: PyMAST.PyNodeKind.TS_GetMonoModuleField,
+        EXP_UNIT: PyMAST.PyNodeKind.EXP_Unit,
+        EXP_INT: PyMAST.PyNodeKind.EXP_Int,
+        EXP_FLOAT: PyMAST.PyNodeKind.EXP_Float,
+        EXP_STRING: PyMAST.PyNodeKind.EXP_String,
+        EXP_LID: PyMAST.PyNodeKind.EXP_LId,
+        EXP_GID: PyMAST.PyNodeKind.EXP_GId,
+        EXP_TUPLE: PyMAST.PyNodeKind.EXP_Tuple,
+        EXP_FUNC_CALL: PyMAST.PyNodeKind.EXP_FuncCall,
+        EXP_UNARY_OP: PyMAST.PyNodeKind.EXP_UnaryOp,
+        EXP_BINARY_OP: PyMAST.PyNodeKind.EXP_BinaryOp,
+        EXP_IF_THEN_ELSE: PyMAST.PyNodeKind.EXP_IfThenElse,
+        EXP_GET_TUPLE_FIELD: PyMAST.PyNodeKind.EXP_GetTupleField,
+        EXP_LAMBDA: PyMAST.PyNodeKind.EXP_Lambda,
+        EXP_ALLOCATE_ONE: PyMAST.PyNodeKind.EXP_AllocOne,
+        EXP_ALLOCATE_MANY: PyMAST.PyNodeKind.EXP_AllocMany,
+        EXP_CHAIN: PyMAST.PyNodeKind.EXP_Chain,
+        EXP_GET_POLY_MODULE_FIELD: PyMAST.PyNodeKind.EXP_GetPolyModuleField,
+        EXP_GET_MONO_MODULE_FIELD: PyMAST.PyNodeKind.EXP_GetMonoModuleField,
+        EXP_CAST: PyMAST.PyNodeKind.EXP_Cast,
+        ELEM_BIND1V: PyMAST.PyNodeKind.ELEM_Bind1V,
+        ELEM_BIND1T: PyMAST.PyNodeKind.ELEM_Bind1T,
+        ELEM_DO: PyMAST.PyNodeKind.ELEM_Do
+    }[w_get_node_kind(node_id)]
+
+cpdef object py_mast_get_info(node_id: "PyMAST.NodeID"):
+    # TODO: cache the result of this
+    node_kind = get_node_kind(node_id)
+    if node_kind in (PyMAST.PyNodeKind.TS_Unit, PyMAST.PyNodeKind.EXP_Unit):
+        return ()
+    node_info_ptr = w_get_info_ptr(node_id)
+    if node_kind == PyMAST.PyNodeKind.TS_GId:
+        return PyMAST.PyGlobalIdTypeSpecNodeInfo(
+            def_id=node_info_ptr.ts_gid.def_id
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_LId:
+        return PyMAST.PyLocalIdTypeSpecNodeInfo(
+            int_str_id=node_info_ptr.ts_lid.int_str_id
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_Ptr:
+        return PyMAST.PyPtrTypeSpecNodeInfo(
+            ptd_ts=node_info_ptr.ts_ptr.ptd_ts, 
+            contents_is_mut=node_info_ptr.ts_ptr.contents_is_mut
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_Array:
+        return PyMAST.PyArrayTypeSpecNodeInfo(
+            ptd_ts=node_info_ptr.ts_array.ptd_ts,
+            count_exp=node_info_ptr.ts_array.count_exp,
+            contents_is_mut=node_info_ptr.ts_array.contents_is_mut
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_Slice:
+        return PyMAST.PySliceTypeSpecNodeInfo(
+            ptd_ts=node_info_ptr.ts_array.ptd_ts,
+            contents_is_mut=node_info_ptr.ts_array.contents_is_mut
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_FuncSgn:
+        return PyMAST.PyFuncSgnTypeSpecNodeInfo(
+            arg_ts=node_info_ptr.ts_func_sgn.arg_ts,
+            ret_ts=node_info_ptr.ts_func_sgn.ret_ts,
+            ret_ses={
+                SES_ML: type.side_effects.SES.ML,
+                SES_ST: type.side_effects.SES.ST,
+                SES_EXN: type.side_effects.SES.Exn,
+                SES_DV: type.side_effects.SES.Dv,
+                SES_TOT: type.side_effects.SES.Tot
+            }[node_info_ptr.ts_func_sgn.ret_ses]
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_Tuple:
+        item_id_array = node_info_ptr.ts_tuple.elem_ts_array
+        item_id_count = node_info_ptr.ts_tuple.elem_ts_count
+        return PyMAST.PyTupleTypeSpecNodeInfo(
+            elem_ts_id_list=[
+                item_id_array[i]
+                for i in range(item_id_count)
+            ]
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_GetPolyModuleField:
+        actual_arg_id_array = node_info_ptr.ts_get_poly_module_field.actual_arg_array
+        actual_arg_id_count = node_info_ptr.ts_get_poly_module_field.actual_arg_count
+        return PyMAST.PyGetPolyModuleFieldTypeSpecNodeInfo(
+            actual_arg_id_list=[
+                actual_arg_id_array[i]
+                for i in range(actual_arg_id_count)
+            ],
+            template_id=node_info_ptr.ts_get_poly_module_field.template_id,
+            ts_field_index=node_info_ptr.ts_get_poly_module_field.ts_field_index
+        )
+    if node_kind == PyMAST.PyNodeKind.TS_GetMonoModuleField:
+        return PyMAST.PyGetMonoModuleFieldTypeSpecNodeInfo(
+            template_id=node_info_ptr.ts_get_mono_module_field.template_id,
+            ts_field_index=node_info_ptr.ts_get_mono_module_field.ts_field_index
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Int:
+        return PyMAST.PyIntExpNodeInfo(
+            mantissa=node_info_ptr.exp_int.mantissa,
+            suffix={
+                IS_U1: ("u", 1),
+                IS_U8: ("u", 8),
+                IS_U16: ("u", 16),
+                IS_U32: ("u", 32),
+                IS_U64: ("u", 64),
+                IS_S8: ("s", 8),
+                IS_S16: ("s", 16),
+                IS_S32: ("s", 32),
+                IS_S64: ("s", 64),
+            }[node_info_ptr.exp_int.suffix],
+            is_neg=node_info_ptr.exp_int.is_neg
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Float:
+        return PyMAST.PyFloatExpNodeInfo(
+            value=node_info_ptr.exp_float.value,
+            suffix={
+                FS_F32: ("f", 32),
+                FS_F64: ("f", 64)
+            }[node_info_ptr.exp_float.suffix]
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_String:
+        code_point_array = node_info_ptr.exp_str.code_point_array
+        code_point_count = node_info_ptr.exp_str.code_point_count
+        return PyMAST.PyStringExpNodeInfo(
+            code_point_list=[
+                int(code_point_array[i])
+                for i in range(code_point_count)
+            ]
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_GId:
+        return PyMAST.PyGlobalIdExpNodeInfo(
+            def_id=node_info_ptr.exp_gid.def_id
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_LId:
+        return PyMAST.PyLocalIdExpNodeInfo(
+            int_str_id=node_info_ptr.exp_lid.int_str_id
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Tuple:
+        item_array = node_info_ptr.exp_tuple.item_array
+        item_count = node_info_ptr.exp_tuple.item_count
+        return PyMAST.PyTupleExpNodeInfo(
+            item_list=[
+                item_array[i]
+                for i in range(item_count)
+            ]
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_UnaryOp:
+        return PyMAST.PyUnaryOpExpNodeInfo(
+            arg_exp=node_info_ptr.exp_unary.arg_exp,
+            unary_op={
+                UNARY_DE_REF: ast.node.UnaryOp.DeRef,
+                UNARY_LOGICAL_NOT: ast.node.UnaryOp.LogicalNot,
+                UNARY_POS: ast.node.UnaryOp.Pos,
+                UNARY_NEG: ast.node.UnaryOp.Neg
+            }[node_info_ptr.exp_unary.unary_op]
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_BinaryOp:
+        return PyMAST.PyBinaryOpExpNodeInfo(
+            lt_arg_exp=node_info_ptr.exp_binary.lt_arg_exp,
+            rt_arg_exp=node_info_ptr.exp_binary.rt_arg_exp,
+            binary_op={
+                BINARY_MUL: ast.node.BinaryOp.Mul,
+                BINARY_DIV: ast.node.BinaryOp.Div,
+                BINARY_REM: ast.node.BinaryOp.Rem,
+                BINARY_ADD: ast.node.BinaryOp.Add,
+                BINARY_SUB: ast.node.BinaryOp.Sub,
+                BINARY_LT: ast.node.BinaryOp.LT,
+                BINARY_GT: ast.node.BinaryOp.GT,
+                BINARY_LE: ast.node.BinaryOp.LE,
+                BINARY_GE: ast.node.BinaryOp.GE,
+                BINARY_EQ: ast.node.BinaryOp.Eq,
+                BINARY_NE: ast.node.BinaryOp.NE,
+                BINARY_LOGICAL_AND: ast.node.BinaryOp.LogicalAnd,
+                BINARY_LOGICAL_OR: ast.node.BinaryOp.LogicalOr
+            }[node_info_ptr.exp_binary.binary_op]
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_IfThenElse:
+        return PyMAST.PyIfThenElseExpNodeInfo(
+            cond_exp=node_info_ptr.exp_if_then_else.cond_exp,
+            then_exp=node_info_ptr.exp_if_then_else.then_exp,
+            else_exp=node_info_ptr.exp_if_then_else.else_exp
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_GetTupleField:
+        return PyMAST.PyGetTupleFieldExpNodeInfo(
+            tuple_exp_id=node_info_ptr.exp_get_tuple_field.tuple_exp_id,
+            index=node_info_ptr.exp_get_tuple_field.index
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Lambda:
+        arg_name_count = node_info_ptr.exp_lambda.arg_name_count
+        ctx_enclosed_name_count = node_info_ptr.exp_lambda.ctx_enclosed_name_count
+        arg_name_array = node_info_ptr.exp_lambda.arg_name_array
+        ctx_enclosed_name_array = node_info_ptr.exp_lambda.ctx_enclosed_name_array
+        body_exp_id = node_info_ptr.exp_lambda.body_exp
+
+        return PyMAST.PyLambdaExpNodeInfo(
+            arg_name_list=[
+                arg_name_array[i]
+                for i in range(arg_name_count)
+            ],
+            ctx_enclosed_name_list=[
+                ctx_enclosed_name_array[i]
+                for i in range(arg_name_count)
+            ],
+            body_exp=body_exp_id
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_AllocOne:
+        return PyMAST.PyAllocateOneExpNodeInfo(
+            stored_val_exp_id=node_info_ptr.exp_allocate_one.stored_val_exp_id,
+            allocation_target={
+                ALLOCATION_TARGET_HEAP: ast.node.Allocator.Heap,
+                ALLOCATION_TARGET_STACK: ast.node.Allocator.Stack
+            }[node_info_ptr.exp_allocate_one.allocation_target],
+            allocation_is_mut=node_info_ptr.exp_allocate_one.allocation_is_mut
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_AllocMany:
+        return PyMAST.PyAllocateManyExpNodeInfo(
+            initializer_stored_val_exp_id=node_info_ptr.exp_allocate_many.initializer_stored_val_exp_id,
+            alloc_count_exp=node_info_ptr.exp_allocate_many.alloc_count_exp,
+            allocation_target={
+                ALLOCATION_TARGET_HEAP: ast.node.Allocator.Heap,
+                ALLOCATION_TARGET_STACK: ast.node.Allocator.Stack
+            }[node_info_ptr.exp_allocate_many.allocation_target],
+            allocation_is_mut=node_info_ptr.exp_allocate_many.allocation_is_mut
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Chain:
+        prefix_elem_array = node_info_ptr.exp_chain.prefix_elem_array
+        prefix_elem_count = node_info_ptr.exp_chain.prefix_elem_count
+        return PyMAST.PyChainExpNodeInfo(
+            prefix_elem_list=[
+                prefix_elem_array[i]
+                for i in range(prefix_elem_count)
+            ],
+            ret_exp_id=node_info_ptr.exp_chain.ret_exp_id
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_GetPolyModuleField:
+        arg_count = node_info_ptr.exp_get_poly_module_field.arg_count
+        arg_array = node_info_ptr.exp_get_poly_module_field.arg_array
+        return PyMAST.PyGetPolyModuleFieldExpNodeInfo(
+            arg_list=[
+                arg_array[i]
+                for i in range(arg_count)
+            ],
+            template_id=node_info_ptr.exp_get_poly_module_field.template_id,
+            field_index=node_info_ptr.exp_get_poly_module_field.field_index
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_GetMonoModuleField:
+        return PyMAST.PyGetMonoModuleFieldExpNodeInfo(
+            template_id=node_info_ptr.exp_get_mono_module_field.template_id,
+            field_index=node_info_ptr.exp_get_mono_module_field.field_index
+        )
+    if node_kind == PyMAST.PyNodeKind.EXP_Cast:
+        return PyMAST.PyCastExpNodeInfo(
+            ts_id=node_info_ptr.exp_cast.ts_id,
+            exp_id=node_info_ptr.exp_cast.exp_id
+        )
+    if node_kind == PyMAST.PyNodeKind.ELEM_Bind1V:
+        return PyMAST.PyBind1VElemNodeInfo(
+            bound_id=node_info_ptr.elem_bind1v.bound_id,
+            init_exp_id=node_info_ptr.elem_bind1v.init_exp_id
+        )
+    if node_kind == PyMAST.PyNodeKind.ELEM_Bind1T:
+        return PyMAST.PyBind1TElemNodeInfo(
+            bound_id=node_info_ptr.elem_bind1t.bound_id,
+            init_ts_id=node_info_ptr.elem_bind1t.init_ts_id
+        )
+    if node_kind == PyMAST.PyNodeKind.ELEM_Do:
+        return PyMAST.PyDoElemNodeInfo(
+            eval_exp_id=node_info_ptr.elem_do.eval_exp_id
+        )
+    raise NotImplementedError(f"`mast_get_info` for node_kind {node_kind}")
+
+
+# TODO: write Python wrapper for `mval`

@@ -24,7 +24,6 @@ This pass is broken into multiple phases:
 import sys
 import time
 import typing as t
-from collections import namedtuple
 
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy
@@ -848,12 +847,3 @@ cdef instantiate_entry_point(object proj: frontend.Project):
     #   - it acts as the root of all monomorphic global discovery
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
     wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
-
-#
-# Phase 4:
-#
-
-# TODO: use exposed methods from the wrapper to copy MAST data 
-#       into Python classes.
-# Use AoS + tuples to store data in tables rather than individual
-# objects.

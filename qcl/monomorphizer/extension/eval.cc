@@ -497,6 +497,7 @@ namespace monomorphizer::eval {
                 auto new_body_exp_id = p2m_exp(old_body_exp_id, s, st, ignored_gdef_id_set, mono_mod_id);
 
                 bool changed = (old_body_exp_id != new_body_exp_id);
+                mast::ExpID lambda_exp_id;
                 if (changed) {
                     auto arg_name_count = info->arg_name_count;
                     auto new_arg_name_array = new intern::IntStr[arg_name_count];
@@ -511,7 +512,7 @@ namespace monomorphizer::eval {
                         ctx_enclosed_name_array[i] = info->ctx_enclosed_name_array[i];
                     }
 
-                    return mast::new_lambda_exp(
+                    lambda_exp_id = mast::new_lambda_exp(
                         arg_name_count, 
                         new_arg_name_array,
                         ctx_enclosed_name_count,
@@ -519,8 +520,12 @@ namespace monomorphizer::eval {
                         new_body_exp_id
                     );
                 } else {
-                    return mast_exp_id;
+                    lambda_exp_id = mast_exp_id;
                 }
+
+                modules::register_lambda(mono_mod_id, lambda_exp_id);
+
+                return lambda_exp_id;
             } break;
 
             case mast::EXP_ALLOCATE_ONE:

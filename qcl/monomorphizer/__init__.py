@@ -1,5 +1,7 @@
 from . import copier
-
+from . import wrapper
 
 def run(project):
-    copier.monomorphize_project(project)
+    mp = copier.monomorphize_project(project)
+    # assert isinstance(mp, wrapper.MonomorphizerPkg)
+    return mp

@@ -212,6 +212,14 @@ namespace monomorphizer::printing {
             print_def_id(field_def_id);
             std::cout << std::endl;
         }
+        std::cout << "\t" "* Embedded lambdas list..." << std::endl;
+        size_t lambda_count = modules::count_registered_lambdas(mono_mod_id);
+        for (size_t i = 0; i < lambda_count; i++) {
+            std::cout << "\t" "  " "- ";
+            std::cout << "LAMBDA-" << i << ": ";
+            print_exp(modules::get_registered_lambda_at(mono_mod_id, i));
+            std::cout << std::endl;
+        }
     }
     void print_poly_mod(PolyModID poly_mod_id) {
         auto mod_name = modules::get_poly_mod_name(poly_mod_id);

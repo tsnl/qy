@@ -51,6 +51,7 @@ namespace monomorphizer::modules {
 
     static std::vector<CommonModInfo> s_mono_common_info_table;
     static std::vector<MonoModInfo> s_mono_mod_info_table;
+    static std::vector< std::vector<mast::ExpID> > s_mono_mod_lambda_reg_table;
 
     static std::vector<CommonModInfo> s_poly_common_info_table;
     static std::vector<PolyModInfo> s_poly_custom_info_table;
@@ -74,6 +75,8 @@ namespace monomorphizer::modules {
         MonoModID id = s_mono_mod_info_table.size();
         s_mono_common_info_table.push_back({{}, mv_name});
         s_mono_mod_info_table.push_back({parent_mod_id});
+        s_mono_mod_lambda_reg_table.emplace_back();
+        s_mono_mod_lambda_reg_table.back().reserve(16);
         return id;
     }
     size_t add_mono_module_field(
@@ -340,6 +343,26 @@ namespace monomorphizer::modules {
         {
             return mono_mod_id;
         }
+    }
+
+    void register_lambda(
+        MonoModID mono_mod_id, 
+        mast::ExpID lambda_exp
+    ) {
+        s_mono_mod_lambda_reg_table[mono_mod_id].emplace_back(lambda_exp);
+    }
+
+    size_t count_registered_lambdas(
+        MonoModID mono_mod_id
+    ) {
+        return s_mono_mod_lambda_reg_table[mono_mod_id].size();
+    }
+
+    mast::ExpID get_registered_lambda_at(
+        MonoModID mono_mod_id,
+        size_t index
+    ) {
+        return s_mono_mod_lambda_reg_table[mono_mod_id][index];
     }
 
     size_t count_all_mono_modules() {

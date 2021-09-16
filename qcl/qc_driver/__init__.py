@@ -50,7 +50,7 @@ def main():
         #   - using `vm` module to evaluate template args and instantiate templates (copy&sub)
         try:
             monomorphizer.run(project)
-        except excepts.PtcCheckCompilationError as e:
+        except excepts.CheckerCompilationError as e:
             # TODO: fold exception data into feedback. Print, then exit elegantly.
             raise e from e
 

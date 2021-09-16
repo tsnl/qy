@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "id-modules.hh"
 #include "id-gdef.hh"
 #include "id-mast.hh"
@@ -62,6 +64,18 @@ namespace monomorphizer::modules {
     MonoModID instantiate_poly_mod(
         PolyModID poly_mod_id,
         arg_list::ArgListID arg_list_id
+    );
+
+    // in monomorphization, we want to store all lambda function expressions.
+    void register_lambda(
+        MonoModID mono_mod_id, 
+        mast::ExpID mono_lambda_exp
+    );
+
+    size_t count_registered_lambdas(MonoModID mono_mod_id);
+    mast::ExpID get_registered_lambda_at(
+        MonoModID mono_mod_id,
+        size_t lambda_index
     );
 
     // system info:
