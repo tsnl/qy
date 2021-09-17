@@ -38,11 +38,6 @@ namespace monomorphizer::mval {
         VK_ARRAY,
         VK_SLICE,
         VK_FUNCTION
-
-        // add pointers, mutation
-        //  - each pointer contains a VCellID
-        //  - each array/slice contains numerous VCellIDs
-        //  - VCellIDs are only actually created in allocate expressions
     };
 
     union ValueInfo {
@@ -160,9 +155,13 @@ namespace monomorphizer::mval {
     bool get_seq_elem1_compatibility(size_t seq_info_index, size_t index, VID* out_vid);
     bool get_seq_elem2_compatibility(VID tuple_val_id, size_t index, VID* out_vid);
     FuncInfo* get_func_info(size_t func_info_index);
-    vcell::VCellID get_ptr_vcell(mval::VID val_id);
-    vcell::VCellID get_array_vcell(mval::VID val_id, size_t index);
-    vcell::VCellID get_slice_vcell(mval::VID val_id, size_t index);
+    vcell::VCellID get_ptr_vcell(size_t ptr_info_index);
+    size_t count_array_vcells(size_t array_info_index);
+    size_t count_slice_vcells(size_t array_info_index);
+    vcell::VCellID get_array_vcell(size_t array_info_index, size_t index);
+    vcell::VCellID get_slice_vcell(size_t array_info_index, size_t index);
+    size_t count_str_code_points(size_t str_info_index);
+    int get_str_code_point_at(size_t str_info_index, size_t code_point_index);
 
     // equality:
     bool equals(VID v1, VID v2);

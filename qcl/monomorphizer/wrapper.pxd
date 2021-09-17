@@ -192,12 +192,12 @@ cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
         MonoModID mono_mod_id
     
     union ValueInfo:
-        bint U1
+        bint u1
         uint8_t u8
         uint16_t u16
         uint32_t u32
         uint64_t u64
-        int8_t i8
+        int8_t s8
         int16_t s16
         int32_t s32
         int64_t s64
@@ -486,6 +486,7 @@ cdef:
     # in source code.
     size_t w_get_mono_mod_field_count(MonoModID mono_mod_id)
     GDefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index)
+    PolyModID w_get_mono_mod_origin_poly_mod(MonoModID mono_mod_id)
     GDefID w_get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t field_index)
     GDefID w_get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index)
 
@@ -505,6 +506,8 @@ cdef:
 cdef:
     IntStr w_intern_string_1(cpp_string s, bint is_tid_not_vid)
     IntStr w_intern_string_2(const char* nt_bytes, bint is_tid_not_vid)
+    cpp_string w_get_interned_string(IntStr int_str_id)
+    bint w_is_interned_string_tid_not_vid(IntStr int_str_id)
 
 
 #
@@ -559,9 +562,18 @@ cdef:
     bint w_get_seq_elem1(size_t seq_info_index, size_t index, VID* out_vid)
     bint w_get_seq_elem2(size_t tuple_val_id, size_t index, VID* out_vid)
     FuncInfo* w_get_func_info(size_t func_info_index)
-    VCellID w_get_ptr_vcell(VID val_id)
-    VCellID w_get_array_vcell(VID val_id, size_t index)
-    VCellID w_get_slice_vcell(VID val_id, size_t index)
+    VCellID w_get_ptr_vcell(size_t ptr_info_index)
+    size_t w_count_array_vcells(size_t array_info_index)
+    size_t w_count_slice_vcells(size_t slice_info_index)
+    VCellID w_get_array_vcell(size_t array_info_index, size_t index)
+    VCellID w_get_slice_vcell(size_t slice_info_index, size_t index)
     bint w_equals(VID v1, VID v2)
+    size_t w_count_str_code_points(size_t str_info_index);
+    int w_get_str_code_point_at(size_t str_info_index, size_t code_point_index);
 
-    # TODO: must be able to iterate through all defined FUNCTIONS with associated MonoModID
+#
+# vcell
+#
+
+cdef:
+    VID w_get_vcell_val(VCellID vcell_id)

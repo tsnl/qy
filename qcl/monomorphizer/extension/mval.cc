@@ -336,18 +336,27 @@ namespace monomorphizer::mval {
     FuncInfo* get_func_info(size_t func_info_index) {
         return &s_func_info_table[func_info_index];
     }
-    vcell::VCellID get_ptr_vcell(mval::VID val_id) {
-        size_t ptr_info_index = s_value_info_table[val_id].ptr_info_index;
+    vcell::VCellID get_ptr_vcell(size_t ptr_info_index) {
         vcell::VCellID ptr_vcell = s_ptr_info_table[ptr_info_index];
         return ptr_vcell;
     }
-    vcell::VCellID get_array_vcell(mval::VID val_id, size_t index) {
-        size_t array_info_index = s_value_info_table[val_id].array_info_index;
+    size_t count_array_vcells(size_t array_info_index) {
+        return s_array_vcell_count_table[array_info_index];
+    }
+    size_t count_slice_vcells(size_t slice_info_index) {
+        return s_slice_vcell_count_table[slice_info_index];
+    }
+    vcell::VCellID get_array_vcell(size_t array_info_index, size_t index) {
         return s_array_vcell_array_table[array_info_index][index];
     }
-    vcell::VCellID get_slice_vcell(mval::VID val_id, size_t index) {
-        size_t slice_info_index = s_value_info_table[val_id].slice_info_index;
+    vcell::VCellID get_slice_vcell(size_t slice_info_index, size_t index) {
         return s_slice_vcell_array_table[slice_info_index][index];
+    }
+    size_t count_str_code_points(size_t str_info_index) {
+        return s_value_string_info_table[str_info_index].code_point_count;
+    }
+    int get_str_code_point_at(size_t str_info_index, size_t code_point_index) {
+        return s_value_string_info_table[str_info_index].code_point_array[code_point_index];
     }
 
     // serialization:

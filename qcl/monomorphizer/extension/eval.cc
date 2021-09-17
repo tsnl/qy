@@ -32,6 +32,11 @@ namespace monomorphizer::eval {
     //  - otherwise, the program would hang
     //
 
+    //
+    // FIXME: cache result of p2m within a MonoModID (since `s` has already been applied)
+    //  - this prevents multiple copies being generated during monomorphization
+    //
+
     mast::TypeSpecID p2m_ts(mast::TypeSpecID ts_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set, MonoModID mono_mod_id);
     mast::ExpID p2m_exp(mast::ExpID exp_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set, MonoModID mono_mod_id);
     mast::ElemID p2m_elem(mast::ElemID elem_id, sub::Substitution* s, stack::Stack* st, std::set<GDefID>& ignore_gdef_id_set, MonoModID mono_mod_id);

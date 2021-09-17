@@ -50,6 +50,7 @@ namespace monomorphizer::modules {
     // in which symbols are added.
     // By convention, this should be the order in which source nodes are written 
     // in source code.
+    // TODO: consider replacing names with IntStr
     char const* get_mono_mod_name(MonoModID mono_mod_id);
     char const* get_poly_mod_name(PolyModID poly_mod_id);
     size_t get_mono_mod_field_count(PolyModID poly_mod_id);
@@ -58,6 +59,7 @@ namespace monomorphizer::modules {
     GDefID get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index);
     size_t get_poly_mod_formal_arg_count(PolyModID poly_mod_id);
     GDefID get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t arg_index);
+    PolyModID get_mono_mod_origin_poly_mod(MonoModID mono_mod_id);
 
     // instantiation: 
     // turn a PolyModID into a MonoModID using some template arguments.

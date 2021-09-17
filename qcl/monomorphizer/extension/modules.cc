@@ -162,6 +162,10 @@ namespace monomorphizer::modules {
         return poly_mod_info->bv_def_id_array[arg_index];
     }
 
+    PolyModID get_mono_mod_origin_poly_mod(MonoModID mono_mod_id) {
+        return s_mono_mod_info_table[mono_mod_id].opt_parent_mod_id;
+    }
+
 }
 
 //

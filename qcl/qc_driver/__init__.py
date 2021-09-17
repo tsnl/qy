@@ -2,7 +2,7 @@ import os
 import os.path as path
 import argparse
 
-from qcl import ast
+from qcl import ast, llvm_compiler
 from qcl import excepts
 from qcl import frontend
 from qcl import typer
@@ -60,7 +60,11 @@ def main():
         print("WARNING: skipping SMT checks")
 
         # todo: emit LLVM IR from Qy and C/C++ source code in `frontend` (using `libclang`).
-        print("WARNING: skipping emitting output")
+        try:
+            llvm_compiler.run()
+        except excepts.EmitterCompilationError as e:
+            # TODO: fold exception data into feedback. Print, then exit elegantly.
+            raise e from e
 
         return 0
 
