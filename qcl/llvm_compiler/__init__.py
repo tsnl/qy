@@ -2,7 +2,12 @@ from qcl import monomorphizer as mm
 
 
 def run():
-    print(">- BEG of LLVM emitter")
+    print(">- BEG of LLVM emitter -<")
+
+    # FIXME: need some way to get substitution used to instantiate PolyMod into MonoMod
+    #   - can obtain this from ArgList, translating mtype.TID to type.TID
+    #   - can then generate a substitution and an AST node reference (for LambdaExp)
+    #   - applying sub to existing type yields subbed type, true for any type in MonoModID
 
     mono_mod_count = mm.modules.count_all_mono_modules()
     for mono_mod_id in range(mono_mod_count):
@@ -32,3 +37,5 @@ def run():
                 print("  " "  - TODO: emit me!")
             else:
                 print("  " "  - ERROR: how did this DefKind get here?")
+
+    print(">- END of LLVM emitter -<")
