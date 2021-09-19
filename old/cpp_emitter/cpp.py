@@ -44,12 +44,17 @@ class File(object):
         self.builtin_header_names = get_opt_iterable(opt_builtin_header_names)
         self.client_header_names = get_opt_iterable(opt_client_header_names)
 
+        self.builtin_header_names.append("type_traits")
+        self.builtin_header_names.append("cstddef")
+        self.builtin_header_names.append("cstdint")
+        self.builtin_header_names.append("cmath")
+
         #
         # Post-initialization setup:
         #
 
-        self.print("#include <type_traits>")
-
+        self.print("// General setup:")
+        
         for builtin_header_name in self.builtin_header_names:
             self.print(f"#include <{builtin_header_name}>")
         for client_header_name in self.client_header_names:
@@ -58,10 +63,8 @@ class File(object):
         self.print("#define SUB struct")
         self.print("#define AOT(e) (std::integral_constant<decltype(e), e>::value)")
 
-        # CPP-file-only setup:
-        if self.type == FileType.Cpp:
-            self.print('namespace qy {}')
-            self.print("using namespace qy;")
+        self.print("")
+        self.print("// Project output:")
 
     def close(self):
         self.file.close()
@@ -110,15 +113,21 @@ class TemplateArgs(object):
         template_value_arg_decls = get_opt_iterable(opt_template_value_arg_decls)
         self.help_check_str_iterable(template_type_arg_names, check_id)
         self.help_check_str_iterable(template_value_arg_decls, check_decl)
-        assert 0 < len(template_type_arg_names) + len(template_value_arg_decls)
 
         self.template_type_arg_names = template_type_arg_names
         self.template_value_arg_decls = template_value_arg_decls
         self.has_variadic_suffix = has_variadic_suffix
-        self.default_instantiation_string = "<" + ", ".join(
-            self.template_type_arg_names + 
-            [split_decl(decl)[1] for decl in self.template_value_arg_decls]
-        ) + ">"
+        self.default_instantiation_string = (
+            "<" + ", ".join(
+                self.template_type_arg_names + 
+                [split_decl(decl)[1] for decl in self.template_value_arg_decls]
+            ) + ">"
+            if len(self.template_type_arg_names) + len(self.template_value_arg_decls) else
+            ""
+        )
+
+    def __bool__(self):
+        return bool(len(self.template_type_arg_names) + len(self.template_value_arg_decls))
     
     @classmethod
     def help_check_str_iterable(cls, arg_str_iterable, check_fn):
@@ -126,8 +135,8 @@ class TemplateArgs(object):
             for arg_str in arg_str_iterable:
                 check_fn(arg_str, cls.__name__)
         
-
-    def print_declaration_line_to_file(self, f: File):
+    @property
+    def declaration_string(self):
         type_args_str = (
             ", ".join(f"typename {t}" for t in self.template_type_arg_names)
             if self.template_type_arg_names else
@@ -136,22 +145,33 @@ class TemplateArgs(object):
         val_args_str = (
             ", ".join(val_arg_spec for val_arg_spec in self.template_value_arg_decls)
         )
+
+        empty_declaration_string = False
         if type_args_str and val_args_str:
             args_str = type_args_str + ", " + val_args_str
         elif type_args_str:
             args_str = type_args_str
-        else:
-            assert val_args_str
+        elif val_args_str:
             args_str = val_args_str
-        f.print(f"template <{args_str}>")
+        else:
+            empty_declaration_string = True
+
+        if not empty_declaration_string:
+            return f"template <{args_str}>"
+        else:
+            return ""
+
+    def print_declaration_line_to_file(self, f: File):
+        f.print(self.declaration_string)
     
 
 class FuncKind(enum.Enum):
-    Static = enum.auto()
-    Virtual = enum.auto()
-    PureVirtual = enum.auto()
-    Override = enum.auto()
-    Constructor = enum.auto()
+    GlobalFunction = enum.auto()
+    StaticMethod = enum.auto()
+    VirtualMethod = enum.auto()
+    PureVirtualMethod = enum.auto()
+    OverrideMethod = enum.auto()
+    ConstructorMethod = enum.auto()
 
 
 class FuncDeclaration(object):
@@ -162,6 +182,7 @@ class FuncDeclaration(object):
         arg_decls: t.Iterable[str],
         opt_func_return_type: t.Optional[str],
         func_kind: FuncKind,
+        template_args: TemplateArgs,
         is_total: bool,
         explicit_this_ptr_is_const=False,
     ):
@@ -176,22 +197,32 @@ class FuncDeclaration(object):
         self.arg_decls = arg_decls
         self.opt_func_return_type = opt_func_return_type
         self.func_kind = func_kind
+        self.template_args = template_args
         self.explicit_this_ptr_is_const = explicit_this_ptr_is_const
         self.is_total = is_total
 
     @property
     def func_fully_qualified_name(self):
-        return f"{self.func_fully_qualified_name_prefix}::{self.func_name}"
+        if self.func_fully_qualified_name_prefix:
+            return f"{self.func_fully_qualified_name_prefix}::{self.func_name}"
+        else:
+            return self.func_name
 
     def to_string(self, not_for_decl: bool):
+        # header:
+        header_list = []
+        if self.is_total:
+            header_list.append("constexpr")
+        if self.template_args:
+            header_list.append(self.template_args.declaration_string)
+        header = " ".join(header_list)
+
         # prefix:
         prefix_list = []
-        if not not_for_decl and self.func_kind == FuncKind.Static:
+        if not not_for_decl and self.func_kind == FuncKind.StaticMethod:
             prefix_list.append('static')
-        elif not not_for_decl and self.func_kind in (FuncKind.Virtual, FuncKind.PureVirtual, FuncKind.Override):
+        elif not not_for_decl and self.func_kind in (FuncKind.VirtualMethod, FuncKind.PureVirtualMethod, FuncKind.OverrideMethod):
             prefix_list.append('virtual')
-        if self.is_total:
-            prefix_list.append('constexpr')
         prefix = " ".join(prefix_list)
 
         # main: main part of declaration
@@ -206,14 +237,16 @@ class FuncDeclaration(object):
         suffix_list = []
         if self.explicit_this_ptr_is_const:
             suffix_list.append('const')
-        if self.func_kind == FuncKind.Override:
+        if self.func_kind == FuncKind.OverrideMethod:
             suffix_list.append('override')
-        elif self.func_kind == FuncKind.PureVirtual:
+        elif self.func_kind == FuncKind.PureVirtualMethod:
             suffix_list.append('= 0')
         suffix = " ".join(suffix_list)
 
         # pulling together:
         total_list = []
+        if header:
+            total_list.append(header)
         if prefix:
             total_list.append(prefix)
         total_list.append(main)
@@ -231,9 +264,12 @@ class ConstructorDeclaration(FuncDeclaration):
             class_name,
             f"{class_name}<{template_args.default_instantiation_string}>",
             [], None,
-            FuncKind.Constructor,
+            FuncKind.ConstructorMethod,
             is_total=is_total
         )
+
+
+# TODO: add a ValueDeclaration
 
 
 #
@@ -284,17 +320,14 @@ def poly_submod_block(cpp_file: File, cls_name: str, template_args: TemplateArgs
 
 def define_func_block(
     cpp_file: File, 
-    func_decl: FuncDeclaration,
-    template_args: TemplateArgs
+    func_decl: FuncDeclaration
 ):
-    template_args.print_declaration_line_to_file(cpp_file)
     return block(cpp_file, func_decl.to_string(not_for_decl=True))
 
 
 #
 # Check functions
 #
-
 
 def raise_check_error(msg: str):
     raise ValueError(msg)

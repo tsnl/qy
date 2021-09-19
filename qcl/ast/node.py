@@ -374,7 +374,8 @@ class FileModExp(BaseModExp):
 class SubModExp(BaseModExp):
     def __init__(
             self, loc: feedback.ILoc,
-            template_arg_names: t.List[str], elements: t.List["BaseElem"]
+            template_arg_names: t.List[str], 
+            elements: t.List["BaseElem"]
     ):
         super().__init__(loc)
         self.table = Table(

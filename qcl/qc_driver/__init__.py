@@ -6,7 +6,9 @@ from qcl import ast
 from qcl import excepts
 from qcl import frontend
 from qcl import typer
-from qcl import cpp_emitter
+# from qcl import cpp_emitter
+from qcl import monomorphizer
+from qcl import llvm_emitter
 
 
 def main():
@@ -47,17 +49,16 @@ def main():
 
         # TODO: run post-typer checks
 
+        # TODO: run monomorphizer
+        try:
+            monomorphizer.run(project)
+        except excepts.CheckerCompilationError as e:
+            raise e from e
+
         # todo: perform SMT analysis:
         #   - using Z3 library
         #   - cf. `monomorphic_logic`
         print("WARNING: skipping SMT checks")
-
-        # emit C++ source code:
-        try:
-            cpp_emitter.emit_project(project)
-        except excepts.EmitterCompilationError as e:
-            # TODO: fold exception data into feedback. Print, then exit elegantly.
-            raise e from e
 
         return 0
 

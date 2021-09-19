@@ -1,0 +1,9 @@
+--- sub main_for_v1_default_loader ---
+
+forty_two = const[I32, 42]:value;
+main_for_v1_default_loader = () -> ML {};
+
+--- sub const[T, m] ---
+
+value ~ T;
+value = m;
