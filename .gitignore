@@ -1,10 +1,26 @@
+# OS and tools:
 build/
 venv/
 .DS_Store
+.vscode
 
+# Python:
 __pycache__/
 *.pyc
 
+# Antlr:
 .antlr
 
-.vscode
+# Reserved (for dev stuff)
+tmp/
+
+# CMake build:
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+output-1
+
+# Ninja build:
+.ninja_deps
+.ninja_log
+build.ninja

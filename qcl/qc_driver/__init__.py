@@ -2,11 +2,11 @@ import os
 import os.path as path
 import argparse
 
-from qcl import ast, llvm_compiler
+from qcl import ast
 from qcl import excepts
 from qcl import frontend
 from qcl import typer
-from qcl import monomorphizer
+from qcl import cpp_emitter
 
 
 def main():
@@ -45,23 +45,16 @@ def main():
             # DEBUG:
             print(f"INFO: Typer successful.")
 
-        # run post-type-check checks (PTC checks) and monomorphise output:
-        #   - performs checks on polymorphic source code
-        #   - using `vm` module to evaluate template args and instantiate templates (copy&sub)
-        try:
-            monomorphizer.run(project)
-        except excepts.CheckerCompilationError as e:
-            # TODO: fold exception data into feedback. Print, then exit elegantly.
-            raise e from e
+        # TODO: run post-typer checks
 
         # todo: perform SMT analysis:
         #   - using Z3 library
         #   - cf. `monomorphic_logic`
         print("WARNING: skipping SMT checks")
 
-        # todo: emit LLVM IR from Qy and C/C++ source code in `frontend` (using `libclang`).
+        # emit C++ source code:
         try:
-            llvm_compiler.run()
+            cpp_emitter.emit_project(project)
         except excepts.EmitterCompilationError as e:
             # TODO: fold exception data into feedback. Print, then exit elegantly.
             raise e from e
