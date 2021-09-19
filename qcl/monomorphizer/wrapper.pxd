@@ -240,64 +240,88 @@ cdef:
 # expressions:
 # - TODO: consider supporting local and global IDs separately
 cdef:
-    ExpID w_get_unit_exp()
-    ExpID w_new_int_exp(size_t mantissa, IntegerSuffix int_suffix, bint is_neg)
-    ExpID w_new_float_exp(double value, FloatSuffix float_suffix)
-    ExpID w_new_string_exp(size_t code_point_count, int* code_point_array)
-    ExpID w_new_lid_exp(IntStr int_str_id)
-    ExpID w_new_gid_exp(GDefID def_id)
-    ExpID w_new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot)
-    ExpID w_new_tuple_exp(size_t item_count, ExpID* mv_item_array);
-    ExpID w_new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp)
-    ExpID w_new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp)
-    ExpID w_new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp)
-    ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index)
+    ExpID w_new_unit_exp(size_t source_index)
+    ExpID w_new_int_exp(size_t mantissa, IntegerSuffix int_suffix, bint is_neg, size_t source_index)
+    ExpID w_new_float_exp(double value, FloatSuffix float_suffix, size_t source_index)
+    ExpID w_new_string_exp(size_t code_point_count, int* code_point_array, size_t source_index)
+    ExpID w_new_lid_exp(IntStr int_str_id, size_t source_index)
+    ExpID w_new_gid_exp(GDefID def_id, size_t source_index)
+    ExpID w_new_func_call_exp(ExpID called_fn, ExpID arg_exp, bint call_is_non_tot, size_t source_index)
+    ExpID w_new_tuple_exp(size_t item_count, ExpID* mv_item_array, size_t source_index)
+    ExpID w_new_unary_op_exp(UnaryOp unary_op, ExpID arg_exp, size_t source_index)
+    ExpID w_new_binary_op_exp(BinaryOp binary_op, ExpID lt_arg_exp, ExpID rt_arg_exp, size_t source_index)
+    ExpID w_new_if_then_else_exp(ExpID cond_exp, ExpID then_exp, ExpID else_exp, size_t source_index)
+    ExpID w_new_get_tuple_field_by_index_exp(ExpID tuple_exp_id, size_t index, size_t source_index)
     ExpID w_new_lambda_exp(
             uint32_t arg_name_count,
             IntStr* arg_name_array,
             uint32_t ctx_enclosed_name_count,
             IntStr* ctx_enclosed_name_array,
-            ExpID body_exp
+            ExpID body_exp,
+            size_t source_index
     )
-    ExpID w_new_allocate_one_exp(ExpID stored_val_exp_id, AllocationTarget allocation_target, bint allocation_is_mut)
+    ExpID w_new_allocate_one_exp(
+        ExpID stored_val_exp_id, 
+        AllocationTarget allocation_target, 
+        bint allocation_is_mut,
+        size_t source_index
+    )
     ExpID w_new_allocate_many_exp(
         ExpID initializer_stored_val_exp_id,
         ExpID alloc_count_exp,
         AllocationTarget allocation_target,
-        bint allocation_is_mut
+        bint allocation_is_mut,
+        size_t source_index
     )
-    ExpID w_new_chain_exp(size_t prefix_elem_id_count, ElemID *mv_prefix_elem_id_array, ExpID ret_exp_id)
-    ExpID w_new_get_mono_module_field_exp(MonoModID mono_mod_id, size_t exp_field_ix)
+    ExpID w_new_chain_exp(
+        size_t prefix_elem_id_count, 
+        ElemID *mv_prefix_elem_id_array, 
+        ExpID ret_exp_id,
+        size_t source_index
+    )
+    ExpID w_new_get_mono_module_field_exp(
+        MonoModID mono_mod_id, 
+        size_t exp_field_ix,
+        size_t source_index
+    )
     ExpID w_new_get_poly_module_field_exp(
-        PolyModID poly_mod_id, size_t exp_field_ix,
-        size_t arg_count, NodeID* arg_array
+        PolyModID poly_mod_id, 
+        size_t exp_field_ix,
+        size_t arg_count, 
+        NodeID* arg_array,
+        size_t source_index
     )
-    ExpID w_new_cast_exp(TypeSpecID ts_id, ExpID exp_id)
+    ExpID w_new_cast_exp(
+        TypeSpecID ts_id, 
+        ExpID exp_id, 
+        size_t source_index
+    )
 
 # type-specs:
 # - TODO: consider supporting local and global IDs separately
 cdef:
-    TypeSpecID w_get_unit_ts()
-    TypeSpecID w_new_gid_ts(GDefID def_id)
-    TypeSpecID w_new_lid_ts(IntStr int_str_id)
-    TypeSpecID w_new_ptr_ts(TypeSpecID ptd_ts, bint contents_is_mut)
-    TypeSpecID w_new_array_ts(TypeSpecID ptd_ts, ExpID count_exp, bint contents_is_mut)
-    TypeSpecID w_new_slice_ts(TypeSpecID ptd_ts, bint contents_is_mut)
-    TypeSpecID w_new_func_sgn_ts(TypeSpecID arg_ts, TypeSpecID ret_ts, SES ret_ses)
-    TypeSpecID w_new_tuple_ts(size_t elem_ts_count, TypeSpecID* mv_elem_ts_array)
-    TypeSpecID w_new_get_mono_module_field_ts(MonoModID mono_mod_id, size_t ts_field_ix)
+    TypeSpecID w_new_unit_ts(size_t source_index)
+    TypeSpecID w_new_gid_ts(GDefID def_id, size_t source_index)
+    TypeSpecID w_new_lid_ts(IntStr int_str_id, size_t source_index)
+    TypeSpecID w_new_ptr_ts(TypeSpecID ptd_ts, bint contents_is_mut, size_t source_index)
+    TypeSpecID w_new_array_ts(TypeSpecID ptd_ts, ExpID count_exp, bint contents_is_mut, size_t source_index)
+    TypeSpecID w_new_slice_ts(TypeSpecID ptd_ts, bint contents_is_mut, size_t source_index)
+    TypeSpecID w_new_func_sgn_ts(TypeSpecID arg_ts, TypeSpecID ret_ts, SES ret_ses, size_t source_index)
+    TypeSpecID w_new_tuple_ts(size_t elem_ts_count, TypeSpecID* mv_elem_ts_array, size_t source_index)
+    TypeSpecID w_new_get_mono_module_field_ts(MonoModID mono_mod_id, size_t ts_field_ix, size_t source_index)
     TypeSpecID w_new_get_poly_module_field_ts(
         PolyModID poly_mod_id,
         size_t ts_field_ix,
         size_t actual_arg_count,
-        NodeID* actual_arg_array
+        NodeID* actual_arg_array,
+        size_t source_index
     )
 
 # elements:
 cdef:
-    ElemID w_new_bind1v_elem(IntStr bound_def_id, ExpID init_exp_id)
-    ElemID w_new_bind1t_elem(IntStr bound_def_id, TypeSpecID init_ts_id)
-    ElemID w_new_do_elem(ExpID eval_exp_id)
+    ElemID w_new_bind1v_elem(IntStr bound_def_id, ExpID init_exp_id, size_t source_index)
+    ElemID w_new_bind1t_elem(IntStr bound_def_id, TypeSpecID init_ts_id, size_t source_index)
+    ElemID w_new_do_elem(ExpID eval_exp_id, size_t source_index)
 
 # get-info:
 
@@ -452,6 +476,7 @@ cdef:
     NodeKind w_get_node_kind(NodeID node_id)
     NodeInfo* w_get_info_ptr(NodeID node_id)
     bint w_is_node_exp_not_ts(NodeID node_id)
+    size_t w_get_source_node_index(NodeID node_id)
 
 #
 # Defs:
@@ -477,7 +502,12 @@ cdef:
 cdef:
     # Polymorphic template construction:
     # - add_field pushes a field and returns the field's unique index.
-    PolyModID w_new_polymorphic_module(char* mv_template_name, size_t bv_def_id_count, GDefID* mv_bv_def_id_array);
+    PolyModID w_new_polymorphic_module(
+        char* mv_template_name, 
+        size_t bv_def_id_count, 
+        GDefID* mv_bv_def_id_array,
+        size_t source_node_index
+    );
     size_t w_add_poly_module_field(PolyModID template_id, GDefID field_def_id);
 
     # Module fields are accessed by an index that is determined by the order
@@ -487,6 +517,7 @@ cdef:
     size_t w_get_mono_mod_field_count(MonoModID mono_mod_id)
     GDefID w_get_mono_mod_field_at(MonoModID mono_mod_id, size_t field_index)
     PolyModID w_get_mono_mod_origin_poly_mod(MonoModID mono_mod_id)
+    size_t w_get_mono_mod_source_node_index(MonoModID mono_mod_id)
     GDefID w_get_poly_mod_formal_arg_at(PolyModID poly_mod_id, size_t field_index)
     GDefID w_get_poly_mod_field_at(PolyModID poly_mod_id, size_t field_index)
 

@@ -49,7 +49,7 @@ def main():
 
         # TODO: run post-typer checks
 
-        # TODO: run monomorphizer
+        # run monomorphizer
         try:
             monomorphizer.run(project)
         except excepts.CheckerCompilationError as e:
@@ -59,6 +59,12 @@ def main():
         #   - using Z3 library
         #   - cf. `monomorphic_logic`
         print("WARNING: skipping SMT checks")
+
+        # running an LLVM emitter:
+        try:
+            llvm_emitter.run()
+        except excepts.EmitterCompilationError as e:
+            raise e from e
 
         return 0
 

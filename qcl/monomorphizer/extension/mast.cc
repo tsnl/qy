@@ -24,9 +24,7 @@ namespace monomorphizer::mast {
       private:
         std::vector<NodeKind> m_kind_table;
         std::vector<NodeInfo> m_info_table;
-
-      public:
-        SingletonNodeCache m_singleton_cache;
+        std::vector<size_t> m_source_ast_node_index_table;
 
       public:
         NodeMgr(size_t capacity);
@@ -39,11 +37,12 @@ namespace monomorphizer::mast {
             return m_kind_table.size();
         }
 
-        inline void push(NodeKind kind) {
+        inline void push(NodeKind kind, size_t source_ast_node_index) {
             // std::cout << "Pushing NK=" << (size_t)kind << std::endl;
             auto id = m_kind_table.size();
             m_kind_table.push_back(kind);
             m_info_table.emplace_back();
+            m_source_ast_node_index_table.push_back(source_ast_node_index);
             assert(m_kind_table[id] == kind);
         }
 
@@ -55,8 +54,8 @@ namespace monomorphizer::mast {
             return &m_info_table[index];
         }
 
-        inline SingletonNodeCache const& singleton_cache() const {
-            return m_singleton_cache;
+        inline size_t source_node_index(size_t index) {
+            return m_source_ast_node_index_table[index];
         }
     };
 
@@ -66,14 +65,12 @@ namespace monomorphizer::mast {
     NodeMgr::NodeMgr(size_t capacity)
     :   m_kind_table(),
         m_info_table(),
-        m_singleton_cache({
-            NULL_NODE_ID,
-            NULL_NODE_ID
-        })
+        m_source_ast_node_index_table()
     {
         // reserving vectors:
         m_kind_table.reserve(capacity);
         m_info_table.reserve(capacity);
+        m_source_ast_node_index_table.reserve(capacity);
     }
 
     static NodeMgr* s_mgr = nullptr;
@@ -83,10 +80,6 @@ namespace monomorphizer::mast {
         if (!s_mgr) {
             // allocating:
             s_mgr = new NodeMgr(capacity);
-
-            // initializing singleton cache:
-            s_mgr->m_singleton_cache.ts_unit = new_unit_ts();
-            s_mgr->m_singleton_cache.exp_unit = new_unit_exp();
         }
     }
 
@@ -104,29 +97,25 @@ namespace monomorphizer::mast {
         return s_mgr->tmp_info_ptr(node_index);
     }
 
-    mast::NodeID help_alloc_node(NodeKind kind) {
+    mast::NodeID help_alloc_node(NodeKind kind, size_t source_ast_node_index) {
         auto node_id = s_mgr->node_count();
-        s_mgr->push(kind);
+        s_mgr->push(kind, source_ast_node_index);
         return node_id;
     }
 
-    mast::TypeSpecID new_unit_ts() {
-        auto new_node_id = help_alloc_node(NodeKind::TS_UNIT);
-        return new_node_id;
+    mast::TypeSpecID new_unit_ts(size_t node_index) {
+        return help_alloc_node(NodeKind::TS_UNIT, node_index);
     }
-    mast::TypeSpecID get_unit_ts() {
-        return s_mgr->singleton_cache().ts_unit;
-    }
-    mast::TypeSpecID new_gid_ts(GDefID def_id) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_GID);
+    mast::TypeSpecID new_gid_ts(GDefID def_id, size_t node_index) {
+        auto new_node_id = help_alloc_node(NodeKind::TS_GID, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_gid;
 
         info_ptr->def_id = def_id;
 
         return new_node_id;
     }
-    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_LID);
+    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id, size_t node_index) {
+        auto new_node_id = help_alloc_node(NodeKind::TS_LID, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_lid;
 
         info_ptr->int_str_id = int_str_id;
@@ -135,9 +124,10 @@ namespace monomorphizer::mast {
     }
     mast::TypeSpecID new_ptr_ts(
         mast::TypeSpecID ptd_ts,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_PTR);
+        auto new_node_id = help_alloc_node(NodeKind::TS_PTR, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_ptr;
 
         info_ptr->ptd_ts = ptd_ts;
@@ -148,9 +138,10 @@ namespace monomorphizer::mast {
     mast::TypeSpecID new_array_ts(
         mast::TypeSpecID ptd_ts,
         mast::ExpID count_exp,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_ARRAY);
+        auto new_node_id = help_alloc_node(NodeKind::TS_ARRAY, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_array;
 
         info_ptr->ptd_ts = ptd_ts;
@@ -161,9 +152,10 @@ namespace monomorphizer::mast {
     }
     mast::TypeSpecID new_slice_ts(
         mast::TypeSpecID ptd_ts,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_SLICE);
+        auto new_node_id = help_alloc_node(NodeKind::TS_SLICE, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_slice;
 
         info_ptr->ptd_ts = ptd_ts;
@@ -174,9 +166,10 @@ namespace monomorphizer::mast {
     mast::TypeSpecID new_func_sgn_ts(
         mast::TypeSpecID arg_ts,
         mast::TypeSpecID ret_ts,
-        SES ret_ses
+        SES ret_ses,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_FUNC_SGN);
+        auto new_node_id = help_alloc_node(NodeKind::TS_FUNC_SGN, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_func_sgn;
 
         info_ptr->arg_ts = arg_ts;
@@ -187,9 +180,10 @@ namespace monomorphizer::mast {
     }
     mast::TypeSpecID new_tuple_ts(
         size_t elem_ts_count,
-        mast::TypeSpecID* mv_elem_ts_array
+        mast::TypeSpecID* mv_elem_ts_array,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_TUPLE);
+        auto new_node_id = help_alloc_node(NodeKind::TS_TUPLE, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_tuple;
 
         info_ptr->elem_ts_count = elem_ts_count;
@@ -199,9 +193,10 @@ namespace monomorphizer::mast {
     }
     mast::TypeSpecID new_get_mono_module_field_ts(
         MonoModID mono_mod_id,
-        size_t field_index
+        size_t field_index,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_GET_MONO_MODULE_FIELD);
+        auto new_node_id = help_alloc_node(NodeKind::TS_GET_MONO_MODULE_FIELD, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_get_mono_module_field;
         
         info_ptr->template_id = mono_mod_id;
@@ -213,9 +208,10 @@ namespace monomorphizer::mast {
         PolyModID poly_mod_id,
         size_t field_index,
         size_t actual_arg_count,
-        mast::NodeID* mv_actual_arg_array
+        mast::NodeID* mv_actual_arg_array,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::TS_GET_POLY_MODULE_FIELD);
+        auto new_node_id = help_alloc_node(NodeKind::TS_GET_POLY_MODULE_FIELD, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->ts_get_poly_module_field;
         
         info_ptr->template_id = poly_mod_id;
@@ -226,19 +222,17 @@ namespace monomorphizer::mast {
         return new_node_id;
     }
 
-    mast::ExpID new_unit_exp() {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_UNIT);
+    mast::ExpID new_unit_exp(size_t node_index) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_UNIT, node_index);
         return new_node_id;
-    }
-    mast::TypeSpecID get_unit_exp() {
-        return s_mgr->singleton_cache().exp_unit;
     }
     mast::ExpID new_int_exp(
         size_t mantissa,
         IntegerSuffix typing_suffix,
-        bool is_neg
+        bool is_neg,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_INT);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_INT, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_int;
 
         info_ptr->mantissa = mantissa;
@@ -249,9 +243,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_float_exp(
         double value,
-        FloatSuffix typing_suffix
+        FloatSuffix typing_suffix,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_FLOAT);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_FLOAT, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_float;
 
         info_ptr->value = value;
@@ -261,9 +256,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_string_exp(
         size_t code_point_count,
-        int* code_point_array
+        int* code_point_array,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_STRING);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_STRING, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_str;
 
         info_ptr->code_point_count = code_point_count;
@@ -274,16 +270,16 @@ namespace monomorphizer::mast {
 
         return new_node_id;
     }
-    mast::ExpID new_gid_exp(GDefID def_id) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_GID);
+    mast::ExpID new_gid_exp(GDefID def_id, size_t node_index) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GID, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_gid;
 
         info_ptr->def_id = def_id;
 
         return new_node_id;
     }
-    mast::ExpID new_lid_exp(intern::IntStr int_str_id) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_LID);
+    mast::ExpID new_lid_exp(intern::IntStr int_str_id, size_t node_index) {
+        auto new_node_id = help_alloc_node(NodeKind::EXP_LID, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_lid;
 
         info_ptr->int_str_id = int_str_id;
@@ -293,9 +289,10 @@ namespace monomorphizer::mast {
     mast::ExpID new_func_call_exp(
         mast::ExpID called_fn,
         mast::ExpID arg_exp_id,
-        bool call_is_non_tot
+        bool call_is_non_tot,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_FUNC_CALL);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_FUNC_CALL, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_call;
         
         info_ptr->called_fn = called_fn;
@@ -306,9 +303,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_tuple_exp(
         size_t tuple_item_count,
-        mast::ExpID* mv_tuple_item_array
+        mast::ExpID* mv_tuple_item_array,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_TUPLE);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_TUPLE, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_tuple;
         
         info_ptr->item_count = tuple_item_count;
@@ -318,9 +316,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_unary_op_exp(
         UnaryOp unary_op,
-        mast::ExpID arg_exp
+        mast::ExpID arg_exp,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_UNARY_OP);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_UNARY_OP, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_unary;
 
         info_ptr->unary_op = unary_op;
@@ -331,9 +330,10 @@ namespace monomorphizer::mast {
     mast::ExpID new_binary_op_exp(
         BinaryOp binary_op,
         mast::ExpID lt_arg_exp,
-        mast::ExpID rt_arg_exp
+        mast::ExpID rt_arg_exp,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_BINARY_OP);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_BINARY_OP, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_binary;
 
         info_ptr->binary_op = binary_op;
@@ -345,9 +345,10 @@ namespace monomorphizer::mast {
     mast::ExpID new_if_then_else_exp(
         mast::ExpID cond_exp,
         mast::ExpID then_exp,
-        mast::ExpID else_exp
+        mast::ExpID else_exp,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_IF_THEN_ELSE);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_IF_THEN_ELSE, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_if_then_else;
 
         info_ptr->cond_exp = cond_exp;
@@ -358,9 +359,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_get_tuple_field_by_index_exp(
         mast::ExpID tuple_exp_id,
-        size_t index
+        size_t index,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_TUPLE_FIELD);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_TUPLE_FIELD, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_get_tuple_field;
 
         info_ptr->tuple_exp_id = tuple_exp_id;
@@ -373,9 +375,10 @@ namespace monomorphizer::mast {
         intern::IntStr* mv_arg_name_array,
         uint32_t ctx_enclosed_name_count,
         intern::IntStr* mv_ctx_enclosed_name_array,
-        mast::ExpID body_exp_id
+        mast::ExpID body_exp_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(EXP_LAMBDA);
+        auto new_node_id = help_alloc_node(EXP_LAMBDA, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_lambda;
 
         info_ptr->arg_name_count = arg_name_count;
@@ -389,9 +392,10 @@ namespace monomorphizer::mast {
     mast::ExpID new_allocate_one_exp(
         mast::ExpID stored_val_exp_id,
         AllocationTarget allocation_target,
-        bool allocation_is_mut
+        bool allocation_is_mut,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_ALLOCATE_ONE);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_ALLOCATE_ONE, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_allocate_one;
 
         info_ptr->stored_val_exp_id = stored_val_exp_id;
@@ -404,9 +408,10 @@ namespace monomorphizer::mast {
         mast::ExpID initializer_stored_val_exp_id,
         mast::ExpID alloc_count_exp,
         AllocationTarget allocation_target,
-        bool allocation_is_mut
+        bool allocation_is_mut,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_ALLOCATE_MANY);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_ALLOCATE_MANY, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_allocate_many;
 
         info_ptr->initializer_stored_val_exp_id = initializer_stored_val_exp_id;
@@ -419,9 +424,10 @@ namespace monomorphizer::mast {
     mast::ExpID new_chain_exp(
         size_t prefix_elem_id_count,
         mast::ElemID* mv_prefix_elem_id_array,
-        mast::ExpID ret_exp_id
+        mast::ExpID ret_exp_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(EXP_CHAIN);
+        auto new_node_id = help_alloc_node(EXP_CHAIN, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_chain;
 
         info_ptr->prefix_elem_count = prefix_elem_id_count;
@@ -432,9 +438,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_get_mono_module_field_exp(
         MonoModID mono_mod_id,
-        size_t field_index
+        size_t field_index,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_MONO_MODULE_FIELD);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_MONO_MODULE_FIELD, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_get_mono_module_field;
         
         info_ptr->template_id = mono_mod_id;
@@ -446,9 +453,10 @@ namespace monomorphizer::mast {
         PolyModID poly_mod_id,
         size_t field_index,
         size_t actual_arg_count,
-        mast::NodeID* mv_actual_arg_array
+        mast::NodeID* mv_actual_arg_array,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_POLY_MODULE_FIELD);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_GET_POLY_MODULE_FIELD, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_get_poly_module_field;
 
         info_ptr->template_id = poly_mod_id;
@@ -460,9 +468,10 @@ namespace monomorphizer::mast {
     }
     mast::ExpID new_cast_exp(
         mast::TypeSpecID ts_id,
-        mast::ExpID exp_id
+        mast::ExpID exp_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::EXP_CAST);
+        auto new_node_id = help_alloc_node(NodeKind::EXP_CAST, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->exp_cast;
 
         info_ptr->ts_id = ts_id;
@@ -473,9 +482,10 @@ namespace monomorphizer::mast {
 
     mast::ElemID new_bind1v_elem(
         intern::IntStr bound_id,
-        mast::ExpID init_exp_id
+        mast::ExpID init_exp_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1V);
+        auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1V, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->elem_bind1v;
 
         info_ptr->bound_id = bound_id;
@@ -486,9 +496,10 @@ namespace monomorphizer::mast {
     }
     mast::ElemID new_bind1t_elem(
         intern::IntStr bound_id,
-        mast::TypeSpecID init_ts_id
+        mast::TypeSpecID init_ts_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1T);
+        auto new_node_id = help_alloc_node(NodeKind::ELEM_BIND1T, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->elem_bind1t;
 
         info_ptr->bound_id = bound_id;
@@ -498,9 +509,10 @@ namespace monomorphizer::mast {
         return new_node_id;
     }
     mast::ElemID new_do_elem(
-        mast::ExpID eval_exp_id
+        mast::ExpID eval_exp_id,
+        size_t node_index
     ) {
-        auto new_node_id = help_alloc_node(NodeKind::ELEM_DO);
+        auto new_node_id = help_alloc_node(NodeKind::ELEM_DO, node_index);
         auto info_ptr = &get_info_ptr(new_node_id)->elem_do;
 
         info_ptr->eval_exp_id = eval_exp_id;
@@ -557,6 +569,10 @@ namespace monomorphizer::mast {
                 );
             }
         }
+    }
+
+    size_t get_source_node_index(mast::NodeID node_id) {
+        return s_mgr->source_node_index(node_id);
     }
 
 }

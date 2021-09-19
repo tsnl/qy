@@ -26,7 +26,8 @@ namespace monomorphizer::modules {
     // Monomorphic template construction:
     MonoModID new_monomorphic_module(
         char* mv_template_name,
-        PolyModID parent_template_id
+        PolyModID parent_template_id,
+        size_t source_node_index
     );
     // add_field pushes a field and returns its unique index.
     size_t add_mono_module_field(
@@ -38,7 +39,8 @@ namespace monomorphizer::modules {
     PolyModID new_polymorphic_module(
         char* mv_template_name,
         size_t bv_def_id_count,
-        GDefID* mv_bv_def_id_array
+        GDefID* mv_bv_def_id_array,
+        size_t source_node_index
     );
     // add_field pushes a field and returns the field's unique index.
     size_t add_poly_module_field(
@@ -78,6 +80,9 @@ namespace monomorphizer::modules {
     mast::ExpID get_registered_lambda_at(
         MonoModID mono_mod_id,
         size_t lambda_index
+    );
+    size_t get_mono_mod_source_node_index(
+        MonoModID mono_mod_id
     );
 
     // system info:

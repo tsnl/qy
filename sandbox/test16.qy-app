@@ -1,7 +1,7 @@
---- sub main_for_v1_default_loader ---
+--- sub entry_point_for_v1_default_loader ---
 
 forty_two = const[I32, 42]:value;
-main_for_v1_default_loader = () -> ML {};
+main_for_v1_default_loader = () -> ML {0};
 
 --- sub const[T, m] ---
 

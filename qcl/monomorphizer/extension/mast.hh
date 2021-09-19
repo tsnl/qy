@@ -235,15 +235,6 @@ namespace monomorphizer::mast {
     };
 
     //
-    // Since some expressions take no arguments, we cache a constant instead.
-    //
-
-    struct SingletonNodeCache {
-        mast::TypeSpecID ts_unit;
-        mast::ExpID exp_unit;
-    };
-
-    //
     //
     // Union of all NodeInfo:
     //
@@ -299,125 +290,148 @@ namespace monomorphizer::mast {
     //
 
     // Type-specifiers:
-    mast::TypeSpecID get_unit_ts();
-    mast::TypeSpecID new_gid_ts(GDefID def_id);
-    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id);
+    mast::TypeSpecID new_unit_ts(size_t node_index);
+    mast::TypeSpecID new_gid_ts(GDefID def_id, size_t node_index);
+    mast::TypeSpecID new_lid_ts(intern::IntStr int_str_id, size_t node_index);
     mast::TypeSpecID new_ptr_ts(
         mast::TypeSpecID ptd_ts,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     );
     mast::TypeSpecID new_array_ts(
         mast::TypeSpecID ptd_ts,
         mast::ExpID count_exp,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     );
     mast::TypeSpecID new_slice_ts(
         mast::TypeSpecID ptd_ts,
-        bool contents_is_mut
+        bool contents_is_mut,
+        size_t node_index
     );
     mast::TypeSpecID new_func_sgn_ts(
         mast::TypeSpecID arg_ts,
         mast::TypeSpecID ret_ts,
-        SES ret_ses
+        SES ret_ses,
+        size_t node_index
     );
     mast::TypeSpecID new_tuple_ts(
         size_t elem_ts_count,
-        mast::TypeSpecID* mv_elem_ts_array
+        mast::TypeSpecID* mv_elem_ts_array,
+        size_t node_index
     );
     mast::TypeSpecID new_get_mono_module_field_ts(
         MonoModID mono_mod_id,
-        size_t ts_field_ix
+        size_t ts_field_ix,
+        size_t node_index
     );
     mast::TypeSpecID new_get_poly_module_field_ts(
         PolyModID poly_mod_id,
         size_t ts_field_ix,
         size_t actual_arg_count,
-        mast::NodeID* actual_arg_array
+        mast::NodeID* actual_arg_array,
+        size_t node_index
     );
     
     // Expressions:
-    mast::ExpID get_unit_exp();
-    mast::ExpID new_int_exp(size_t mantissa, IntegerSuffix int_typing_suffix, bool is_neg);
-    mast::ExpID new_float_exp(double value, FloatSuffix float_typing_suffix);
-    mast::ExpID new_string_exp(size_t code_point_count, int* code_point_array);
-    mast::ExpID new_gid_exp(GDefID def_id);
-    mast::ExpID new_lid_exp(intern::IntStr int_str_id);
+    mast::ExpID new_unit_exp(size_t node_index);
+    mast::ExpID new_int_exp(size_t mantissa, IntegerSuffix int_typing_suffix, bool is_neg, size_t node_index);
+    mast::ExpID new_float_exp(double value, FloatSuffix float_typing_suffix, size_t node_index);
+    mast::ExpID new_string_exp(size_t code_point_count, int* code_point_array, size_t node_index);
+    mast::ExpID new_gid_exp(GDefID def_id, size_t node_index);
+    mast::ExpID new_lid_exp(intern::IntStr int_str_id, size_t node_index);
     mast::ExpID new_func_call_exp(
         mast::ExpID called_fn,
         mast::ExpID arg_exp,
-        bool call_is_non_tot
+        bool call_is_non_tot,
+        size_t node_index
     );
     mast::ExpID new_tuple_exp(
         size_t tuple_item_count,
-        mast::ExpID* mv_tuple_item_array
+        mast::ExpID* mv_tuple_item_array,
+        size_t node_index
     );
     mast::ExpID new_unary_op_exp(
         UnaryOp unary_op,
-        mast::ExpID arg_exp
+        mast::ExpID arg_exp,
+        size_t node_index
     );
     mast::ExpID new_binary_op_exp(
         BinaryOp binary_op,
         mast::ExpID lt_arg_exp,
-        mast::ExpID rt_arg_exp
+        mast::ExpID rt_arg_exp,
+        size_t node_index
     );
     mast::ExpID new_if_then_else_exp(
         mast::ExpID cond_exp,
         mast::ExpID then_exp,
-        mast::ExpID else_exp
+        mast::ExpID else_exp,
+        size_t node_index
     );
     mast::ExpID new_get_tuple_field_by_index_exp(
         mast::ExpID tuple_exp_id,
-        size_t index
+        size_t index,
+        size_t node_index
     );
     mast::ExpID new_lambda_exp(
         uint32_t arg_name_count,
         intern::IntStr* arg_name_array,
         uint32_t ctx_enclosed_item_count,
         intern::IntStr* ctx_enclosed_name_array,
-        mast::ExpID body_exp_id
+        mast::ExpID body_exp_id,
+        size_t node_index
     );
     mast::ExpID new_allocate_one_exp(
         mast::ExpID stored_val_exp_id,
         AllocationTarget allocation_target,
-        bool allocation_is_mut
+        bool allocation_is_mut,
+        size_t node_index
     );
     mast::ExpID new_allocate_many_exp(
         mast::ExpID initializer_stored_val_exp_id,
         mast::ExpID alloc_count_exp,
         AllocationTarget allocation_target,
-        bool allocation_is_mut
+        bool allocation_is_mut,
+        size_t node_index
     );
     mast::ExpID new_chain_exp(
         size_t prefix_elem_id_count,
         mast::ElemID* mv_prefix_elem_id_array,
-        mast::ExpID ret_exp_id
+        mast::ExpID ret_exp_id,
+        size_t node_index
     );
     mast::ExpID new_get_mono_module_field_exp(
         MonoModID mono_mod_id,
-        size_t exp_field_ix
+        size_t exp_field_ix,
+        size_t node_index
     );
     mast::ExpID new_get_poly_module_field_exp(
         PolyModID poly_mod_id,
         size_t exp_field_ix,
         size_t actual_arg_count,
-        mast::NodeID* actual_arg_array
+        mast::NodeID* actual_arg_array,
+        size_t node_index
     );
     mast::ExpID new_cast_exp(
         mast::TypeSpecID ts_id,
-        mast::ExpID exp_id
+        mast::ExpID exp_id,
+        size_t node_index
     );
 
     // Element creation methods:
     mast::ElemID new_bind1v_elem(
         intern::IntStr bound_id,
-        mast::ExpID init_exp_id
+        mast::ExpID init_exp_id,
+        size_t node_index
     );
     mast::ElemID new_bind1t_elem(
         intern::IntStr bound_id,
-        mast::TypeSpecID init_ts_id
+        mast::TypeSpecID init_ts_id,
+        size_t node_index
     );
     mast::ElemID new_do_elem(
-        mast::ExpID eval_exp_id
+        mast::ExpID eval_exp_id,
+        size_t node_index
     );
 
     //
@@ -426,6 +440,7 @@ namespace monomorphizer::mast {
 
     NodeKind get_node_kind(mast::NodeID node_id);
     NodeInfo* get_info_ptr(mast::NodeID node_id);
+    size_t get_source_node_index(mast::NodeID node_id);
     bool is_node_exp_not_ts(mast::NodeID node_id);
 
 }

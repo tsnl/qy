@@ -17,13 +17,24 @@ from qcl import type
 from qcl import typer
 
 
+all_node_table = []
+
+
+def get_node_by_index(node_index: int) -> "BaseNode":
+    return all_node_table[node_index]
+
+
 class BaseNode(object, metaclass=abc.ABCMeta):
     # Every node is expected to have a dataclass instance named 'DATA' on the class.
     # The below constructor services all these classes.
 
     def __init__(self, loc: "feedback.ILoc"):
+        global all_node_table
+        
         super().__init__()
         self.loc = loc
+        self.index = len(all_node_table)
+        all_node_table.append(self)
 
 
 class TypedBaseNode(BaseNode):

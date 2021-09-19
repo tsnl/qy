@@ -134,7 +134,8 @@ namespace monomorphizer::eval {
                                 char* cp_name = strdup(gdef::get_def_name(old_def_id));
                                 GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_TS, cp_name);
                                 gdef::set_def_target(new_def_id, new_target);
-                                return mast::new_gid_ts(new_def_id);
+                                auto source_index = mast::get_source_node_index(mast_ts_id);
+                                return mast::new_gid_ts(new_def_id, source_index);
                             } else {
                                 return mast_ts_id;
                             }
@@ -150,7 +151,8 @@ namespace monomorphizer::eval {
                             return mast_ts_id;
                         } else {
                             // std::cout << "INFO: REPLACEMENT: " << old_def_id << " -> " << new_def_id << std::endl;
-                            return mast::new_gid_ts(new_def_id);
+                            auto source_index = mast::get_source_node_index(mast_ts_id);
+                            return mast::new_gid_ts(new_def_id, source_index);
                         }
                     }
                     default:
@@ -165,7 +167,8 @@ namespace monomorphizer::eval {
                 auto ptd_ts = p2m_ts(old_ptd_ts, s, st, ignore_gdef_id_set, mono_mod_id);
                 bool contents_is_mut = info.contents_is_mut;
                 if (old_ptd_ts != ptd_ts) {
-                    return mast::new_ptr_ts(ptd_ts, contents_is_mut);
+                    auto source_index = mast::get_source_node_index(mast_ts_id);
+                    return mast::new_ptr_ts(ptd_ts, contents_is_mut, source_index);
                 } else {
                     return mast_ts_id;
                 }
@@ -178,9 +181,11 @@ namespace monomorphizer::eval {
                 auto old_count_exp = info.count_exp;
                 auto count_exp = p2m_exp(old_count_exp, s, st, ignore_gdef_id_set, mono_mod_id);
                 if (old_ptd_ts != ptd_ts || old_count_exp != count_exp) {
+                    auto source_index = mast::get_source_node_index(mast_ts_id);
                     return mast::new_array_ts(
                         ptd_ts, count_exp, 
-                        contents_is_mut
+                        contents_is_mut,
+                        source_index
                     );
                 } else {
                     return mast_ts_id;
@@ -192,7 +197,8 @@ namespace monomorphizer::eval {
                 auto ptd_ts = p2m_ts(old_ptd_ts, s, st, ignore_gdef_id_set, mono_mod_id);
                 bool contents_is_mut = info.contents_is_mut;
                 if (old_ptd_ts != ptd_ts) {
-                    return mast::new_slice_ts(ptd_ts, contents_is_mut);
+                    auto source_index = mast::get_source_node_index(mast_ts_id);
+                    return mast::new_slice_ts(ptd_ts, contents_is_mut, source_index);
                 } else {
                     return mast_ts_id;
                 }
@@ -214,9 +220,11 @@ namespace monomorphizer::eval {
                     new_elem_ts_array[i] = new_ts;
                 }
                 if (any_elem_changed) {
+                    auto source_index = mast::get_source_node_index(mast_ts_id);
                     return mast::new_tuple_ts(
                         elem_count,
-                        new_elem_ts_array
+                        new_elem_ts_array,
+                        source_index
                     );
                 } else {
                     delete[] new_elem_ts_array;
@@ -234,10 +242,12 @@ namespace monomorphizer::eval {
                 auto ret_ses = info->ret_ses;
 
                 if (new_arg_ts != old_arg_ts || new_ret_ts != old_ret_ts) {
+                    auto source_index = mast::get_source_node_index(mast_ts_id);
                     return mast::new_func_sgn_ts(
                         new_arg_ts,
                         new_ret_ts,
-                        ret_ses
+                        ret_ses,
+                        source_index
                     );
                 } else {
                     return mast_ts_id;
@@ -264,7 +274,8 @@ namespace monomorphizer::eval {
                 );
 
                 auto mono_mod_id = modules::instantiate_poly_mod(poly_mod_id, actual_arg_list);
-                return mast::new_get_mono_module_field_ts(mono_mod_id, info->ts_field_index);
+                auto source_index = mast::get_source_node_index(mast_ts_id);
+                return mast::new_get_mono_module_field_ts(mono_mod_id, info->ts_field_index, source_index);
             } break;
             default: {
                 // std::cout << "INFO: unknown TS node kind = " << ts_kind << std::endl;
@@ -316,7 +327,8 @@ namespace monomorphizer::eval {
                                 char* cp_name = strdup(gdef::get_def_name(old_def_id));
                                 GDefID new_def_id = gdef::declare_global_def(gdef::DefKind::CONST_EXP, cp_name);
                                 gdef::set_def_target(new_def_id, new_target);
-                                return mast::new_gid_exp(new_def_id);
+                                auto source_index = mast::get_source_node_index(mast_exp_id);
+                                return mast::new_gid_exp(new_def_id, source_index);
                             } else {
                                 return mast_exp_id;
                             }
@@ -336,7 +348,8 @@ namespace monomorphizer::eval {
                             //     << "replacing " << old_def_id << " with " << new_def_id << " such that "
                             //     << "new target is " << gdef::get_def_target(new_def_id)
                             //     << std::endl;
-                            return mast::new_gid_exp(new_def_id);
+                            auto source_index = mast::get_source_node_index(mast_exp_id);
+                            return mast::new_gid_exp(new_def_id, source_index);
                         }
                     }
                     default:
@@ -363,10 +376,12 @@ namespace monomorphizer::eval {
                     (old_arg_exp != new_arg_exp)
                 );
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_func_call_exp(
                         new_fn_exp,
                         new_arg_exp,
-                        call_is_non_tot
+                        call_is_non_tot,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -383,7 +398,8 @@ namespace monomorphizer::eval {
                 auto unary_op = info->unary_op;
 
                 if (old_arg_exp != new_arg_exp) {
-                    return mast::new_unary_op_exp(unary_op, new_arg_exp);
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
+                    return mast::new_unary_op_exp(unary_op, new_arg_exp, source_index);
                 } else {
                     return mast_exp_id;
                 }
@@ -406,10 +422,12 @@ namespace monomorphizer::eval {
                     (old_rt_arg_exp != new_rt_arg_exp)
                 );
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_binary_op_exp(
                         binary_op,
                         new_lt_arg_exp,
-                        new_rt_arg_exp
+                        new_rt_arg_exp,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -435,10 +453,12 @@ namespace monomorphizer::eval {
                     (old_else_exp != new_else_exp)
                 );
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_if_then_else_exp(
                         new_cond_exp,
                         new_then_exp,
-                        new_else_exp
+                        new_else_exp,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -457,9 +477,11 @@ namespace monomorphizer::eval {
 
                 bool changed = (old_tuple_exp != new_tuple_exp);
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_get_tuple_field_by_index_exp(
                         new_tuple_exp,
-                        index
+                        index,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -485,7 +507,8 @@ namespace monomorphizer::eval {
                 );
 
                 auto mono_mod_id = modules::instantiate_poly_mod(poly_mod_id, actual_arg_list);
-                return mast::new_get_mono_module_field_exp(mono_mod_id, info->field_index);
+                auto source_index = mast::get_source_node_index(mast_exp_id);
+                return mast::new_get_mono_module_field_exp(mono_mod_id, info->field_index, source_index);
             } break;
 
             case mast::EXP_GET_MONO_MODULE_FIELD:
@@ -517,12 +540,14 @@ namespace monomorphizer::eval {
                         ctx_enclosed_name_array[i] = info->ctx_enclosed_name_array[i];
                     }
 
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     lambda_exp_id = mast::new_lambda_exp(
                         arg_name_count, 
                         new_arg_name_array,
                         ctx_enclosed_name_count,
                         ctx_enclosed_name_array,
-                        new_body_exp_id
+                        new_body_exp_id,
+                        source_index
                     );
                 } else {
                     lambda_exp_id = mast_exp_id;
@@ -542,10 +567,12 @@ namespace monomorphizer::eval {
 
                 bool changed = (old_init_exp_id != new_init_exp_id);
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_allocate_one_exp(
                         new_init_exp_id,
                         info->allocation_target,
-                        info->allocation_is_mut
+                        info->allocation_is_mut,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -564,11 +591,13 @@ namespace monomorphizer::eval {
 
                 bool changed = (old_init_exp_id != new_init_exp_id);
                 if (changed) {
+                    auto source_index = mast::get_source_node_index(mast_exp_id);
                     return mast::new_allocate_many_exp(
                         new_init_exp_id,
                         new_count_exp_id,
                         info->allocation_target,
-                        info->allocation_is_mut
+                        info->allocation_is_mut,
+                        source_index
                     );
                 } else {
                     return mast_exp_id;
@@ -594,7 +623,8 @@ namespace monomorphizer::eval {
 
                 mast::ExpID ret_exp_id = p2m_exp(info->ret_exp_id, s, st, ignored_gdef_id_set, mono_mod_id);
 
-                return mast::new_chain_exp(elem_count, new_elem_array, ret_exp_id);
+                auto source_index = mast::get_source_node_index(mast_exp_id);
+                return mast::new_chain_exp(elem_count, new_elem_array, ret_exp_id, source_index);
             } break;
 
             case mast::EXP_TUPLE:
@@ -608,7 +638,8 @@ namespace monomorphizer::eval {
                     new_item_array[i] = p2m_exp(old_item_array[i], s, st, ignored_gdef_id_set, mono_mod_id);
                 }
 
-                return mast::new_tuple_exp(item_count, new_item_array);
+                auto source_index = mast::get_source_node_index(mast_exp_id);
+                return mast::new_tuple_exp(item_count, new_item_array, source_index);
             } break;
 
             case mast::EXP_CAST:
@@ -621,7 +652,8 @@ namespace monomorphizer::eval {
                 auto old_exp_id = info->exp_id;
                 auto new_exp_id = p2m_exp(old_exp_id, s, st, ignored_gdef_id_set, mono_mod_id);
 
-                return mast::new_cast_exp(new_ts_id, new_exp_id);
+                auto source_index = mast::get_source_node_index(mast_exp_id);
+                return mast::new_cast_exp(new_ts_id, new_exp_id, source_index);
             } break;
 
             default:
@@ -645,20 +677,23 @@ namespace monomorphizer::eval {
                 auto info = &mast::get_info_ptr(elem_id)->elem_bind1t;
                 auto bound_id = info->bound_id;
                 auto init_ts_id = p2m_ts(info->init_ts_id, s, st, ignored_gdef_id_set, mono_mod_id);
-                return mast::new_bind1t_elem(bound_id, init_ts_id);
+                auto source_index = mast::get_source_node_index(elem_id);
+                return mast::new_bind1t_elem(bound_id, init_ts_id, source_index);
             } break;
             case mast::ELEM_BIND1V:
             {
                 auto info = &mast::get_info_ptr(elem_id)->elem_bind1v;
                 auto bound_id = info->bound_id;
                 auto init_exp_id = p2m_exp(info->init_exp_id, s, st, ignored_gdef_id_set, mono_mod_id);
-                return mast::new_bind1v_elem(bound_id, init_exp_id);
+                auto source_index = mast::get_source_node_index(elem_id);
+                return mast::new_bind1v_elem(bound_id, init_exp_id, source_index);
             } break;
             case mast::ELEM_DO:
             {
                 auto info = &mast::get_info_ptr(elem_id)->elem_do;
                 auto discarded_exp_id = p2m_exp(info->eval_exp_id, s, st, ignored_gdef_id_set, mono_mod_id);
-                return mast::new_do_elem(discarded_exp_id);
+                auto source_index = mast::get_source_node_index(elem_id);
+                return mast::new_do_elem(discarded_exp_id, source_index);
             } break;
             default:
             {

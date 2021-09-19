@@ -250,7 +250,8 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     new_poly_mod_id = wrapper.w_new_polymorphic_module(
         mv_sub_mod_name,
         bv_def_id_count,
-        bv_def_id_array
+        bv_def_id_array,
+        sub_mod_exp.index
     )
 
     # declaring fields for this module given bind1v and bind1t lists
@@ -309,7 +310,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
 cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
     # Unit:
     if isinstance(ts, ast.node.UnitTypeSpec):
-        return wrapper.w_get_unit_ts()
+        return wrapper.w_new_unit_ts(ts.index)
 
     # IDs -> LIDs, GIDs:
     elif isinstance(ts, ast.node.IdTypeSpec):
@@ -342,11 +343,11 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
             s = mk_c_str_from_py_str(id_ts.name)
             int_str_id = wrapper.w_intern_string_2(s, 1)
             free_c_str_from_py_str(s)
-            return wrapper.w_new_lid_ts(int_str_id)
+            return wrapper.w_new_lid_ts(int_str_id, id_ts.index)
         else:
             # return a GID:
             def_id = get_def_id_from_def_rec(found_def_rec)
-            return wrapper.w_new_gid_ts(def_id)
+            return wrapper.w_new_gid_ts(def_id, id_ts.index)
 
     # IdTypeSpecInModule
     elif isinstance(ts, ast.node.IdTypeSpecInModule):
@@ -388,7 +389,8 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
             poly_mod_id,
             ts_field_ix,
             actual_arg_count,
-            actual_arg_array
+            actual_arg_array,
+            ts.index
         )
 
     # TupleTypeSpec
@@ -400,7 +402,8 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
         
         return wrapper.w_new_tuple_ts(
             elem_ts_count,
-            elem_ts_array
+            elem_ts_array,
+            ts.index
         )
 
     # FnSignatureTypeSpec
@@ -415,26 +418,26 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
             PySES.ST: wrapper.SES_ST,
             PySES.ML: wrapper.SES_ML
         }
-        return wrapper.w_new_func_sgn_ts(arg_ts, ret_ts, ret_ses)
+        return wrapper.w_new_func_sgn_ts(arg_ts, ret_ts, ret_ses, ts.index)
 
     # PtrTypeSpec
     elif isinstance(ts, ast.node.PtrTypeSpec):
         ptd_ts = ast_to_mast_ts(ts.ptd_ts)
         contents_is_mut = <bint> ts.is_mut
-        return wrapper.w_new_ptr_ts(ptd_ts, contents_is_mut)
+        return wrapper.w_new_ptr_ts(ptd_ts, contents_is_mut, ts.index)
 
     # ArrayTypeSpec
     elif isinstance(ts, ast.node.ArrayTypeSpec):
         ptd_ts = ast_to_mast_ts(ts.elem_ts)
         count_exp = ast_to_mast_exp(ts.array_count)
         contents_is_mut = <bint> ts.is_mut
-        return wrapper.w_new_array_ts(ptd_ts, count_exp, contents_is_mut)
+        return wrapper.w_new_array_ts(ptd_ts, count_exp, contents_is_mut, ts.index)
 
     # SliceTypeSpec
     elif isinstance(ts, ast.node.SliceTypeSpec):
         ptd_ts = ast_to_mast_ts(ts.elem_ts)
         contents_is_mut = <bint> ts.is_mut
-        return wrapper.w_new_slice_ts(ptd_ts, contents_is_mut)
+        return wrapper.w_new_slice_ts(ptd_ts, contents_is_mut, ts.index)
 
     # AdtTypeSpec
     elif isinstance(ts, ast.node.AdtTypeSpec):
@@ -448,7 +451,7 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
                 assert isinstance(elem, ast.node.Type1VElem)
                 mast_elem_ts_id = ast_to_mast_ts(elem.type_spec)
                 item_array[elem_index] = mast_elem_ts_id
-            return wrapper.w_new_tuple_ts(item_count, item_array)
+            return wrapper.w_new_tuple_ts(item_count, item_array, ts.index)
         else:
             panic("NotImplemented: ast_to_mast_ts for AdtTypeSpec with unknown ADT kind")
 
@@ -459,7 +462,7 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
 
 cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
     if isinstance(e, ast.node.UnitExp):
-        return wrapper.w_get_unit_exp()
+        return wrapper.w_new_unit_exp(e.index)
 
     elif isinstance(e, ast.node.NumberExp):
         # ExpID w_new_int_exp(size_t mantissa, IntegerSuffix int_suffix, bint is_neg)
@@ -472,7 +475,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
                 # default to F32 for static computation unless higher precision is explicitly demanded
                 float_suffix = wrapper.FS_F32
             value = float(e.value_text)
-            return wrapper.w_new_float_exp(value, float_suffix)
+            return wrapper.w_new_float_exp(value, float_suffix, e.index)
 
         elif e.is_unsigned_int:
             if width_in_bits == 128:
@@ -491,7 +494,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
                 panic("Unknown UInt size in `qcl.monomorphizer.copier.ast_to_mast_exp`")
 
             mantissa: size_t = int(e.value_text)
-            return wrapper.w_new_int_exp(mantissa, int_suffix, 0)
+            return wrapper.w_new_int_exp(mantissa, int_suffix, 0, e.index)
 
         elif e.is_signed_int:
             if width_in_bits == 64:
@@ -506,7 +509,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
                 panic("Unknown SInt size in `qcl.monomorphizer.copier.ast_to_mast_exp`")
 
             mantissa = int(e.value_text)
-            return wrapper.w_new_int_exp(mantissa, int_suffix, 0)
+            return wrapper.w_new_int_exp(mantissa, int_suffix, 0, e.index)
 
     # TODO: implement these expression handlers
     elif isinstance(e, ast.node.StringExp):
@@ -515,15 +518,15 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         code_point_array = <int*> malloc(sizeof(int) * code_point_count)
         for i in range(code_point_count):
             code_point_array[i] = e.runes[i]
-        return wrapper.w_new_string_exp(code_point_count, code_point_array)
+        return wrapper.w_new_string_exp(code_point_count, code_point_array, e.index)
 
     elif isinstance(e, ast.node.IdExp):
         if not e.found_def_rec.is_bound_globally_visible:
             int_str_id = mk_int_str_from_py_str(e.name, 0)
-            return wrapper.w_new_lid_exp(int_str_id)
+            return wrapper.w_new_lid_exp(int_str_id, e.index)
         else:
             def_id = get_def_id_from_def_rec(e.found_def_rec)
-            return wrapper.w_new_gid_exp(def_id)
+            return wrapper.w_new_gid_exp(def_id, e.index)
 
     elif isinstance(e, ast.node.IdExpInModule):
         assert len(e.data.elem_args) == 0
@@ -560,14 +563,15 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             poly_mod_id,
             exp_field_ix,
             actual_arg_count,
-            actual_arg_array
+            actual_arg_array,
+            e.index
         )
 
     elif isinstance(e, ast.node.PostfixVCallExp):
         called_exp_id = ast_to_mast_exp(e.called_exp)
         arg_exp_id = ast_to_mast_exp(e.arg_exp)
         has_se = <bint> e.has_se
-        return wrapper.w_new_func_call_exp(called_exp_id, arg_exp_id, has_se)
+        return wrapper.w_new_func_call_exp(called_exp_id, arg_exp_id, has_se, e.index)
 
     elif isinstance(e, ast.node.UnaryExp):
         unary_operator = {
@@ -577,7 +581,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             PyUnaryOp.DeRef: wrapper.UNARY_DE_REF
         }[e.unary_op]
         unary_operand = ast_to_mast_exp(e.arg_exp)
-        return wrapper.w_new_unary_op_exp(unary_operator, unary_operand)
+        return wrapper.w_new_unary_op_exp(unary_operator, unary_operand, e.index)
 
     elif isinstance(e, ast.node.BinaryExp):
         binary_operator = {
@@ -598,7 +602,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         }[e.binary_op]
         lt_operand = ast_to_mast_exp(e.lt_arg_exp)
         rt_operand = ast_to_mast_exp(e.rt_arg_exp)
-        return wrapper.w_new_binary_op_exp(binary_operator, lt_operand, rt_operand)
+        return wrapper.w_new_binary_op_exp(binary_operator, lt_operand, rt_operand, e.index)
 
     elif isinstance(e, ast.node.IfExp):
         cond_exp = ast_to_mast_exp(e.cond_exp)
@@ -606,9 +610,9 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         if e.opt_else_exp is not None:
             else_exp = ast_to_mast_exp(e.opt_else_exp)
         else:
-            else_exp = wrapper.w_get_unit_exp()
+            else_exp = wrapper.w_new_unit_exp(e.index)
 
-        return wrapper.w_new_if_then_else_exp(cond_exp, then_exp, else_exp)
+        return wrapper.w_new_if_then_else_exp(cond_exp, then_exp, else_exp, e.index)
 
     elif isinstance(e, ast.node.LambdaExp):
         # copying arg names:
@@ -638,7 +642,8 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
             arg_name_array,
             non_local_name_count,
             non_local_name_array,
-            body_exp
+            body_exp,
+            e.index
         )
 
     elif isinstance(e, ast.node.ChainExp):
@@ -664,12 +669,13 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         if e.opt_tail is not None:
             chain_ret_exp_id = ast_to_mast_exp(e.opt_tail)
         else:
-            chain_ret_exp_id = wrapper.w_get_unit_exp()
+            chain_ret_exp_id = wrapper.w_new_unit_exp(e.index)
 
         return wrapper.w_new_chain_exp(
             elem_id_count,
             elem_id_array,
-            chain_ret_exp_id
+            chain_ret_exp_id,
+            e.index
         )
 
     elif isinstance(e, ast.node.TupleExp):
@@ -678,7 +684,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         for i, it_exp in enumerate(e.items):
             item_array[i] = ast_to_mast_exp(it_exp) 
 
-        return wrapper.w_new_tuple_exp(item_count, item_array)
+        return wrapper.w_new_tuple_exp(item_count, item_array, e.index)
 
     elif isinstance(e, ast.node.GetElementByDotIndexExp):
         tuple_exp_id = ast_to_mast_exp(e.container)
@@ -686,7 +692,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         assert isinstance(index_exp, ast.node.NumberExp)
         index_int = <size_t> int(index_exp.value_text)
 
-        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, index_int)
+        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, index_int, e.index)
 
     elif isinstance(e, ast.node.GetElementByDotNameExp):
         tuple_exp_id = ast_to_mast_exp(e.container)
@@ -697,12 +703,12 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         assert field_name_py_str is not None
         assert field_index is not None
 
-        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, field_index)
+        return wrapper.w_new_get_tuple_field_by_index_exp(tuple_exp_id, field_index, e.index)
 
     elif isinstance(e, ast.node.CastExp):
         ts_id = ast_to_mast_ts(e.constructor_ts)
         exp_id = ast_to_mast_exp(e.initializer_data)
-        return wrapper.w_new_cast_exp(ts_id, exp_id)
+        return wrapper.w_new_cast_exp(ts_id, exp_id, e.index)
 
     else:
         # TODO: translate AST to MAST using the following functions:
@@ -726,16 +732,19 @@ cdef wrapper.ElemID ast_to_mast_elem(object e: ast.node.BaseElem):
     if isinstance(e, ast.node.Bind1VElem):
         return wrapper.w_new_bind1v_elem(
             mk_int_str_from_py_str(e.id_name, 0),
-            ast_to_mast_exp(e.bound_exp)
+            ast_to_mast_exp(e.bound_exp),
+            e.index
         )
     elif isinstance(e, ast.node.Bind1TElem):
         return wrapper.w_new_bind1t_elem(
             mk_int_str_from_py_str(e.id_name, 1),
-            ast_to_mast_ts(e.bound_type_spec)
+            ast_to_mast_ts(e.bound_type_spec),
+            e.index
         )
     elif isinstance(e, ast.node.ForceEvalElem):
         return wrapper.w_new_do_elem(
-            ast_to_mast_exp(e.discarded_exp)
+            ast_to_mast_exp(e.discarded_exp),
+            e.index
         )
     else:
         panic(f"Unknown element instance: {e}")
@@ -1029,18 +1038,9 @@ class PyMAST:
         ["eval_exp_id"]
     )
 
-    get_unit_ts = py_mast_get_unit_ts
-    get_unit_exp = py_mast_get_unit_exp
     get_node_kind = py_mast_get_node_kind
     get_node_info = py_mast_get_node_info
-
-cpdef object py_mast_get_unit_ts():
-    # TODO: cache this
-    return wrapper.w_get_unit_ts()
-
-cpdef object py_mast_get_unit_exp():
-    # TODO: cache this
-    return wrapper.w_get_unit_exp()
+    get_ast_node = py_mast_get_ast_node
 
 cpdef object py_mast_get_node_kind(node_id: "PyMAST.NodeID"):
     # TODO: cache this
@@ -1319,7 +1319,8 @@ cpdef object py_mast_get_node_info(node_id: "PyMAST.NodeID"):
             eval_exp_id=node_info_ptr.elem_do.eval_exp_id
         )
     raise NotImplementedError(f"`mast_get_info` for node_kind {node_kind}")
-
+cpdef py_mast_get_ast_node(node_id):
+    return ast.node.get_node_by_index(wrapper.w_get_source_node_index(node_id))
 
 # Py interface: mval:
 class PyMVal:
@@ -1474,6 +1475,7 @@ class PyModules:
     get_mono_mod_origin_sub_mod = py_modules_get_mono_mod_origin_sub_mod
     count_registered_lambdas = py_modules_count_registered_lambdas
     get_registered_lambda_at = py_modules_get_registered_lambda_at
+    get_source_sub_mod_exp = py_modules_get_sub_mod_exp
 cpdef object py_modules_count_all_mono_modules():
     return int(wrapper.w_count_all_mono_modules())
 cpdef object py_modules_get_mono_mod_field_count(wrapper.MonoModID mono_mod_id):
@@ -1489,6 +1491,8 @@ cpdef object py_modules_count_registered_lambdas(wrapper.MonoModID mono_mod_id):
     return wrapper.w_count_registered_lambdas(mono_mod_id)
 cpdef object py_modules_get_registered_lambda_at(wrapper.MonoModID mono_mod_id, size_t field_index):
     return wrapper.w_get_registered_lambda_at(mono_mod_id, field_index)
+cpdef object py_modules_get_sub_mod_exp(wrapper.MonoModID mono_mod_id):
+    return ast.node.get_node_by_index(wrapper.w_get_mono_mod_source_node_index(mono_mod_id))
 
 # Py interface: vcell
 class PyVCell:

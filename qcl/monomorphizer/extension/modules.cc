@@ -52,9 +52,11 @@ namespace monomorphizer::modules {
     static std::vector<CommonModInfo> s_mono_common_info_table;
     static std::vector<MonoModInfo> s_mono_mod_info_table;
     static std::vector< std::vector<mast::ExpID> > s_mono_mod_lambda_reg_table;
+    static std::vector<size_t> s_mono_source_node_index_table;
 
     static std::vector<CommonModInfo> s_poly_common_info_table;
     static std::vector<PolyModInfo> s_poly_custom_info_table;
+    static std::vector<size_t> s_poly_source_node_index_table;
 }
 
 //
@@ -70,13 +72,15 @@ namespace monomorphizer::modules {
     // Monomorphic template construction:
     MonoModID new_monomorphic_module(
         char* mv_name,
-        PolyModID parent_mod_id
+        PolyModID parent_mod_id,
+        size_t source_node_index
     ) {
         MonoModID id = s_mono_mod_info_table.size();
         s_mono_common_info_table.push_back({{}, mv_name});
         s_mono_mod_info_table.push_back({parent_mod_id});
         s_mono_mod_lambda_reg_table.emplace_back();
         s_mono_mod_lambda_reg_table.back().reserve(16);
+        s_mono_source_node_index_table.push_back(source_node_index);
         return id;
     }
     size_t add_mono_module_field(
@@ -99,13 +103,13 @@ namespace monomorphizer::modules {
     PolyModID new_polymorphic_module(
         char* mv_template_name,
         size_t bv_def_id_count,
-        GDefID* mv_bv_def_id_array
+        GDefID* mv_bv_def_id_array,
+        size_t source_node_index
     ) {
         PolyModID id = s_poly_custom_info_table.size();
         s_poly_common_info_table.push_back({{}, mv_template_name});
-        s_poly_custom_info_table.push_back(
-            {bv_def_id_count, mv_bv_def_id_array}
-        );
+        s_poly_custom_info_table.push_back({bv_def_id_count, mv_bv_def_id_array});
+        s_poly_source_node_index_table.push_back(source_node_index);
         return id;
     }
     size_t add_poly_module_field(
@@ -208,8 +212,10 @@ namespace monomorphizer::modules {
         {
             // creating target mono mod:
             PolyModInfo* info = &s_poly_custom_info_table[poly_mod_id];
+            size_t source_node_index = s_poly_source_node_index_table[poly_mod_id];
+            
             auto cp_name = strdup(base->name);
-            mono_mod_id = modules::new_monomorphic_module(cp_name, poly_mod_id);
+            mono_mod_id = modules::new_monomorphic_module(cp_name, poly_mod_id, source_node_index);
             
             // adding fields for (1) poly mod fields and (2) formal args
             //  - NOTE: must add poly mod fields first so indices can be blindly copied
@@ -367,6 +373,12 @@ namespace monomorphizer::modules {
         size_t index
     ) {
         return s_mono_mod_lambda_reg_table[mono_mod_id][index];
+    }
+
+    size_t get_mono_mod_source_node_index(
+        MonoModID mono_mod_id
+    ) {
+        return s_mono_source_node_index_table[mono_mod_id];
     }
 
     size_t count_all_mono_modules() {
