@@ -200,4 +200,17 @@ namespace monomorphizer::mtype {
         return s_reverse_key_table[tuple_tid].arg_list;
     }
 
+    TID get_func_tid_arg_tid(TID func_tid) {
+        return std::get<0>(s_reverse_key_table[func_tid].func_key);
+    }
+
+    TID get_func_tid_ret_tid(TID func_tid) {
+        return std::get<1>(s_reverse_key_table[func_tid].func_key);
+    }
+
+    SES get_func_tid_ses(TID func_tid) {
+        return std::get<2>(s_reverse_key_table[func_tid].func_key);
+    }
+
+
 }

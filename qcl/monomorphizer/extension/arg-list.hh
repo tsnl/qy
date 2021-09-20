@@ -28,6 +28,8 @@ namespace monomorphizer::arg_list {
     ArgListID tail(
         ArgListID arg_list_id
     );
+    inline size_t arg_list_head_compatibility(ArgListID arg_list_id) { return head(arg_list_id); }
+    inline ArgListID arg_list_tail_compatibility(ArgListID arg_list_id) { return tail(arg_list_id); }
 
     ArgListID empty_arg_list_id();
     size_t count_arg_list_items(ArgListID arg_list_id);

@@ -9,6 +9,8 @@ modules = copier.PyModules
 intstr = copier.PyIntStr
 gdef = copier.PyGDef
 vcell = copier.PyVCell
+mtype = copier.PyMType
+arg_list = copier.PyArgList
 
 
 def run(project):

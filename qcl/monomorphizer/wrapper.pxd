@@ -220,6 +220,25 @@ cdef extern from "extension/vcell.hh" namespace "monomorphizer::vcell":
 
 
 #
+# MType:
+#
+
+cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
+    enum TypeKind:
+        TK_ERROR = 0,
+        TK_UNIT,
+        TK_U1, TK_U8, TK_U16, TK_U32, TK_U64,
+        TK_S8, TK_S16, TK_S32, TK_S64,
+        TK_F32, TK_F64,
+        TK_STRING,
+        TK_TUPLE,
+        TK_POINTER,
+        TK_ARRAY,
+        TK_SLICE,
+        TK_FUNCTION
+
+
+#
 #
 # Interface:
 #
@@ -523,12 +542,16 @@ cdef:
 
     # instantiation:
     # turn a PolyModID into a MonoModID using some template arguments.
-    MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
+    MonoModID w_instantiate_poly_mod(
+        PolyModID poly_mod_id, 
+        ArgListID arg_list_id
+    );
 
     # reading back mono modules:
     size_t w_count_all_mono_modules()
     size_t w_count_registered_lambdas(MonoModID mono_mod_id)
     ExpID w_get_registered_lambda_at(MonoModID mono_mod_id, size_t index)
+    ArgListID w_get_instantiation_arg_list_id(MonoModID mono_mod_id)
 
 #
 # Interning:
@@ -556,6 +579,8 @@ cdef:
 
 cdef:
     ArgListID w_empty_arg_list_id()
+    size_t w_arg_list_head(ArgListID arg_list_id)
+    ArgListID w_arg_list_tail(ArgListID arg_list_id)
 
 
 #
@@ -608,3 +633,15 @@ cdef:
 
 cdef:
     VID w_get_vcell_val(VCellID vcell_id)
+
+#
+# MType:
+#
+
+cdef:
+    TypeKind w_kind_of_tid(TID mtid)
+    size_t w_get_tuple_count(TID tuple_mtid)
+    ArgListID w_get_tuple_arg_list(TID tuple_mtid)
+    TID w_get_func_mtid_arg_mtid(TID func_mtid)
+    TID w_get_func_mtid_ret_mtid(TID func_mtid)
+    SES w_get_func_mtid_ses(TID func_mtid)

@@ -257,25 +257,29 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     # declaring fields for this module given bind1v and bind1t lists
     # (in this order)
     sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer = [
-        wrapper.w_add_poly_module_field(
+        int(wrapper.w_add_poly_module_field(
             new_poly_mod_id,
             wrapper.w_declare_global_def(wrapper.CONST_EXP, mk_c_str_from_py_str(bind1v_def_obj.name))
-        )
+        ))
         for bind1v_ast_node, bind1v_def_obj in zip(
             sub_mod_exp.table.ordered_value_imp_bind_elems,
             sub_mod_exp.bind1v_def_obj_list_from_typer
         )
     ]
     sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer = [
-        wrapper.w_add_poly_module_field(
+        int(wrapper.w_add_poly_module_field(
             new_poly_mod_id,
             wrapper.w_declare_global_def(wrapper.CONST_TS, mk_c_str_from_py_str(bind1t_def_obj.name))
-        )
+        ))
         for bind1t_ast_node, bind1t_def_obj in zip(
             sub_mod_exp.table.ordered_type_bind_elems,
             sub_mod_exp.bind1t_def_obj_list_from_typer
         )
     ]
+    # b1v_count = len(sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer)
+    # assert b1v_count == len(set(sub_mod_exp.mast_bind1v_field_index_mapping_from_monomorphizer))
+    # b1t_count = len(sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer)
+    # assert b1t_count == len(set(sub_mod_exp.mast_bind1t_field_index_mapping_from_monomorphizer))
 
     # saving template formal args' GDefIDs for later in `gdef_map`
     for i, bv_arg_def_obj in enumerate(sub_mod_exp.template_def_list_from_typer):
@@ -866,8 +870,12 @@ cdef instantiate_entry_point(object proj: frontend.Project):
 
     # instantiating this entry-point sub-module:
     #   - it acts as the root of all monomorphic global discovery
+    # TODO: pass args here
     entry_point_poly_mod_id = poly_mod_id_map[entry_point_sub_mod_exp]
-    wrapper.w_instantiate_poly_mod(entry_point_poly_mod_id, wrapper.w_empty_arg_list_id())
+    wrapper.w_instantiate_poly_mod(
+        entry_point_poly_mod_id, 
+        wrapper.w_empty_arg_list_id()
+    )
 
 
 #
@@ -1475,6 +1483,7 @@ class PyModules:
     get_mono_mod_origin_sub_mod = py_modules_get_mono_mod_origin_sub_mod
     count_registered_lambdas = py_modules_count_registered_lambdas
     get_registered_lambda_at = py_modules_get_registered_lambda_at
+    get_instantiation_arg_list_id = py_modules_get_instantiation_arg_list_id
     get_source_sub_mod_exp = py_modules_get_sub_mod_exp
 cpdef object py_modules_count_all_mono_modules():
     return int(wrapper.w_count_all_mono_modules())
@@ -1491,6 +1500,8 @@ cpdef object py_modules_count_registered_lambdas(wrapper.MonoModID mono_mod_id):
     return wrapper.w_count_registered_lambdas(mono_mod_id)
 cpdef object py_modules_get_registered_lambda_at(wrapper.MonoModID mono_mod_id, size_t field_index):
     return wrapper.w_get_registered_lambda_at(mono_mod_id, field_index)
+cpdef object py_modules_get_instantiation_arg_list_id(wrapper.MonoModID mono_mod_id):
+    return wrapper.w_get_instantiation_arg_list_id(mono_mod_id)
 cpdef object py_modules_get_sub_mod_exp(wrapper.MonoModID mono_mod_id):
     return ast.node.get_node_by_index(wrapper.w_get_mono_mod_source_node_index(mono_mod_id))
 
@@ -1518,11 +1529,9 @@ class PyGDef:
         ConstTypeSpec = wrapper.CONST_TS
         ConstTotVal = wrapper.CONST_TOT_VAL
         ConstTotTID = wrapper.CONST_TOT_TID
-
     get_def_kind = py_gdef_get_def_kind
     get_def_name = py_gdef_get_def_name
     get_def_target = py_gdef_get_def_target
-    
 cpdef object py_gdef_get_def_kind(wrapper.GDefID def_id):
     return {
         wrapper.BV_EXP: PyGDef.DefKind.BoundVarExp,
@@ -1532,15 +1541,91 @@ cpdef object py_gdef_get_def_kind(wrapper.GDefID def_id):
         wrapper.CONST_TOT_VAL: PyGDef.DefKind.ConstTotVal,
         wrapper.CONST_TOT_TID: PyGDef.DefKind.ConstTotTID
     }[wrapper.w_get_def_kind(def_id)]
-
 cpdef object py_gdef_get_def_name(wrapper.GDefID def_id):
     return (<bytes>wrapper.w_get_def_name(def_id)).decode('utf-8')
-
 cpdef object py_gdef_get_def_target(wrapper.GDefID def_id):
     return wrapper.w_get_def_target(def_id)
 
-# TODO: add an interface to mtype/TID?
-#   - may be required by PyGDef
+# Py interface: MType
+class PyMType:
+    class TypeKind(enum.Enum):
+        Error = wrapper.TK_ERROR,
+        Unit = wrapper.TK_UNIT
+        U1 = wrapper.TK_U1,
+        U8 = wrapper.TK_U8,
+        U16 = wrapper.TK_U16,
+        U32 = wrapper.TK_U32,
+        U64 = wrapper.TK_U64,
+        S8 = wrapper.TK_S8,
+        S16 = wrapper.TK_S16,
+        S32 = wrapper.TK_S32,
+        S64 = wrapper.TK_S64,
+        F32 = wrapper.TK_F32,
+        F64 = wrapper.TK_F64,
+        String = wrapper.TK_STRING,
+        Tuple = wrapper.TK_TUPLE,
+        Pointer = wrapper.TK_POINTER,
+        Array = wrapper.TK_ARRAY,
+        Slice = wrapper.TK_SLICE,
+        Function = wrapper.TK_FUNCTION
+    kind_of_tid = py_mtype_kind_of_tid
+    get_tuple_count = py_mtype_get_tuple_count
+    get_tuple_arg_list = py_mtype_get_tuple_arg_list
+    get_func_mtid_arg_mtid = py_mtype_get_func_mtid_arg_mtid
+    get_func_mtid_ret_mtid = py_mtype_get_func_mtid_ret_mtid
+    get_func_mtid_ses = py_mtype_get_func_mtid_ses
+cpdef object py_mtype_kind_of_tid(mtid: int):
+    return {
+        wrapper.TK_ERROR: PyMType.TypeKind.Error,
+        wrapper.TK_UNIT: PyMType.TypeKind.Unit,
+        wrapper.TK_U1: PyMType.TypeKind.U1,
+        wrapper.TK_U8: PyMType.TypeKind.U8,
+        wrapper.TK_U16: PyMType.TypeKind.U16,
+        wrapper.TK_U32: PyMType.TypeKind.U32,
+        wrapper.TK_U64: PyMType.TypeKind.U64,
+        wrapper.TK_S8: PyMType.TypeKind.S8,
+        wrapper.TK_S16: PyMType.TypeKind.S16,
+        wrapper.TK_S32: PyMType.TypeKind.S32,
+        wrapper.TK_S64: PyMType.TypeKind.S64,
+        wrapper.TK_F32: PyMType.TypeKind.F32,
+        wrapper.TK_F64: PyMType.TypeKind.F64,
+        wrapper.TK_STRING: PyMType.TypeKind.String,
+        wrapper.TK_TUPLE: PyMType.TypeKind.Tuple,
+        wrapper.TK_POINTER: PyMType.TypeKind.Pointer,
+        wrapper.TK_ARRAY: PyMType.TypeKind.Array,
+        wrapper.TK_SLICE: PyMType.TypeKind.Slice,
+        wrapper.TK_FUNCTION: PyMType.TypeKind.Function,
+    }[wrapper.w_kind_of_tid(mtid)]
+cpdef object py_mtype_get_tuple_count(object tuple_mtid: int):
+    return wrapper.w_get_tuple_count(tuple_mtid)
+cpdef object py_mtype_get_tuple_arg_list(object tuple_mtid: int):
+    return wrapper.w_get_tuple_arg_list(tuple_mtid)
+cpdef object py_mtype_get_func_mtid_arg_mtid(object func_mtid: int):
+    return wrapper.w_get_func_mtid_arg_mtid(func_mtid)
+cpdef object py_mtype_get_func_mtid_ret_mtid(object func_mtid: int):
+    return wrapper.w_get_func_mtid_ret_mtid(func_mtid)
+cpdef object py_mtype_get_func_mtid_ses(object func_mtid: int):
+    return {
+        wrapper.SES_ML: type.side_effects.SES.ML,
+        wrapper.SES_ST: type.side_effects.SES.ST,
+        wrapper.SES_EXN: type.side_effects.SES.Exn,
+        wrapper.SES_DV: type.side_effects.SES.Dv,
+        wrapper.SES_TOT: type.side_effects.SES.Tot
+    }[wrapper.w_get_func_mtid_ses(func_mtid)]
+
+# Py interface: ArgList
+class PyArgList:
+    empty_arg_list_id = py_arg_list_empty_arg_list_id
+    head = py_arg_list_head
+    tail = py_arg_list_tail
+
+cpdef object py_arg_list_empty_arg_list_id():
+    return wrapper.w_empty_arg_list_id()
+cpdef object py_arg_list_head(wrapper.ArgListID arg_list):
+    return wrapper.w_arg_list_head(arg_list)
+cpdef object py_arg_list_tail(wrapper.ArgListID arg_list):
+    return wrapper.w_arg_list_tail(arg_list)
+
 
 # TODO: when implementing Feedback...
 #   - tabulate all ILoc instances

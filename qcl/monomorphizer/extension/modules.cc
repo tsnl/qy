@@ -53,6 +53,7 @@ namespace monomorphizer::modules {
     static std::vector<MonoModInfo> s_mono_mod_info_table;
     static std::vector< std::vector<mast::ExpID> > s_mono_mod_lambda_reg_table;
     static std::vector<size_t> s_mono_source_node_index_table;
+    static std::vector<size_t> s_mono_instantiation_arg_list_id;
 
     static std::vector<CommonModInfo> s_poly_common_info_table;
     static std::vector<PolyModInfo> s_poly_custom_info_table;
@@ -73,7 +74,8 @@ namespace monomorphizer::modules {
     MonoModID new_monomorphic_module(
         char* mv_name,
         PolyModID parent_mod_id,
-        size_t source_node_index
+        size_t source_node_index,
+        size_t instantiation_arg_list_id
     ) {
         MonoModID id = s_mono_mod_info_table.size();
         s_mono_common_info_table.push_back({{}, mv_name});
@@ -81,6 +83,7 @@ namespace monomorphizer::modules {
         s_mono_mod_lambda_reg_table.emplace_back();
         s_mono_mod_lambda_reg_table.back().reserve(16);
         s_mono_source_node_index_table.push_back(source_node_index);
+        s_mono_instantiation_arg_list_id.push_back(instantiation_arg_list_id);
         return id;
     }
     size_t add_mono_module_field(
@@ -215,7 +218,12 @@ namespace monomorphizer::modules {
             size_t source_node_index = s_poly_source_node_index_table[poly_mod_id];
             
             auto cp_name = strdup(base->name);
-            mono_mod_id = modules::new_monomorphic_module(cp_name, poly_mod_id, source_node_index);
+            mono_mod_id = modules::new_monomorphic_module(
+                cp_name, 
+                poly_mod_id, 
+                source_node_index,
+                arg_list_id
+            );
             
             // adding fields for (1) poly mod fields and (2) formal args
             //  - NOTE: must add poly mod fields first so indices can be blindly copied
@@ -379,6 +387,12 @@ namespace monomorphizer::modules {
         MonoModID mono_mod_id
     ) {
         return s_mono_source_node_index_table[mono_mod_id];
+    }
+
+    arg_list::ArgListID get_instantiation_arg_list_id(
+        MonoModID mono_mod_id
+    ) {
+        return s_mono_instantiation_arg_list_id[mono_mod_id];
     }
 
     size_t count_all_mono_modules() {

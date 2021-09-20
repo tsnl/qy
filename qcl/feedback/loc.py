@@ -48,4 +48,4 @@ class TextFileLoc(ILoc):
             else:
                 return f"{self.start_line}:{self.start_column}-{self.end_column}"
         else:
-            return f"{self.start_line}:{self.end_column}-{self.end_line}:{self.end_column}"
+            return f"{self.start_line}:{self.start_column}-{self.end_line}:{self.end_column}"

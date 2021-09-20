@@ -27,7 +27,8 @@ namespace monomorphizer::modules {
     MonoModID new_monomorphic_module(
         char* mv_template_name,
         PolyModID parent_template_id,
-        size_t source_node_index
+        size_t source_node_index,
+        arg_list::ArgListID instantiation_arg_list_id
     );
     // add_field pushes a field and returns its unique index.
     size_t add_mono_module_field(
@@ -82,6 +83,9 @@ namespace monomorphizer::modules {
         size_t lambda_index
     );
     size_t get_mono_mod_source_node_index(
+        MonoModID mono_mod_id
+    );
+    arg_list::ArgListID get_instantiation_arg_list_id(
         MonoModID mono_mod_id
     );
 

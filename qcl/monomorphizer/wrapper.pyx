@@ -22,6 +22,8 @@ cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
     extern const ArgListID EMPTY_ARG_LIST
 cdef extern from "extension/arg-list.hh" namespace "monomorphizer::arg_list":
     ArgListID empty_arg_list_id()
+    size_t arg_list_head_compatibility(ArgListID arg_list_id)
+    ArgListID arg_list_tail_compatibility(ArgListID arg_list_id)
 
 
 # defs:
@@ -78,12 +80,16 @@ cdef extern from "extension/modules.hh" namespace "monomorphizer::modules":
 
     # instantiation:
     # turn a PolyModID into a MonoModID using some template arguments.
-    MonoModID instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id);
+    MonoModID instantiate_poly_mod(
+        PolyModID poly_mod_id, 
+        ArgListID arg_list_id
+    );
 
     # system info:
     size_t count_all_mono_modules()
     size_t count_registered_lambdas(MonoModID mono_mod_id)
     ExpID get_registered_lambda_at(MonoModID mono_mod_id, size_t index)
+    ArgListID get_instantiation_arg_list_id(MonoModID mono_mod_id)
 
 # mast:
 cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
@@ -213,6 +219,13 @@ cdef extern from "extension/mtype.hh" namespace "monomorphizer::mtype":
     TID get_array_tid(TID ptd_tid, VID count_val_id, bint contents_is_mut);
     TID get_slice_tid(TID ptd_tid, bint contents_is_mut);
     TID get_function_tid(TID arg_tid, TID ret_tid, SES ses);
+
+    TypeKind kind_of_tid(TID tid);
+    size_t get_tuple_count(TID tuple_tid);
+    ArgListID get_tuple_arg_list(TID tuple_tid);
+    TID get_func_tid_arg_tid(TID func_tid)
+    TID get_func_tid_ret_tid(TID func_tid)
+    SES get_func_tid_ses(TID func_tid)
 
 # mval:
 cdef extern from "extension/mval.hh" namespace "monomorphizer::mval":
@@ -446,8 +459,14 @@ cdef:
 
     # instantiation:
     # turn a PolyModID into a MonoModID using some template arguments.
-    MonoModID w_instantiate_poly_mod(PolyModID poly_mod_id, ArgListID arg_list_id):
-        return instantiate_poly_mod(poly_mod_id, arg_list_id)
+    MonoModID w_instantiate_poly_mod(
+        PolyModID poly_mod_id, 
+        ArgListID arg_list_id
+    ):
+        return instantiate_poly_mod(
+            poly_mod_id,
+            arg_list_id
+        )
 
     # mono module count:
     size_t w_count_all_mono_modules():
@@ -458,6 +477,9 @@ cdef:
     
     ExpID w_get_registered_lambda_at(MonoModID mono_mod_id, size_t index):
         return get_registered_lambda_at(mono_mod_id, index)
+
+    ArgListID w_get_instantiation_arg_list_id(MonoModID mono_mod_id):
+        return get_instantiation_arg_list_id(mono_mod_id)
 
 
 # interning:
@@ -483,6 +505,10 @@ cdef:
 cdef:
     ArgListID w_empty_arg_list_id():
         return empty_arg_list_id()
+    size_t w_arg_list_head(ArgListID arg_list_id):
+        return arg_list_head_compatibility(arg_list_id)
+    ArgListID w_arg_list_tail(ArgListID arg_list_id):
+        return arg_list_tail_compatibility(arg_list_id)
 
 
 # MType:
@@ -559,3 +585,19 @@ cdef:
 cdef:
     VID w_get_vcell_val(VCellID vcell_id):
         return get_vcell_val(vcell_id)
+
+
+# MType:
+cdef:
+    TypeKind w_kind_of_tid(TID tid):
+        return kind_of_tid(tid)
+    size_t w_get_tuple_count(TID tuple_tid):
+        return get_tuple_count(tuple_tid)
+    ArgListID w_get_tuple_arg_list(TID tuple_tid):
+        return get_tuple_arg_list(tuple_tid)
+    TID w_get_func_mtid_arg_mtid(TID func_mtid):
+        return get_func_tid_arg_tid(func_mtid)
+    TID w_get_func_mtid_ret_mtid(TID func_mtid):
+        return get_func_tid_ret_tid(func_mtid)
+    SES w_get_func_mtid_ses(TID func_mtid):
+        return get_func_tid_ses(func_mtid)
