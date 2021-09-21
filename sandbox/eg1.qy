@@ -1,0 +1,42 @@
+# Qy is a statically typed programming language designed to be JITed.
+
+# the user may define macros that can be expanded ONLY in blocks
+#   - macro expansions are automatically guarded (like C headers)
+#   - macro definitions cannot be nested
+#   - use `expand` to expand a macro
+
+--- macro defVector3 (T) ---
+
+def Vector3<T> = struct {
+    x: T,
+    y: T,
+    z: T
+};
+val add:   Method<Vector3<T>, Fn<Vector3<T>, Vector3<T>>>;
+val scale: Method<Vector3<T>, Fn<T,          Vector3<T>>>;
+fun add (v) (u) = {
+    Vector3<T> (
+        v.x + u.x,
+        v.y + u.y,
+        v.z + u.z
+    )
+};
+fun scale (v) (s) = {
+    Vector3<T> (
+        v.x * s,
+        v.y * s,
+        v.z * s
+    )
+};
+
+--- macro entryPoint ---
+
+expand defVector3(Float32);
+expand defVector3(Float64);
+
+def Vector3f = Vector3<Float32>;
+def Vector3i = Vector3<Int32>;
+
+fun main() = {
+    0
+};
