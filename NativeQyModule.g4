@@ -237,7 +237,6 @@ binaryTypeSpec
     ;
 bulkyTypeSpec
     : through=binaryTypeSpec                        #throughBulkyTypeSpec
-    | 'NoCtxPtr' '{' nested=binaryTypeSpec '}'      #noClosureTypeSpec
     ;
 
 //

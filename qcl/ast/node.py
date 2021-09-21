@@ -46,7 +46,6 @@ class TypedBaseNode(BaseNode):
         super().__init__(loc)
         self.x_tid = None       # types-ID: the value of this expression is always of this types
         self.x_ses = None       # side-effects-specifier: what capabilities does this expression need?
-        self.x_cs = None        # closure-spec: what memory does this expression need?
         self.x_ctx = None       # context: semantics of where expression is used
         self.x_rml = None       # rel memory loc: for mem-window types, handles where memory is stored.
 
@@ -63,10 +62,6 @@ class TypedBaseNode(BaseNode):
         return self.x_ctx
 
     @property
-    def cs(self) -> t.Optional["types.closure_spec.CS"]:
-        return self.x_cs
-
-    @property
     def type_info_finalized(self):
         is_finalized = self.x_tid is not None
         if is_finalized:
@@ -77,13 +72,11 @@ class TypedBaseNode(BaseNode):
             self,
             tid: "types.identity.TID",
             ses: "types.side_effects.SES",
-            cs: "types.closure_spec.CS",
             ctx: "typer.context.Context"
     ):
         assert not self.type_info_finalized
         self.x_tid = tid
         self.x_ses = ses
-        self.x_cs = cs
         self.x_ctx = ctx
 
 
@@ -225,7 +218,12 @@ class IdExp(BaseExp):
 
 
 class LambdaExp(BaseExp):
-    def __init__(self, loc: "feedback.ILoc", arg_names: t.List[str], body: BaseExp):
+    def __init__(
+            self,
+            loc: "feedback.ILoc",
+            arg_names: t.List[str],
+            body: BaseExp
+    ):
         super().__init__(loc)
         self.arg_names = arg_names
         self.body = body
@@ -510,17 +508,12 @@ class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
     opt_ses: t.Optional["types.side_effects.SES"]
-    closure_spec: "types.closure_spec.CS"
-
+    
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)
         self.arg_type_spec = arg_type_spec
         self.return_type_spec = return_type_spec
         self.opt_ses = opt_ses
-
-        # by default, the closure spec is `Yes`, since our language uses fat
-        # pointers internally.
-        self.closure_spec = types.closure_spec.CS.Yes
 
 
 class BaseMemWindowTypeSpec(BaseTypeSpec, metaclass=abc.ABCMeta):

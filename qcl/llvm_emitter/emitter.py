@@ -19,8 +19,11 @@ LambdaRegistrationRecord = namedtuple(
 
 
 class Emitter(object):
-    def __init__(self) -> None:
+    def __init__(self, size_t_width_in_bits) -> None:
         super().__init__()
+
+        self.size_t_width_in_bits = size_t_width_in_bits
+        assert self.size_t_width_in_bits in (32, 64)
 
         # LLVM IR stuff:
         self.llvm_module = llvm_ir.Module("default_qy_module")
@@ -42,7 +45,7 @@ class Emitter(object):
         # Each record contains a `MonoModID` that contains this lambda as well as a registration index.
         self.lambda_registration_map = defaultdict(lambda: defaultdict(list))
 
-        self._build_caches()
+        self.build_caches()
 
         #
         # Declaration maps:
@@ -53,12 +56,12 @@ class Emitter(object):
         self.synthetic_function_map = {}
 
     def emit_project(self, output_ir_file_path: str):
-        self._emit_declarations()
-        self._emit_definitions()
+        self.emit_declarations()
+        self.emit_definitions()
         with open(output_ir_file_path, "w") as output_ir_file:
             print(self.llvm_module, file=output_ir_file)
 
-    def _build_caches(self):
+    def build_caches(self):
         # acquiring the total number of MonoModIDs in the system:
         mono_mod_count = mm.modules.count_all_mono_modules()
 
@@ -113,13 +116,7 @@ class Emitter(object):
                     )
                 )
 
-    def _emit_declarations(self):
-        # TODO:
-        #   - iterate through each registered Lambda and declare a synthetic function as required
-        #   - associate this synthetic lambda with
-        # raise NotImplementedError("_emit_declarations")
-        print("WARNING: placeholder `_emit_declarations`")
-
+    def emit_declarations(self):
         synthetic_index = 0
         for ast_lambda_exp, mono_mod_lambda_reg_rec_map in self.lambda_registration_map.items():
             for mono_mod_id, lambda_reg_rec_list in mono_mod_lambda_reg_rec_map.items():
@@ -128,39 +125,62 @@ class Emitter(object):
                 for lambda_reg_rec in lambda_reg_rec_list:
                     assert isinstance(lambda_reg_rec, LambdaRegistrationRecord)
 
-                    synthetic_name = f"synthetic_function{{index:{synthetic_index},loc:{ast_lambda_exp.loc}}}"
+                    self.emit_lambda_declaration(
+                        synthetic_index,
+                        ast_lambda_exp,
+                        lambda_reg_rec,
+                        mono_mod_instantiation_sub
+                    )
                     synthetic_index += 1
 
-                    # TODO: compute `fn_ty` by exporting lambda function types
-                    #   - can save LambdaExp TIDs
-                    assert isinstance(ast_lambda_exp, ast.node.LambdaExp)
-                    for non_local_name, non_local_def_rec in ast_lambda_exp.non_local_name_map.items():
-                        print(f"- implicit argument: ", non_local_name, flush=True)
-                    # lambda_reg_rec.container_mono_mod_id
-                    # lambda_reg_rec.lambda_registration_index
-                    # lambda_reg_rec.mast_node_id
-                    # llvm_fn_type = ir.FunctionType(llvm_ret_type, llvm_arg_types)
-                    native_fn_type = mono_mod_instantiation_sub.rewrite_type(ast_lambda_exp.x_tid)
-                    llvm_fn_type = self.emit_llvm_type_for_tid(native_fn_type)
-                    # llvm_fn_type = llvm_ir.FunctionType(llvm_ir.VoidType(), ())
+    def emit_lambda_declaration(self, synthetic_index, ast_lambda_exp, lambda_reg_rec, mono_mod_instantiation_sub):
+        """
+        We map each LambdaRegistrationRecord to an LLVM function such that each Lambda we emit in every MonoModID gets
+        declared ahead of time.
+        This function declares these functions and stores their data on `builder` and maps on `self`.
+        NOTE: if a function accepts implicit arguments, they must be bundled into an extra argument
+            - if the argument is less than `size_t` bytes in size, it is passed directly as an argument
+            - otherwise, it is passed using a pointer
+            - regardless of whether this slot is used, we pass a `size_t` arg to every function called `implicit_args`
+        :param synthetic_index: a unique index for this synthetic function
+        :param ast_lambda_exp: the polymorphic lambda for which this declaration is.
+        :param lambda_reg_rec: the registration record for the monomorphic lambda.
+        :param mono_mod_instantiation_sub: a sub used to monomorphize types
+        """
 
-                    # TODO: create a function declaration
-                    llvm_fn = llvm_ir.Function(self.llvm_module, llvm_fn_type, name=synthetic_name)
+        synthetic_name = f"synthetic_function{{index:{synthetic_index},loc:{ast_lambda_exp.loc}}}"
 
-                    # TODO: store the `llvm_fn` instance on a map associated with this `lambda_reg_rec.mast_node_id`
-                    #   - when emitting definitions, any instances of this ID evaluate to this `Fn`
-                    self.synthetic_function_map[lambda_reg_rec] = llvm_fn
+        # checking whether this lambda accepts
+        assert isinstance(ast_lambda_exp, ast.node.LambdaExp)
+        has_implicit_args = bool(ast_lambda_exp.non_local_name_map)
 
-    def _emit_definitions(self):
+        native_fn_type = mono_mod_instantiation_sub.rewrite_type(ast_lambda_exp.x_tid)
+        assert types.kind.of(native_fn_type) == types.kind.TK.Fn
+
+        for non_local_name, non_local_def_rec in ast_lambda_exp.non_local_name_map.items():
+            print(f"- implicit argument: ", non_local_name, flush=True)
+
+        llvm_fn_type = self.emit_llvm_type_for_tid(native_fn_type)
+        llvm_fn = llvm_ir.Function(self.llvm_module, llvm_fn_type, name=synthetic_name)
+
+        # store the `llvm_fn` instance on a map associated with this `lambda_reg_rec.mast_node_id`
+        #   - when emitting definitions, any instances of this ID evaluate to this `Fn`
+        self.synthetic_function_map[lambda_reg_rec] = llvm_fn
+
+    def emit_definitions(self):
         # acquiring the total number of MonoModIDs in the system:
         mono_mod_count = mm.modules.count_all_mono_modules()
 
-        # iterating through each MonoModID (order-independent):
+        # iterating through each MonoModID (order-independent) to emit lambda definitions and global variable bindings:
         for mono_mod_id in range(mono_mod_count):
             # acquiring MonoMod props:
             source_sub_mod_exp = mm.modules.get_source_sub_mod_exp(mono_mod_id)
             instantiation_arg_list_id = mm.modules.get_instantiation_arg_list_id(mono_mod_id)
+            instantiation_sub = self.mono_mod_instantiation_sub_map[mono_mod_id]
             assert isinstance(source_sub_mod_exp, ast.node.SubModExp)
+
+            # iterating through each registered lambda:
+            # TODO: implement me
 
             # iterating through each Bind1VElement in the SubModExp for this MonoModID:
             for field_ix, bind_elem in zip(
@@ -217,9 +237,7 @@ class Emitter(object):
         elif mt_kind == mm.mtype.TypeKind.F64:
             return llvm_ir.DoubleType()
         elif mt_kind == mm.mtype.TypeKind.String:
-            return self._emit_llvm_type_for_string()
-        elif mt_kind == mm.mtype.TypeKind.Function:
-            return self._emit_llvm_type_for_function()
+            return self.emit_llvm_type_for_string()
         else:
             raise NotImplementedError(f"Translating unknown MTypeKind to LLVM IR: {mt_kind}")
 
@@ -238,19 +256,28 @@ class Emitter(object):
             else:
                 raise NotImplementedError(f"Unknown LLVM Type for floating point type F{width_in_bits}")
         elif tk == types.kind.TK.String:
-            return self._emit_llvm_type_for_string()
+            return self.emit_llvm_type_for_string()
+        elif tk == types.kind.TK.Fn:
+            native_arg_tid = types.elem.tid_of_fn_arg(tid)
+            native_ret_tid = types.elem.tid_of_fn_ret(tid)
+            llvm_arg_type = self.emit_llvm_type_for_tid(native_arg_tid)
+            llvm_ret_type = self.emit_llvm_type_for_tid(native_ret_tid)
+            return self.emit_llvm_type_for_function(llvm_arg_type, llvm_ret_type)
+        elif tk in (types.kind.TK.Tuple, types.kind.TK.Struct):
+            elem_count = types.elem.count(tid)
+            return llvm_ir.LiteralStructType([
+                self.emit_llvm_type_for_tid(types.elem.tid_of_field_ix(tid, elem_index))
+                for elem_index in range(elem_count)
+            ], packed=False)
         else:
-            raise NotImplementedError("Translating unknown TID into LLVM")
+            raise NotImplementedError(f"Translating unknown TID into LLVM: {types.spelling.of(tid)}")
 
-    def _emit_llvm_type_for_string(self):
+    def emit_llvm_type_for_string(self):
         raise NotImplementedError("Translating String type to LLVM")
 
-    def _emit_llvm_type_for_function(self):
-        # TODO: acquire enclosed IDs' types
-        # TODO: acquire argument IDs' types
-        # TODO: acquire return type
-        # Can figure these out using the ArgListID
-        raise NotImplementedError("Translating Function type to LLVM")
+    def emit_llvm_type_for_function(self, llvm_arg_type, llvm_ret_type):
+        implicit_args_type = llvm_ir.IntType(self.size_t_width_in_bits)
+        return llvm_ir.FunctionType(llvm_ret_type, (llvm_arg_type, implicit_args_type))
 
     def compute_instantiation_sub(
             self,
@@ -272,7 +299,7 @@ class Emitter(object):
 
             # filtering only MTypeIDs:
             if isinstance(template_arg_def_rec, typer.definition.TypeRecord):
-                actual_tid = self._translate_mtid_to_tid_for_arg_list(id_from_arg_list)
+                actual_tid = self.translate_mtid_to_tid_for_arg_list(id_from_arg_list)
                 formal_tid = formal_tid_list[formal_tid_list_index]
                 instantiation_sub_map[formal_tid] = actual_tid
                 formal_tid_list_index += 1
@@ -280,7 +307,7 @@ class Emitter(object):
         return typer.substitution.Substitution(instantiation_sub_map)
 
     @staticmethod
-    def _translate_mtid_to_tid_for_arg_list(mtid: int) -> types.identity.TID:
+    def translate_mtid_to_tid_for_arg_list(mtid: int) -> types.identity.TID:
         mtid_kind = mm.mtype.kind_of_tid(mtid)
         if mtid_kind == mm.mtype.TypeKind.Unit:
             return types.get_unit_type()

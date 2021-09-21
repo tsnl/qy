@@ -4,7 +4,6 @@ from . import scalar_width_in_bits
 from . import mem_window
 from . import kind
 from . import side_effects
-from . import closure_spec
 
 VarPrintComponent = str
 
@@ -55,13 +54,7 @@ def of(tid: identity.TID):
         # if lhs_spelling[0] != '(':
         #     lhs_spelling = f"({lhs_spelling})"
 
-        opt_prefix, opt_suffix = {
-            closure_spec.CS.Yes: ("", ""),
-            closure_spec.CS.No: ("NoCtxPtr { ", " }"),
-            closure_spec.CS.Maybe: ("OptCtxPtr { ", " }")
-        }[closure_spec.of(tid)]
-
-        return f"{opt_prefix}{lhs_spelling} -> {ses_spelling} {rhs_spelling}{opt_suffix}"
+        return f"{lhs_spelling} -> {ses_spelling} {rhs_spelling}"
 
     elif type_kind in (kind.TK.Struct, kind.TK.Union, kind.TK.Module):
         prefix_keyword_map = {

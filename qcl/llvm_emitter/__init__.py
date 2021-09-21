@@ -14,7 +14,7 @@ def run():
     #       - requires info about implicit arguments
     #   - next, process function definitions & global variable initializers
 
-    e = emitter.Emitter()
+    e = emitter.Emitter(size_t_width_in_bits=64)
     e.emit_project("qy-build/output-1.ir")
 
     print(">- END of LLVM emitter -<")

@@ -139,8 +139,7 @@ class Substitution(object):
             return types.get_fn_type(
                 self.rewrite_type(types.elem.tid_of_fn_arg(tid)),
                 self.rewrite_type(types.elem.tid_of_fn_ret(tid)),
-                types.side_effects.of(tid),
-                types.closure_spec.of(tid)
+                types.side_effects.of(tid)
             )
 
         # unknown:
