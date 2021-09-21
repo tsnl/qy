@@ -8,7 +8,7 @@ import typing as t
 from collections import namedtuple
 
 from qcl import frontend
-from qcl import type
+from qcl import types
 from qcl import feedback as fb
 from qcl import ast
 
@@ -28,7 +28,7 @@ class Context(object):
             purpose: str, loc: fb.ILoc,
             opt_parent_context: t.Optional["Context"],
             symbol_table: t.Dict[str, definition.BaseRecord] = None,
-            local_type_template_arg_tid_map: t.Optional[t.Dict[str, type.identity.TID]] = None,
+            local_type_template_arg_tid_map: t.Optional[t.Dict[str, types.identity.TID]] = None,
             opt_func: t.Optional["ast.node.LambdaExp"] = None,
             opt_container_submodule: t.Optional["ast.node.SubModExp"] = None
     ):
@@ -73,13 +73,13 @@ class Context(object):
             self.symbol_table = symbol_table
 
         # initializing a lifetime for this context:
-        self.lifetime = type.lifetime.mint(self)
+        self.lifetime = types.lifetime.mint(self)
 
         #
         # Derived/computed properties:
         #
 
-        # computing a map of all bound type variables in scope:
+        # computing a map of all bound types variables in scope:
         if local_type_template_arg_tid_map is not None:
             self.local_type_template_arg_tid_map = local_type_template_arg_tid_map
 
@@ -96,7 +96,7 @@ class Context(object):
             else:
                 self.global_type_template_arg_tid_map = self.local_type_template_arg_tid_map
 
-        # defining each local type template argument in this context using the BoundVar types supplied.
+        # defining each local types template argument in this context using the BoundVar types supplied.
         # NOTE: despite the term 'local', these symbols are always globally visible: they are 'local' to the
         #       encapsulating scheme.
         self.local_type_template_arg_def_map = {}
@@ -195,7 +195,7 @@ class Context(object):
 
 
 def make_default_root(project):
-    def new_builtin_type_def(def_name: str, def_type_id: type.identity.TID) -> definition.TypeRecord:
+    def new_builtin_type_def(def_name: str, def_type_id: types.identity.TID) -> definition.TypeRecord:
         loc = fb.BuiltinLoc(def_name)
         def_obj = definition.TypeRecord(
             project,
@@ -214,23 +214,23 @@ def make_default_root(project):
         opt_parent_context=None,
         symbol_table=dict(
             **{
-                "Str": new_builtin_type_def("String", type.get_str_type()),
+                "Str": new_builtin_type_def("String", types.get_str_type()),
             },
             **{
                 f"I{n_bits}": new_builtin_type_def(
-                    f"SignedInt<{n_bits}>", type.get_int_type(n_bits, is_unsigned=False)
+                    f"SignedInt<{n_bits}>", types.get_int_type(n_bits, is_unsigned=False)
                 )
                 for n_bits in (8, 16, 32, 64, 128)
             },
             **{
                 f"U{n_bits}": new_builtin_type_def(
-                    f"UnsignedInt<{n_bits}>", type.get_int_type(n_bits, is_unsigned=True)
+                    f"UnsignedInt<{n_bits}>", types.get_int_type(n_bits, is_unsigned=True)
                 )
                 for n_bits in (1, 8, 16, 32, 64, 128)
             },
             **{
                 f"F{n_bits}": new_builtin_type_def(
-                    f"Float<{n_bits}>", type.get_float_type(n_bits)
+                    f"Float<{n_bits}>", types.get_float_type(n_bits)
                 )
                 for n_bits in (16, 32, 64)
             }

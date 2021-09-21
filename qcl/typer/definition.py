@@ -3,7 +3,7 @@ import enum
 import typing as t
 
 from qcl import feedback
-from qcl import type
+from qcl import types
 from qcl import ast
 from qcl import frontend
 
@@ -47,7 +47,7 @@ class ValueRecord(BaseRecord):
             project: "frontend.Project",
             name: str,
             loc: feedback.ILoc,
-            value_tid: type.identity.TID,
+            value_tid: types.identity.TID,
             opt_func,
             is_bound_globally_visible: bool,
             def_is_bound_var: bool
@@ -68,7 +68,7 @@ class TypeRecord(BaseRecord):
     def __init__(
             self,
             project: "frontend.Project",
-            name: str, loc: feedback.ILoc, type_tid: type.identity.TID,
+            name: str, loc: feedback.ILoc, type_tid: types.identity.TID,
             opt_func,
             is_bound_globally_visible,
             def_is_bound_var
@@ -100,6 +100,10 @@ class ModRecord(BaseRecord):
             def_is_bound_var=False              # no module can be used as a template arg
         )
         self.mod_exp = mod_exp
+
+        # map 1-1 DefRec to Mod:
+        assert self.mod_exp.own_def_rec_from_typer is None
+        self.mod_exp.own_def_rec_from_typer = self
 
 
 @enum.unique

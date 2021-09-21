@@ -1,10 +1,10 @@
 """
-In practice, we can view effects-specifiers as a property of the function type.
+In practice, we can view effects-specifiers as a property of the function types.
 This is because an effects-specifier can be used either to qualify a lambda's return or within a chain to qualify a
 sub-chain.
 When used within a sub-chain, the effect-specifier is validated against the parent chain's effect-specifier,
 **just like an assignment expression, an allocator, or a throw statement**.
-Thus, in correct code, the most general effects-specifier bubbles up inductively to the function return type.
+Thus, in correct code, the most general effects-specifier bubbles up inductively to the function return types.
 Upon execution, the function upholds the specified effects until it returns.
 """
 

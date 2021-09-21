@@ -1,7 +1,7 @@
 """
-Each type is just a unique integer ID.
-Each sub-module of this package manages a system, or a co-located facet some type.
-We guarantee a structural type system using `functools.cache` + a nominal wrapper to create type.
+Each types is just a unique integer ID.
+Each sub-module of this package manages a system, or a co-located facet some types.
+We guarantee a structural types system using `functools.cache` + a nominal wrapper to create types.
 """
 
 import functools
@@ -39,7 +39,7 @@ def _get_cached_type(cache, ctor, arg_key, ctor_takes_arg_key_directly=False):
 
 
 #
-# Unit type:
+# Unit types:
 #
 
 def get_unit_type():
@@ -329,7 +329,7 @@ def _new_union_type(field_elem_info_tuple) -> identity.TID:
 #
 
 #
-# NOTE: module creation is not cached, because we want each module to have a unique type.
+# NOTE: module creation is not cached, because we want each module to have a unique types.
 #
 
 def new_module_type(field_elem_info_tuple) -> identity.TID:
@@ -344,7 +344,6 @@ def new_module_type(field_elem_info_tuple) -> identity.TID:
 # NOTE: variable creation is not cached, even if the created variables share a name.
 #       this is because no two variables are structurally equal.
 #
-
 
 def new_bound_var(name: str) -> identity.TID:
     tid = identity.mint()

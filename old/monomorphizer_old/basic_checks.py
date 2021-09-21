@@ -34,12 +34,12 @@ import functools
 
 from qcl import frontend
 from qcl import typer
-from qcl import type
+from qcl import types
 from qcl import ast
 from qcl import excepts
 
 
-SES = type.side_effects.SES
+SES = types.side_effects.SES
 
 
 def run(project: frontend.Project):

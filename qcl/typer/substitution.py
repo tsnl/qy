@@ -1,9 +1,9 @@
 """
-A substitution is a mapping from named type variables to types.
+A substitution is a mapping from named types variables to types.
 `Substitution` instances are immutable and composable.
 """
 
-from qcl import type
+from qcl import types
 
 from . import scheme
 from . import context
@@ -48,15 +48,15 @@ class Substitution(object):
         new_body = sub_without_bound_vars.rewrite_type(s.body_tid)
         return s.sub_body(new_body)
 
-    def rewrite_type(self, tid: type.identity.TID, rw_in_progress_tid_set=None) -> type.identity.TID:
+    def rewrite_type(self, tid: types.identity.TID, rw_in_progress_tid_set=None) -> types.identity.TID:
         """
         performs substitution on types and their contents/elements.
-        :param tid: the type to rewrite after the substitution
+        :param tid: the types to rewrite after the substitution
         :param rw_in_progress_tid_set: if tid is in this set, its rewrite does not take the substitution.
             - means rewrite already in progress.
             - e.g. consider case where two modules import each other, so each is an element of the other
             - we must still infer infinite types to handle modules, so delay reporting these to basic checks.
-        :return: the rewritten type.
+        :return: the rewritten types.
         """
         # TODO: test to see if ignoring rewrites in cycles results in incorrect substitution application.
         #   - for now, the incorrect sub always results in a free-var that is always eliminated
@@ -71,7 +71,7 @@ class Substitution(object):
             rw_in_progress_tid_set = set(rw_in_progress_tid_set)
             rw_in_progress_tid_set.add(tid)
 
-        t_kind = type.kind.of(tid)
+        t_kind = types.kind.of(tid)
 
         # variables replaced:
         replacement_tid = self.sub_map.get(tid, None)
@@ -80,67 +80,67 @@ class Substitution(object):
 
         # atoms:
         primitive_tk_set = {
-            type.kind.TK.FreeVar, type.kind.TK.BoundVar,
-            type.kind.TK.Unit, type.kind.TK.String,
-            type.kind.TK.SignedInt, type.kind.TK.UnsignedInt, type.kind.TK.Float
+            types.kind.TK.FreeVar, types.kind.TK.BoundVar,
+            types.kind.TK.Unit, types.kind.TK.String,
+            types.kind.TK.SignedInt, types.kind.TK.UnsignedInt, types.kind.TK.Float
         }
         if t_kind in primitive_tk_set:
             return tid
 
         # memory views: ptr, array, slice
         mem_view_tk_set = {
-            type.kind.TK.Pointer, type.kind.TK.Array, type.kind.TK.Slice
+            types.kind.TK.Pointer, types.kind.TK.Array, types.kind.TK.Slice
         }
         if t_kind in mem_view_tk_set:
             replacement_ctor_map = {
-                type.kind.TK.Pointer: type.get_ptr_type,
-                type.kind.TK.Array: type.get_array_type,
-                type.kind.TK.Slice: type.get_slice_type
+                types.kind.TK.Pointer: types.get_ptr_type,
+                types.kind.TK.Array: types.get_array_type,
+                types.kind.TK.Slice: types.get_slice_type
             }
-            mem_view_is_mut = type.mem_window.is_mut(tid)
+            mem_view_is_mut = types.mem_window.is_mut(tid)
             return replacement_ctor_map[t_kind](
-                self.rewrite_type(type.elem.tid_of_ptd(tid)),
+                self.rewrite_type(types.elem.tid_of_ptd(tid)),
                 mem_view_is_mut
             )
 
         # compounds: tuple, struct, union, enum, module
         compound_tk_set = {
-            type.kind.TK.Tuple, type.kind.TK.Struct, type.kind.TK.Union,
-            type.kind.TK.Module
+            types.kind.TK.Tuple, types.kind.TK.Struct, types.kind.TK.Union,
+            types.kind.TK.Module
         }
         if t_kind in compound_tk_set:
             replacement_elem_tid_list = []
-            for element_index in range(type.elem.count(tid)):
-                element_tid = type.elem.tid_of_field_ix(tid, element_index)
+            for element_index in range(types.elem.count(tid)):
+                element_tid = types.elem.tid_of_field_ix(tid, element_index)
                 replacement_elem_tid = self.rewrite_type(element_tid, rw_in_progress_tid_set=rw_in_progress_tid_set)
                 replacement_elem_tid_list.append(replacement_elem_tid)
 
-            if t_kind == type.kind.TK.Tuple:
-                return type.get_tuple_type(tuple(replacement_elem_tid_list))
+            if t_kind == types.kind.TK.Tuple:
+                return types.get_tuple_type(tuple(replacement_elem_tid_list))
             else:
                 replacement_elem_info_tuple = tuple((
-                    type.elem.ElemInfo(
-                        type.elem.field_name_at_ix(tid, field_index),
+                    types.elem.ElemInfo(
+                        types.elem.field_name_at_ix(tid, field_index),
                         replacement_field_tid,
-                        type.elem.is_type_field_at_field_ix(tid, field_index)
+                        types.elem.is_type_field_at_field_ix(tid, field_index)
                     )
                     for field_index, replacement_field_tid in enumerate(replacement_elem_tid_list)
                 ))
 
                 replacement_ctor_map = {
-                    type.kind.TK.Struct: type.get_struct_type,
-                    type.kind.TK.Union: type.get_union_type,
-                    type.kind.TK.Module: type.new_module_type
+                    types.kind.TK.Struct: types.get_struct_type,
+                    types.kind.TK.Union: types.get_union_type,
+                    types.kind.TK.Module: types.new_module_type
                 }
                 return replacement_ctor_map[t_kind](replacement_elem_info_tuple)
 
         # functions:
-        if t_kind == type.kind.TK.Fn:
-            return type.get_fn_type(
-                self.rewrite_type(type.elem.tid_of_fn_arg(tid)),
-                self.rewrite_type(type.elem.tid_of_fn_ret(tid)),
-                type.side_effects.of(tid),
-                type.closure_spec.of(tid)
+        if t_kind == types.kind.TK.Fn:
+            return types.get_fn_type(
+                self.rewrite_type(types.elem.tid_of_fn_arg(tid)),
+                self.rewrite_type(types.elem.tid_of_fn_ret(tid)),
+                types.side_effects.of(tid),
+                types.closure_spec.of(tid)
             )
 
         # unknown:
@@ -183,7 +183,7 @@ class Substitution(object):
 
     def __str__(self):
         return '{' + ', '.join((
-            f"{type.spelling.of(key)} -> {type.spelling.of(value)}"
+            f"{types.spelling.of(key)} -> {types.spelling.of(value)}"
             for (key, value) in self.sub_map.items()
         )) + '}'
 

@@ -57,7 +57,7 @@ cdef extern from "extension/shared-enums.hh" namespace "monomorphizer":
 
 cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     ctypedef enum NodeKind:
-        # type-specifiers:
+        # types-specifiers:
         TS_UNIT,
         TS_GID,
         TS_LID,
@@ -253,7 +253,7 @@ cdef:
     void w_drop();
 
 #
-# MAST: create expressions, type specs, and elems:
+# MAST: create expressions, types specs, and elems:
 #
 
 # expressions:
@@ -316,7 +316,7 @@ cdef:
         size_t source_index
     )
 
-# type-specs:
+# types-specs:
 # - TODO: consider supporting local and global IDs separately
 cdef:
     TypeSpecID w_new_unit_ts(size_t source_index)
@@ -455,7 +455,7 @@ cdef extern from "extension/mast.hh" namespace "monomorphizer::mast":
     
     # putting it all together:
     union NodeInfo:
-        # type-specs:
+        # types-specs:
         GlobalIdTypeSpecNodeInfo ts_gid
         LocalIdTypeSpecNodeInfo ts_lid
         PtrTypeSpecNodeInfo ts_ptr

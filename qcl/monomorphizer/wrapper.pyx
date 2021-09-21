@@ -348,7 +348,7 @@ cdef:
     ExpID w_new_cast_exp(TypeSpecID ts_id, ExpID exp_id, size_t source_index):
         return new_cast_exp(ts_id, exp_id, source_index)
 
-# mast: type-specs:
+# mast: types-specs:
 cdef:
     TypeSpecID w_new_unit_ts(size_t source_index):
         return new_unit_ts(source_index)

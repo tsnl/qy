@@ -3,7 +3,7 @@ import typing as t
 
 from qcl import ast
 from qcl import excepts
-from qcl import type
+from qcl import types
 
 from . import substitution
 from . import unifier
@@ -110,7 +110,7 @@ class BaseDeferredOrder(object, metaclass=abc.ABCMeta):
     def __str__(self):
         name = f"{self.__class__.__name__}[{self.extra_args_str()}]"
         args = (
-            type.spelling.of(elem_tid)
+            types.spelling.of(elem_tid)
             for elem_tid in self.elem_tid_list
         )
         return f"{name}({', '.join(args)}) @ {self.loc}"
@@ -140,33 +140,33 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
     def cast(self, src_tid, dst_tid, sub):
         solved = True
 
-        src_tk = type.kind.of(src_tid)
-        dst_tk = type.kind.of(dst_tid)
+        src_tk = types.kind.of(src_tid)
+        dst_tk = types.kind.of(dst_tid)
 
         simple_monomorphic_tk_set = {
-            type.kind.TK.Unit,
-            type.kind.TK.String
+            types.kind.TK.Unit,
+            types.kind.TK.String
         }
         number_tk_set = {
-            type.kind.TK.SignedInt,
-            type.kind.TK.UnsignedInt,
-            type.kind.TK.Float
+            types.kind.TK.SignedInt,
+            types.kind.TK.UnsignedInt,
+            types.kind.TK.Float
         }
         simple_window_tk_set = {
-            type.kind.TK.Pointer,
-            type.kind.TK.Array
+            types.kind.TK.Pointer,
+            types.kind.TK.Array
         }
         slice_src_tk_set = {
-            type.kind.TK.Slice,
-            type.kind.TK.Array
+            types.kind.TK.Slice,
+            types.kind.TK.Array
         }
         var_tk_set = {
-            type.kind.TK.FreeVar,
-            type.kind.TK.BoundVar,
+            types.kind.TK.FreeVar,
+            types.kind.TK.BoundVar,
         }
         product_tk_set = {
-            type.kind.TK.Tuple,
-            type.kind.TK.Struct
+            types.kind.TK.Tuple,
+            types.kind.TK.Struct
         }
 
         # comparing src_tid and dst_tid to ensure they can be inter-converted.
@@ -178,10 +178,10 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
         #   - Enum, Union from other Enum, Union
         #       - can construct enum/union branch using `EnumType:variant` or `UnionType:variant` (syntax WIP)
         #   - Array from Array only, Pointer from Pointer only, Slice from Array or Slice
-        #       - NOTE: can unify content type for all three containers: implies that `reinterpret_cast`-type behavior
+        #       - NOTE: can unify content types for all three containers: implies that `reinterpret_cast`-types behavior
         #         is a totally different expression/function.
         #       - NOTE: must also ensure `mut` specifier matches: can convert from `mut` to non-mut but not vice-versa.
-        #   - cannot cast any other type kind
+        #   - cannot cast any other types kind
 
         # case 1: String, Unit
         if dst_tk in simple_monomorphic_tk_set:
@@ -205,8 +205,8 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
                 )
 
             # checking both share the same mutability:
-            dst_is_mut = bool(type.mem_window.is_mut(dst_tid))
-            src_is_mut = bool(type.mem_window.is_mut(src_tid))
+            dst_is_mut = bool(types.mem_window.is_mut(dst_tid))
+            src_is_mut = bool(types.mem_window.is_mut(src_tid))
             if dst_is_mut and not src_is_mut:
                 TypeCastDeferredOrder.raise_cast_error(
                     src_tid, dst_tid,
@@ -214,15 +214,15 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
                 )
 
             # attempting to unify content types => error if failed.
-            if type.elem.tid_of_ptd(dst_tid) != type.get_unit_type():
+            if types.elem.tid_of_ptd(dst_tid) != types.get_unit_type():
                 ptd_unify_sub = unifier.unify_tid(
-                    type.elem.tid_of_ptd(src_tid),
-                    type.elem.tid_of_ptd(dst_tid)
+                    types.elem.tid_of_ptd(src_tid),
+                    types.elem.tid_of_ptd(dst_tid)
                 )
                 sub = ptd_unify_sub.compose(sub)
 
             # if both arrays, check if length is identical:
-            if dst_tk == type.kind.TK.Array:
+            if dst_tk == types.kind.TK.Array:
                 # TODO: need to further validate the arrays are of the same length
                 # NOTE: can also determine this in 'basic checks' later
                 pass
@@ -230,7 +230,7 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
             # TODO: verify that index types are convertible
 
         # case 4: slice
-        elif dst_tk == type.kind.TK.Slice:
+        elif dst_tk == types.kind.TK.Slice:
             if src_tk not in slice_src_tk_set:
                 TypeCastDeferredOrder.raise_cast_error(src_tid, dst_tid)
 
@@ -238,8 +238,8 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
 
         # case 5: handle tuples/structs (using recursive conversion)
         elif dst_tk in product_tk_set:
-            dst_elem_count = type.elem.count(dst_tid)
-            src_elem_count = type.elem.count(src_tid)
+            dst_elem_count = types.elem.count(dst_tid)
+            src_elem_count = types.elem.count(src_tid)
             if src_elem_count != dst_elem_count:
                 TypeCastDeferredOrder.raise_cast_error(
                     src_tid, dst_tid, 
@@ -250,8 +250,8 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
             if not self.field_cast_ops_generated:
                 self.field_cast_ops_generated = True
                 for field_index in range(elem_count):
-                    src_field_tid = type.elem.tid_of_field_ix(src_tid, field_index)
-                    dst_field_tid = type.elem.tid_of_field_ix(dst_tid, field_index)
+                    src_field_tid = types.elem.tid_of_field_ix(src_tid, field_index)
+                    dst_field_tid = types.elem.tid_of_field_ix(dst_tid, field_index)
                     
                     order = TypeCastDeferredOrder(
                         self.loc, 
@@ -274,8 +274,8 @@ class TypeCastDeferredOrder(BaseDeferredOrder):
 
     @staticmethod
     def raise_cast_error(src_tid, dst_tid, more=None):
-        spell_src = type.spelling.of(src_tid)
-        spell_dst = type.spelling.of(dst_tid)
+        spell_src = types.spelling.of(src_tid)
+        spell_dst = types.spelling.of(dst_tid)
         msg_suffix = f"Cannot cast to {spell_dst} from {spell_src}"
         if more is not None:
             msg_suffix += f": {more}"
@@ -324,14 +324,14 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
 
         # handling DeRef: overloaded on `mut[]` and `[]`:
         elif self.unary_op == ast.node.UnaryOp.DeRef:
-            arg_tk = type.kind.of(self.proxy_arg_tid)
+            arg_tk = types.kind.of(self.proxy_arg_tid)
             assert not is_var_tk(arg_tk)
 
-            if arg_tk == type.kind.TK.Pointer:
+            if arg_tk == types.kind.TK.Pointer:
                 # irrelevant whether pointer is mutable or not.
                 return (
                     True,
-                    unifier.unify_tid(self.proxy_ret_tid, type.elem.tid_of_ptd(self.proxy_arg_tid))
+                    unifier.unify_tid(self.proxy_ret_tid, types.elem.tid_of_ptd(self.proxy_arg_tid))
                 )
             else:
                 self.raise_call_error()
@@ -350,7 +350,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
             ast.node.UnaryOp.DeRef: '@',
         }[unary_op]
 
-        arg_spelling = type.spelling.of(arg_tid)
+        arg_spelling = types.spelling.of(arg_tid)
 
         msg_suffix = f"invalid args for unary op call: {unary_op_spelling}({arg_spelling})"
 
@@ -359,8 +359,8 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
     @staticmethod
     def new_pos_neg_overload_map():
         return {
-            (unary_operator, type.get_int_type(i, is_unsigned=src_sgn)):
-                type.get_int_type(i, is_unsigned=False)
+            (unary_operator, types.get_int_type(i, is_unsigned=src_sgn)):
+                types.get_int_type(i, is_unsigned=False)
             for i in (
                 8,
                 16,
@@ -377,7 +377,7 @@ class UnaryOpDeferredOrder(BaseDeferredOrder):
                 ast.node.UnaryOp.Neg
             )
         } | {
-            (unary_operator, type.get_float_type(i)): type.get_float_type(i)
+            (unary_operator, types.get_float_type(i)): types.get_float_type(i)
             for i in (
                 32, 64
             )
@@ -437,9 +437,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
             }
             assert isinstance(BinaryOpDeferredOrder.overload_map, dict)
 
-        # Deferring if arg types & return type are ALL variables
-        #   - if either arg is a variable, we can still infer types for type-symmetric binary operators.
-        #   - if both args are variables but return type is not, we can infer all types for symmetric operators.
+        # Deferring if arg types & return types are ALL variables
+        #   - if either arg is a variable, we can still infer types for types-symmetric binary operators.
+        #   - if both args are variables but return types is not, we can infer all types for symmetric operators.
         args_are_vars = (is_var_tid(self.proxy_lt_arg_tid) and is_var_tid(self.proxy_rt_arg_tid))
         ret_is_var = is_var_tid(self.proxy_ret_tid)
         if args_are_vars and ret_is_var:
@@ -486,7 +486,7 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
             ret_sub = unifier.unify_tid(self.proxy_ret_tid, ret_tid)
             update_with_sub(ret_sub)
 
-        # For arithmetic operators, we can infer the type of all arguments using just the return type,
+        # For arithmetic operators, we can infer the types of all arguments using just the return types,
         # since they form a closed group:
         if self.binary_op in self.uniformly_typed_operators:
             lt_sub = unifier.unify_tid(self.proxy_lt_arg_tid, self.proxy_ret_tid)
@@ -505,8 +505,8 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
 
         binary_op_spelling = self.get_bin_op_spelling(binary_op)
 
-        lt_arg_spelling = type.spelling.of(lt_arg_tid)
-        rt_arg_spelling = type.spelling.of(rt_arg_tid)
+        lt_arg_spelling = types.spelling.of(lt_arg_tid)
+        rt_arg_spelling = types.spelling.of(rt_arg_tid)
 
         msg_suffix = f"invalid args for binary op call: {binary_op_spelling}({lt_arg_spelling}, {rt_arg_spelling})"
 
@@ -533,8 +533,8 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
 
     """
     Overload maps for symmetric binary operations are 'halved':
-    - map 1 argument type to 1 return type
-    - lookups occur for either/both arguments to infer all 3 types: lhs, rhs, return type. 
+    - map 1 argument types to 1 return types
+    - lookups occur for either/both arguments to infer all 3 types: lhs, rhs, return types. 
     """
 
     @staticmethod
@@ -558,9 +558,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         return {
             (
                 binary_operator,
-                type.get_int_type(i, is_unsigned=is_unsigned)
+                types.get_int_type(i, is_unsigned=is_unsigned)
             ): (
-                type.get_int_type(i, is_unsigned=is_unsigned)
+                types.get_int_type(i, is_unsigned=is_unsigned)
             )
             for i in (
                 8,
@@ -588,9 +588,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         return {
             (
                 binary_operator,
-                type.get_int_type(i, is_unsigned=src_is_unsigned)
+                types.get_int_type(i, is_unsigned=src_is_unsigned)
             ): (
-                type.get_int_type(1, is_unsigned=True)
+                types.get_int_type(1, is_unsigned=True)
             )
             for i in (
                 8,
@@ -618,9 +618,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         d = {
             (
                 binary_operator,
-                type.get_float_type(i)
+                types.get_float_type(i)
             ): (
-                type.get_float_type(i)
+                types.get_float_type(i)
             )
             for i in (
                 32,
@@ -642,9 +642,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         return {
             (
                 binary_operator,
-                type.get_float_type(i)
+                types.get_float_type(i)
             ): (
-                type.get_int_type(1, is_unsigned=True)
+                types.get_int_type(1, is_unsigned=True)
             )
             for i in (
                 32,
@@ -665,9 +665,9 @@ class BinaryOpDeferredOrder(BaseDeferredOrder):
         return {
             (
                 binary_operator,
-                type.get_int_type(1, is_unsigned=True)
+                types.get_int_type(1, is_unsigned=True)
             ): (
-                type.get_int_type(1, is_unsigned=True)
+                types.get_int_type(1, is_unsigned=True)
             )
             for binary_operator in (
                 ast.node.BinaryOp.LogicalAnd,
@@ -694,18 +694,18 @@ class DotIndexOpDeferredOrder(BaseDeferredOrder):
             return False, all_sub
         else:
             # checking that the container is a struct or tuple:
-            if type.kind.of(self.container_tid) not in (type.kind.TK.Tuple, type.kind.TK.Struct):
+            if types.kind.of(self.container_tid) not in (types.kind.TK.Tuple, types.kind.TK.Struct):
                 msg_suffix = f"`<container>.<index>` expressions inapplicable when container not Tuple or Struct"
                 raise excepts.TyperCompilationError(msg_suffix)
 
             # checking that the index is within bounds:
-            elem_count = type.elem.count(self.container_tid)
+            elem_count = types.elem.count(self.container_tid)
             if self.index > elem_count:
                 msg_suffix = f"`<container>.<index>` expression has index out of bounds: must be <{elem_count}"
                 raise excepts.TyperCompilationError(msg_suffix)
 
             # acquiring the true field TID:
-            field_tid = type.elem.tid_of_field_ix(self.container_tid, self.index)
+            field_tid = types.elem.tid_of_field_ix(self.container_tid, self.index)
 
             # unifying the true field TID with the proxy, and composing the sub with 'all_sub':
             sol_sub = unifier.unify_tid(field_tid, self.ret_tid)
@@ -733,12 +733,12 @@ class DotNameOpDeferredOrder(BaseDeferredOrder):
             return False, all_sub
         else:
             # checking that the container is a struct:
-            if type.kind.of(self.container_tid) != type.kind.TK.Struct:
+            if types.kind.of(self.container_tid) != types.kind.TK.Struct:
                 msg_suffix = f"`<container>.<name>` expressions inapplicable when container not Struct"
                 raise excepts.TyperCompilationError(msg_suffix)
 
             # acquiring an index from the name, or raising an error if the name does not exist:
-            opt_field_index = type.elem.field_ix_of_name(self.container_tid, self.field_name)
+            opt_field_index = types.elem.field_ix_of_name(self.container_tid, self.field_name)
             if opt_field_index is None:
                 msg_suffix = (
                     f"`<container>.<name>` references a field in a struct that does not exist: "
@@ -748,7 +748,7 @@ class DotNameOpDeferredOrder(BaseDeferredOrder):
 
             # acquiring the true field TID:
             assert opt_field_index is not None
-            field_tid = type.elem.tid_of_field_ix(self.container_tid, opt_field_index)
+            field_tid = types.elem.tid_of_field_ix(self.container_tid, opt_field_index)
 
             # unifying the true field TID with the proxy, and composing the sub with `all_sub`:
             sol_sub = unifier.unify_tid(field_tid, self.ret_tid)
@@ -759,12 +759,12 @@ class DotNameOpDeferredOrder(BaseDeferredOrder):
 
 
 def is_var_tid(tid):
-    tk = type.kind.of(tid)
+    tk = types.kind.of(tid)
     return is_var_tk(tk)
 
 
 def is_var_tk(tk):
     return tk in (
-        type.kind.TK.FreeVar,
-        type.kind.TK.BoundVar
+        types.kind.TK.FreeVar,
+        types.kind.TK.BoundVar
     )

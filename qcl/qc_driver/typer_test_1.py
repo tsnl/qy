@@ -1,4 +1,4 @@
-from qcl import type
+from qcl import types
 
 
 def main(*args):

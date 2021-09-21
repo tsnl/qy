@@ -1,27 +1,27 @@
 import typing as t
 import copy
 
-from qcl import type
+from qcl import types
 
 from . import substitution
 from . import unifier
 
 
 class Scheme(object):
-    bound_vars: t.List[type.identity.TID]
-    bound_var_map: t.Dict[str, type.identity.TID]
-    body_tid: type.identity.TID
+    bound_vars: t.List[types.identity.TID]
+    bound_var_map: t.Dict[str, types.identity.TID]
+    body_tid: types.identity.TID
     def_context: t.Optional[t.Any]      # actually a context
-    all_bound_var_map: t.Optional[t.Dict[str, type.identity.TID]]
+    all_bound_var_map: t.Optional[t.Dict[str, types.identity.TID]]
 
     def __init__(
             self,
-            body_tid: type.identity.TID,
+            body_tid: types.identity.TID,
             bound_var_names: t.Optional[t.List[str]] = None
     ):
         super().__init__()
         if bound_var_names is not None:
-            self.bound_vars = [type.new_bound_var(var_name) for var_name in bound_var_names]
+            self.bound_vars = [types.new_bound_var(var_name) for var_name in bound_var_names]
             self.bound_var_map = {
                 var_name: var
                 for var_name, var in zip(bound_var_names, self.bound_vars)
@@ -38,10 +38,10 @@ class Scheme(object):
         return self.spell()
 
     def spell(self) -> str:
-        body_spelling = type.spelling.of(self.body_tid)
+        body_spelling = types.spelling.of(self.body_tid)
 
         if self.bound_vars:
-            args_text = ', '.join(map(type.spelling.of, self.bound_vars))
+            args_text = ', '.join(map(types.spelling.of, self.bound_vars))
             return f"∀ ({args_text}) {body_spelling}"
         else:
             return body_spelling
@@ -65,7 +65,7 @@ class Scheme(object):
 
     def help_instantiate(
             self, bound_var_map, is_deep_not_shallow=False
-    ) -> t.Tuple[substitution.Substitution, type.identity.TID]:
+    ) -> t.Tuple[substitution.Substitution, types.identity.TID]:
         """
         substitutes bound vars with fresh free-vars.
         :return: a substitution (including bound var mappings) and the instantiated body
@@ -81,14 +81,14 @@ class Scheme(object):
             # computing all bound vars:
             # generating a sub to replace each bound var by a fresh free-var (to be eliminated):
             sub = substitution.Substitution({
-                bound_var: type.new_free_var(f"template_instantiated_free_var.{bound_var_name}")
+                bound_var: types.new_free_var(f"template_instantiated_free_var.{bound_var_name}")
                 for bound_var_name, bound_var in bound_var_map.items()
             })
 
             # NOTE: what about other (i.e. value) template args? How do they get unified?
             #   - they are unified like a function call in the instantiation logic in `inference`.
 
-            # rewriting the type's body using this sub (INSTANTIATION):
+            # rewriting the types's body using this sub (INSTANTIATION):
             #   - note that we WANT to map formal args to instantiated ones.
             instantiated_tid = sub.rewrite_type(self.body_tid)
 

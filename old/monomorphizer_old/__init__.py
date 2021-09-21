@@ -1,5 +1,5 @@
 """
-This module verifies polymorphic code (in the form of a type-annotated AST),
+This module verifies polymorphic code (in the form of a types-annotated AST),
 and generates monomorphic IR.
 """
 

@@ -1,8 +1,8 @@
 """
-This system obtains type that make up other type, i.e. type 'elements'.
-- e.g. arg and return type for functions
-- e.g. field type for structs, unions, and enums
-- e.g. pointed type for pointers, arrays, and slices.
+This system obtains types that make up other types, i.e. types 'elements'.
+- e.g. arg and return types for functions
+- e.g. field types for structs, unions, and enums
+- e.g. pointed types for pointers, arrays, and slices.
 """
 
 from typing import *
@@ -171,7 +171,7 @@ def field_ix_of_name(algebraic_tid: identity.TID, field_name: str) -> int:
         return components[algebraic_tid].field_name_index_lut.get(field_name, None)
     else:
         # no cache, no fields.
-        raise NotImplementedError(f"No field index cache for type of kind {kind.of(algebraic_tid)}")
+        raise NotImplementedError(f"No field index cache for types of kind {kind.of(algebraic_tid)}")
 
 
 def tid_of_ptd(tid: identity.TID) -> identity.TID:

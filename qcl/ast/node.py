@@ -13,7 +13,7 @@ from qcl.typer import definition
 from qcl import excepts
 from qcl import frontend
 from qcl import feedback
-from qcl import type
+from qcl import types
 from qcl import typer
 
 
@@ -38,24 +38,24 @@ class BaseNode(object, metaclass=abc.ABCMeta):
 
 
 class TypedBaseNode(BaseNode):
-    x_tid: t.Optional["type.identity.TID"]
-    x_ses: t.Optional["type.side_effects.SES"]
+    x_tid: t.Optional["types.identity.TID"]
+    x_ses: t.Optional["types.side_effects.SES"]
     x_ctx: t.Optional["typer.context.Context"]
 
     def __init__(self, loc: "feedback.ILoc"):
         super().__init__(loc)
-        self.x_tid = None       # type-ID: the value of this expression is always of this type
+        self.x_tid = None       # types-ID: the value of this expression is always of this types
         self.x_ses = None       # side-effects-specifier: what capabilities does this expression need?
         self.x_cs = None        # closure-spec: what memory does this expression need?
         self.x_ctx = None       # context: semantics of where expression is used
         self.x_rml = None       # rel memory loc: for mem-window types, handles where memory is stored.
 
     @property
-    def tid(self) -> t.Optional["type.identity.TID"]:
+    def tid(self) -> t.Optional["types.identity.TID"]:
         return self.x_tid
 
     @property
-    def ses(self) -> t.Optional["type.side_effects.SES"]:
+    def ses(self) -> t.Optional["types.side_effects.SES"]:
         return self.x_ses
 
     @property
@@ -63,7 +63,7 @@ class TypedBaseNode(BaseNode):
         return self.x_ctx
 
     @property
-    def cs(self) -> t.Optional["type.closure_spec.CS"]:
+    def cs(self) -> t.Optional["types.closure_spec.CS"]:
         return self.x_cs
 
     @property
@@ -75,9 +75,9 @@ class TypedBaseNode(BaseNode):
 
     def finalize_type_info(
             self,
-            tid: "type.identity.TID",
-            ses: "type.side_effects.SES",
-            cs: "type.closure_spec.CS",
+            tid: "types.identity.TID",
+            ses: "types.side_effects.SES",
+            cs: "types.closure_spec.CS",
             ctx: "typer.context.Context"
     ):
         assert not self.type_info_finalized
@@ -229,17 +229,17 @@ class LambdaExp(BaseExp):
         super().__init__(loc)
         self.arg_names = arg_names
         self.body = body
-        self.ret_ses = type.side_effects.SES.Tot
+        self.ret_ses = types.side_effects.SES.Tot
         self.non_local_name_map = {}
         self.global_name_map = {}
 
-    def finalize_fn_ses(self, ses: "type.side_effects.SES"):
+    def finalize_fn_ses(self, ses: "types.side_effects.SES"):
         assert ses in (
-            type.side_effects.SES.Tot,
-            type.side_effects.SES.Dv,
-            type.side_effects.SES.ST,
-            type.side_effects.SES.Exn,
-            type.side_effects.SES.ML,
+            types.side_effects.SES.Tot,
+            types.side_effects.SES.Dv,
+            types.side_effects.SES.ST,
+            types.side_effects.SES.Exn,
+            types.side_effects.SES.ML,
         )
         self.ret_ses = ses
 
@@ -352,6 +352,7 @@ class BaseModExp(TypedBaseNode):
     def __init__(self, loc):
         super().__init__(loc)
         self.module_id = self.generate_fresh_module_id()
+        self.own_def_rec_from_typer = None
 
     @staticmethod
     def generate_fresh_module_id():
@@ -408,7 +409,7 @@ class ChainExp(BaseExp):
     def __init__(
             self, loc, elements, opt_tail: t.Optional[BaseExp],
             opt_prefix_ts: t.Optional["BaseTypeSpec"],
-            opt_prefix_es: t.Optional["type.side_effects.SES"]
+            opt_prefix_es: t.Optional["types.side_effects.SES"]
     ):
         """
         Creates a new chain expression.
@@ -508,8 +509,8 @@ class TupleTypeSpec(BaseTypeSpec):
 class FnSignatureTypeSpec(BaseTypeSpec):
     arg_type_spec: BaseTypeSpec
     return_type_spec: BaseTypeSpec
-    opt_ses: t.Optional["type.side_effects.SES"]
-    closure_spec: "type.closure_spec.CS"
+    opt_ses: t.Optional["types.side_effects.SES"]
+    closure_spec: "types.closure_spec.CS"
 
     def __init__(self, loc, arg_type_spec, return_type_spec, opt_ses):
         super().__init__(loc)
@@ -519,7 +520,7 @@ class FnSignatureTypeSpec(BaseTypeSpec):
 
         # by default, the closure spec is `Yes`, since our language uses fat
         # pointers internally.
-        self.closure_spec = type.closure_spec.CS.Yes
+        self.closure_spec = types.closure_spec.CS.Yes
 
 
 class BaseMemWindowTypeSpec(BaseTypeSpec, metaclass=abc.ABCMeta):
@@ -717,7 +718,7 @@ class Table(object):
         elif element is None:
             assert False and "'None' element parsed-- is this an ANTLRVisitor error?"
         else:
-            raise NotImplementedError("Unknown type of `element` instance.")
+            raise NotImplementedError("Unknown types of `element` instance.")
 
     def parse_binding_elem(self, elem: "BaseBindElem"):
         if isinstance(elem, Bind1VElem):
@@ -747,7 +748,7 @@ class Table(object):
 
         ok = True
 
-        # ensuring each element type is accepted:
+        # ensuring each element types is accepted:
         for element in self.elements:
             if isinstance(element, BaseBindElem):
                 if not self.accepts_binding_elems:
@@ -809,7 +810,7 @@ class Type1VElem(BaseTypingElem):
 
 
 # Binding elements:
-# used to bind a new variable while providing minimal type information.
+# used to bind a new variable while providing minimal types information.
 
 class BaseBindElem(BaseElem):
     def __init__(self, loc, id_name):
@@ -906,6 +907,7 @@ class IdNodeInModuleHelper(object):
     elem_name: str
     opt_child: t.Optional["IdNodeInModuleHelper"]
     found_def_rec: t.Optional["typer.definition.BaseRecord"]
+    instantiate_sub: t.Optional["typer.substitution.Substitution"]
 
     def __init__(self, loc, opt_container, elem_name, elem_args=None):
         super().__init__()
@@ -914,6 +916,7 @@ class IdNodeInModuleHelper(object):
         self.elem_name = elem_name
         self.opt_child = None
         self.found_def_rec = None
+        self.instantiate_sub = None
 
         if elem_args is not None:
             self.elem_args = elem_args

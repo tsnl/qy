@@ -1,7 +1,17 @@
 --- sub entry_point_for_v1_default_loader ---
 
-forty_two = const[I32, 42]:value;
-main_for_v1_default_loader = () -> ML {0};
+forty_two_i32 = const[I32, 42]:value;
+forty_two_f32 = const[F32, 42]:value;
+main_for_v1_default_loader = () -> ML {
+    0
+};
+
+a ~ () -> F32;
+a = () -> {
+    x = 0;
+    embedded = () -> {x};
+    embedded()
+};
 
 --- sub const[T, m] ---
 

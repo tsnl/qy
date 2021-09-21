@@ -1,7 +1,7 @@
 """
 Seeding is the first typer pass.
-It enables us to type symbols in files in any order by defining every global symbol using a free type variable.
-This free type variable is called a seed.
+It enables us to types symbols in files in any order by defining every global symbol using a free types variable.
+This free types variable is called a seed.
 Each seed can later be eliminated (substituted out) by applying rules of inference and unification (see inference).
 
 Thus, this module creates seeds, creates global contexts in which to store (define) these seeds, and exports attributes
@@ -15,7 +15,7 @@ import typing as t
 
 from qcl import ast
 from qcl import frontend
-from qcl import type
+from qcl import types
 from qcl import excepts
 from qcl import feedback
 
@@ -26,8 +26,8 @@ from . import names
 
 
 mod_context_map: t.Dict["ast.node.BaseModExp", "context.Context"] = {}
-mod_exp_tid_map: t.Dict["ast.node.BaseModExp", type.identity.TID] = {}
-mod_tid_exp_map: t.Dict[type.identity.TID, "ast.node.BaseModExp"] = {}
+mod_exp_tid_map: t.Dict["ast.node.BaseModExp", types.identity.TID] = {}
+mod_tid_exp_map: t.Dict[types.identity.TID, "ast.node.BaseModExp"] = {}
 
 
 def seed_project_types(
@@ -46,7 +46,7 @@ def seed_project_types(
     # creating and storing a 'seed' FreeVar for each file-mod-exp:
     #   - this way, seeded imports can use any file-mod-exp's TID instead of an alias.
     for file_mod_exp in all_file_module_list:
-        file_mod_tid = type.new_free_var(f"seed.file-mod[{file_mod_exp.source.file_path_rel_cwd}]")
+        file_mod_tid = types.new_free_var(f"seed.file-mod[{file_mod_exp.source.file_path_rel_cwd}]")
         mod_exp_tid_map[file_mod_exp] = file_mod_tid
         mod_tid_exp_map[file_mod_tid] = file_mod_exp
 
@@ -82,7 +82,7 @@ def seed_file_mod_exp(root_ctx: context.Context, file_mod_exp: "ast.node.FileMod
     mod_context_map[file_mod_exp] = file_mod_ctx
 
     # NOTE:
-    # Even if this sub-mod accepts template args, we can substitute for a `Module` type with monomorphic fields whose
+    # Even if this sub-mod accepts template args, we can substitute for a `Module` types with monomorphic fields whose
     # types depend on Bound Vars.
     # These can then be substituted out by template instantiations. Otherwise, they generate errors.
 
@@ -99,13 +99,13 @@ def seed_import(ctx: context.Context, loc, import_name: str, import_source: fron
 
 def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.node.SubModExp"):
     # creating and storing a 'seed' for this sub-mod-exp:
-    sub_mod_tid = type.new_free_var(f"seed.sub_mod.{sub_mod_name}")
+    sub_mod_tid = types.new_free_var(f"seed.sub_mod.{sub_mod_name}")
     mod_exp_tid_map[sub_mod_exp] = sub_mod_tid
     mod_tid_exp_map[sub_mod_tid] = sub_mod_exp
 
     # defining this sub-mod in the parent context (aka the file-mod):
     # - NOTE: we create a scheme that binds all template arg types.
-    # - NOTE: all value template args do not need a polymorphic type variable.
+    # - NOTE: all value template args do not need a polymorphic types variable.
     template_type_arg_names, template_val_arg_names = names.sift_type_from_val(sub_mod_exp.template_arg_names)
     sub_mod_scheme = scheme.Scheme(sub_mod_tid, template_type_arg_names)
     sub_mod_def_obj = definition.ModRecord(
@@ -142,10 +142,10 @@ def seed_sub_mod_exp(ctx: context.Context, sub_mod_name: str, sub_mod_exp: "ast.
         for template_val_arg_name in template_val_arg_names
     }
 
-    # Gathering all type definitions in this context:
+    # Gathering all types definitions in this context:
     type_arg_name_def_obj_map = dict(sub_mod_ctx.local_type_template_arg_def_map)
 
-    # Gathering all template definitions (type and value):
+    # Gathering all template definitions (types and value):
     all_arg_name_def_obj_map = type_arg_name_def_obj_map | val_arg_name_def_obj_map
     all_arg_name_def_obj_list = [
         all_arg_name_def_obj_map[arg_name]
@@ -181,7 +181,7 @@ def seed_template_val_arg(
         loc: feedback.ILoc,
         template_val_arg_name: str
 ) -> definition.ValueRecord:
-    value_tid = type.new_free_var(f"seed.template_val_arg.{template_val_arg_name}")
+    value_tid = types.new_free_var(f"seed.template_val_arg.{template_val_arg_name}")
     def_obj = definition.ValueRecord(
         sub_mod_ctx.project,
         template_val_arg_name,
@@ -207,7 +207,7 @@ def seed_bind1_elem(
 ) -> definition.BaseRecord:
     # creating a 'seed':
     def_name = bind1_elem.id_name
-    defined_tid = type.new_free_var(f"seed.bind.{def_name}")
+    defined_tid = types.new_free_var(f"seed.bind.{def_name}")
 
     # creating an appropriate definition object `def_obj`:
     def_universe = names.infer_def_universe_of(def_name)

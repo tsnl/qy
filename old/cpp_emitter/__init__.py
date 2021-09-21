@@ -32,13 +32,13 @@ STRUCTURE
     - define builtin functions
     - such that we have a DSL of C++
     * might be easier to `include` this from a C++ file
-- next, we emit template submodule type declarations for all types
+- next, we emit template submodule types declarations for all types
     - we use global types so we can create forward declarations
 - next, we emit submodule value declarations. This entails...
     - function declarations
     - value declarations 
 - next, we emit submodule member definitions. This entails...
-    - type definitions
+    - types definitions
     - function definitions
     - global constant initialization
         - note that global static functions are mapped to a `const` function pointer when defined by lambda
@@ -48,7 +48,7 @@ from qcl.ast.node import SubModExp
 from qcl import frontend
 from qcl import ast
 from qcl import typer
-from qcl import type as ty
+from qcl import types as ty
 
 from . import cpp
 import random
@@ -80,7 +80,7 @@ def emit_project(project: frontend.Project):
         # parsing 'template_args' for this module
         assert isinstance(sub_mod_exp, ast.node.SubModExp)
         
-        # sorting type and value arg names:
+        # sorting types and value arg names:
         type_arg_names = []
         value_arg_names = []
         for arg_name in sub_mod_exp.template_arg_names:
@@ -124,7 +124,7 @@ def emit_project(project: frontend.Project):
     
     # TODO: PHASE 2
     #   - generate forward declarations for all functions
-    #   - generate type bindings/definitions
+    #   - generate types bindings/definitions
 
     # TODO: PHASE 3
     #   - generate function definitions

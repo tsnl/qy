@@ -1,6 +1,6 @@
 import enum
 
-from qcl.type import identity
+from qcl.types import identity
 
 
 class CS(enum.Enum):

@@ -14,7 +14,7 @@ import enum
 import typing as t
 import functools
 
-from qcl import type
+from qcl import types
 from qcl import excepts
 from qcl import frontend
 from qcl import feedback as fb
@@ -43,7 +43,7 @@ def run(project):
 #
 
 class BaseValueModel(object, metaclass=abc.ABCMeta):
-    def __init__(self, loc: fb.ILoc, type_of_tid: type.identity.TID):
+    def __init__(self, loc: fb.ILoc, type_of_tid: types.identity.TID):
         super().__init__()
         self.loc = loc
         self.type_of_tid = type_of_tid
@@ -52,7 +52,7 @@ class BaseValueModel(object, metaclass=abc.ABCMeta):
         if isinstance(src_value_model, self.__class__):
             return self.assign_from_impl(loc, src_value_model, for_fn_call)
         else:
-            raise excepts.CompilerError("Assignment of incorrect type, but passes type-check.")
+            raise excepts.CompilerError("Assignment of incorrect types, but passes types-check.")
 
     @abc.abstractmethod
     def assign_from_impl(self, loc, src_value_model: "BaseValueModel", for_fn_call: bool) -> "BaseValueModel":
@@ -93,7 +93,7 @@ class UnitValueModel(BaseValueModel):
             self,
             loc: "fb.ILoc"
     ):
-        super().__init__(loc, type.get_unit_type())
+        super().__init__(loc, types.get_unit_type())
 
     def assign_from_impl(self, loc, src_value_model: "BaseValueModel", for_fn_call: bool) -> "UnitValueModel":
         return UnitValueModel(loc)
@@ -109,7 +109,7 @@ class StringValueModel(BaseValueModel):
             loc: "fb.ILoc",
             value_set: t.Set[str]
     ):
-        super().__init__(loc, type.get_str_type())
+        super().__init__(loc, types.get_str_type())
         self.value_set = value_set
 
     def assign_from_impl(self, loc, src_value_model: "BaseValueModel", for_fn_call: bool):
@@ -148,9 +148,9 @@ class MemWindowValueModel(BaseValueModel):
     def __init__(
             self,
             loc: fb.ILoc,
-            type_of_tid: type.identity.TID,
+            type_of_tid: types.identity.TID,
             content_val_model: "BaseValueModel",
-            content_lifetime_set: t.Set[type.lifetime.LifetimeID],
+            content_lifetime_set: t.Set[types.lifetime.LifetimeID],
             contents_may_be_frame_local: bool,
             contents_may_be_frame_non_local: bool = False,
     ):
@@ -160,16 +160,16 @@ class MemWindowValueModel(BaseValueModel):
         self.contents_may_be_frame_local = contents_may_be_frame_local
         self.contents_may_be_frame_non_local = contents_may_be_frame_non_local
         self.window_kind = {
-            type.kind.TK.Pointer: MemWindowKind.Pointer,
-            type.kind.TK.Array: MemWindowKind.Array,
-            type.kind.TK.Slice: MemWindowKind.Slice
-        }[type.kind.of(type_of_tid)]
+            types.kind.TK.Pointer: MemWindowKind.Pointer,
+            types.kind.TK.Array: MemWindowKind.Array,
+            types.kind.TK.Slice: MemWindowKind.Slice
+        }[types.kind.of(type_of_tid)]
 
     def store_from(self, loc, stored_value_model: "BaseValueModel"):
         if isinstance(stored_value_model, self.__class__):
             return self.store_from_impl(loc, stored_value_model)
         else:
-            raise excepts.CompilerError("Store of incorrect type, but passes type-check.")
+            raise excepts.CompilerError("Store of incorrect types, but passes types-check.")
 
     def store_from_impl(self, loc, stored_value_model: "BaseValueModel"):
         # assigning to the content model:
@@ -353,7 +353,7 @@ class Analyzer(object):
         def_tid = def_val_rec.val_def_id
 
         # TODO: what about polymorphic arguments?
-        #   CANT instantiate formal type arg `T` unless we have all instantiations
+        #   CANT instantiate formal types arg `T` unless we have all instantiations
         #   THUS, we need to run this pass AFTER monomorphization
         #   THUS, we must ignore or dynamically check for violations of `TOT` assignment
         #   - can be performed within `vm` module

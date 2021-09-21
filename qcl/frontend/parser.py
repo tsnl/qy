@@ -4,7 +4,7 @@ from qcl import antlr
 from qcl import excepts
 from qcl import feedback
 from qcl import ast
-from qcl import type
+from qcl import types
 
 from .file import FileModuleSource
 
@@ -512,7 +512,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
         elif ctx.assign_exp is not None:
             return self.visit(ctx.assign_exp)
         else:
-            assert False and "Unknown bulkyExp type."
+            assert False and "Unknown bulkyExp types."
 
     def visitIfExp(self, ctx):
         return ast.node.IfExp(
@@ -680,7 +680,7 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
             raise excepts.ParserCompilationError(msg_suffix)
         else:
             # updating the closure spec to deny any closure pointer:
-            nested.closure_spec = type.closure_spec.CS.No
+            nested.closure_spec = types.closure_spec.CS.No
 
         return nested
 
@@ -690,15 +690,15 @@ class AstConstructorVisitor(antlr.NativeQyModuleVisitor):
 
     def visitEffectsSpec(self, ctx):
         return {
-            'TOT': type.side_effects.SES.Tot,
-            'DV': type.side_effects.SES.Dv,
-            'EXN': type.side_effects.SES.Exn,
-            'ST': type.side_effects.SES.ST,
-            'ML': type.side_effects.SES.ML
+            'TOT': types.side_effects.SES.Tot,
+            'DV': types.side_effects.SES.Dv,
+            'EXN': types.side_effects.SES.Exn,
+            'ST': types.side_effects.SES.ST,
+            'ML': types.side_effects.SES.ML
         }[ctx.getText()]
 
     #
     # TODO: finish parser features
     #
 
-    # - visit array literals, array type-specs
+    # - visit array literals, array types-specs

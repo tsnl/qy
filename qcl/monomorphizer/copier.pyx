@@ -35,11 +35,11 @@ from qcl import excepts
 from qcl import frontend
 from qcl import ast
 from qcl import typer
-from qcl import type
+from qcl import types
 
 cimport qcl.monomorphizer.wrapper as wrapper
 
-PySES = type.side_effects.SES
+PySES = types.side_effects.SES
 PyUnaryOp = ast.node.UnaryOp
 PyBinaryOp = ast.node.BinaryOp
 
@@ -194,7 +194,7 @@ cdef void forward_declare_proj(object proj: frontend.project.Project):
                 mk_c_str_from_py_str(builtin_def_name)
             )
         else:
-            raise NotImplementedError(f"Unknown def_rec type: {def_rec.__class__.__name__}")
+            raise NotImplementedError(f"Unknown def_rec types: {def_rec.__class__.__name__}")
 
         # defining:
         wrapper.w_set_def_target(def_id, builtin_def_target)
@@ -229,7 +229,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
     bv_def_id_count = len(sub_mod_exp.template_arg_names)
     bv_def_id_array = <wrapper.GDefID*> malloc(sizeof(wrapper.GDefID) * bv_def_id_count)
 
-    # unlike the typer before, this time we create BVs for type and value variables.
+    # unlike the typer before, this time we create BVs for types and value variables.
     bv_def_id_count = len(sub_mod_exp.template_arg_names)
     name_def_obj_pairs_iterable = zip(sub_mod_exp.template_arg_names, sub_mod_exp.template_def_list_from_typer)
     cp_bv_def_id_list = []
@@ -241,7 +241,7 @@ cdef wrapper.PolyModID gen_poly_mod_id_and_declare_fields(
         elif isinstance(bv_arg_def_obj, typer.definition.TypeRecord):
             def_id = wrapper.w_declare_global_def(wrapper.BV_TS, bv_arg_name_c_str)
         else:
-            raise NotImplementedError("Unknown BV arg def-record type")
+            raise NotImplementedError("Unknown BV arg def-record types")
         
         bv_def_id_array[i] = def_id
         cp_bv_def_id_list.append(def_id)
@@ -336,7 +336,7 @@ cdef wrapper.TypeSpecID ast_to_mast_ts(object ts: ast.node.BaseTypeSpec):
         #   - for LID nodes, straightforward interning of definition name
 
         # Checking that this ID does not reference I128/U128, since these are not supported by compile-time eval yet.
-        if ts.x_tid in (type.get_int_type(128, is_unsigned=s) for s in (True, False)):
+        if ts.x_tid in (types.get_int_type(128, is_unsigned=s) for s in (True, False)):
             panic_because_128_bit_ints_unsupported()
 
         id_ts = ts
@@ -471,7 +471,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
     elif isinstance(e, ast.node.NumberExp):
         # ExpID w_new_int_exp(size_t mantissa, IntegerSuffix int_suffix, bint is_neg)
         # ExpID w_new_float_exp(double value, FloatSuffix float_suffix)
-        width_in_bits = type.scalar_width_in_bits.of(e.x_tid)
+        width_in_bits = types.scalar_width_in_bits.of(e.x_tid)
         if e.is_float:
             if width_in_bits == 64:
                 float_suffix = wrapper.FS_F64
@@ -702,7 +702,7 @@ cdef wrapper.ExpID ast_to_mast_exp(object e: ast.node.BaseExp):
         tuple_exp_id = ast_to_mast_exp(e.container)
         tuple_py_tid = e.container.x_tid
         field_name_py_str = e.key_name
-        field_index = type.elem.field_ix_of_name(tuple_py_tid, field_name_py_str)
+        field_index = types.elem.field_ix_of_name(tuple_py_tid, field_name_py_str)
         assert tuple_py_tid is not None
         assert field_name_py_str is not None
         assert field_index is not None
@@ -850,20 +850,20 @@ cdef instantiate_entry_point(object proj: frontend.Project):
         msg_suffix = f"Could not find a suitable entry point function named `{entry_point_function_name}`"
         raise excepts.CheckerCompilationError(msg_suffix)
 
-    # checking the found symbol's type:
+    # checking the found symbol's types:
     _, rec_tid = rec.scheme.shallow_instantiate()
-    expected_tid = type.get_fn_type(
-        type.get_unit_type(),
-        type.get_int_type(32, is_unsigned=False),
-        type.side_effects.SES.ML,
-        type.closure_spec.CS.Maybe      # i.e. does not need a ctx pointer, but can be invoked with one (layout)
+    expected_tid = types.get_fn_type(
+        types.get_unit_type(),
+        types.get_int_type(32, is_unsigned=False),
+        types.side_effects.SES.ML,
+        types.closure_spec.CS.Maybe      # i.e. does not need a ctx pointer, but can be invoked with one (layout)
     )
     rec_type_correct = (rec_tid == expected_tid)
     if not rec_type_correct:
         msg_suffix = (
-            f"Supplied entry-point named `{entry_point_function_name}` does not have the correct type: "
-            f"expected `{entry_point_function_name} ~ {type.spelling.of(expected_tid)}`, but "
-            f"received `{entry_point_function_name} ~ {type.spelling.of(rec_tid)}`"
+            f"Supplied entry-point named `{entry_point_function_name}` does not have the correct types: "
+            f"expected `{entry_point_function_name} ~ {types.spelling.of(expected_tid)}`, but "
+            f"received `{entry_point_function_name} ~ {types.spelling.of(rec_tid)}`"
         )
         # raise excepts.CheckerCompilationError(msg_suffix)
         panic(msg_suffix)
@@ -1121,11 +1121,11 @@ cpdef object py_mast_get_node_info(node_id: "PyMAST.NodeID"):
             arg_ts=node_info_ptr.ts_func_sgn.arg_ts,
             ret_ts=node_info_ptr.ts_func_sgn.ret_ts,
             ret_ses={
-                wrapper.SES_ML: type.side_effects.SES.ML,
-                wrapper.SES_ST: type.side_effects.SES.ST,
-                wrapper.SES_EXN: type.side_effects.SES.Exn,
-                wrapper.SES_DV: type.side_effects.SES.Dv,
-                wrapper.SES_TOT: type.side_effects.SES.Tot
+                wrapper.SES_ML: types.side_effects.SES.ML,
+                wrapper.SES_ST: types.side_effects.SES.ST,
+                wrapper.SES_EXN: types.side_effects.SES.Exn,
+                wrapper.SES_DV: types.side_effects.SES.Dv,
+                wrapper.SES_TOT: types.side_effects.SES.Tot
             }[node_info_ptr.ts_func_sgn.ret_ses]
         )
     if node_kind == PyMAST.NodeKind.TS_Tuple:
@@ -1606,11 +1606,11 @@ cpdef object py_mtype_get_func_mtid_ret_mtid(object func_mtid: int):
     return wrapper.w_get_func_mtid_ret_mtid(func_mtid)
 cpdef object py_mtype_get_func_mtid_ses(object func_mtid: int):
     return {
-        wrapper.SES_ML: type.side_effects.SES.ML,
-        wrapper.SES_ST: type.side_effects.SES.ST,
-        wrapper.SES_EXN: type.side_effects.SES.Exn,
-        wrapper.SES_DV: type.side_effects.SES.Dv,
-        wrapper.SES_TOT: type.side_effects.SES.Tot
+        wrapper.SES_ML: types.side_effects.SES.ML,
+        wrapper.SES_ST: types.side_effects.SES.ST,
+        wrapper.SES_EXN: types.side_effects.SES.Exn,
+        wrapper.SES_DV: types.side_effects.SES.Dv,
+        wrapper.SES_TOT: types.side_effects.SES.Tot
     }[wrapper.w_get_func_mtid_ses(func_mtid)]
 
 # Py interface: ArgList
