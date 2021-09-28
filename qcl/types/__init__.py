@@ -17,7 +17,6 @@ from . import mem_window
 from . import spelling
 from . import side_effects
 from . import free
-from . import closure_spec
 from . import lifetime
 
 
@@ -225,27 +224,23 @@ _fn_tid_map = {}
 
 def get_fn_type(
         arg_tid: identity.TID, ret_tid: identity.TID,
-        ses: side_effects.SES,
-        cs: closure_spec.CS
+        ses: side_effects.SES
 ) -> identity.TID:
     return _get_cached_type(
         _fn_tid_map,
         _new_fn_type,
-        (arg_tid, ret_tid, ses, cs)
+        (arg_tid, ret_tid, ses)
     )
 
 
 def _new_fn_type(
         arg_tid: identity.TID, ret_tid: identity.TID,
-        ses: side_effects.SES,
-        cs: closure_spec.CS
+        ses: side_effects.SES
 ) -> identity.TID:
     assert ses is not None
-    assert closure_spec is not None
     tid = identity.mint()
     kind.init(tid, kind.TK.Fn)
     elem.init_func(tid, arg_tid, ret_tid)
-    closure_spec.init_func(tid, cs)
     side_effects.init(tid, ses)
     return tid
 
@@ -299,30 +294,6 @@ def _new_struct_type(field_elem_info_tuple) -> identity.TID:
 
 
 #
-# Union types:
-#
-
-_union_tid_map = {}
-
-
-def get_union_type(field_elem_info_tuple) -> identity.TID:
-    return _get_cached_type(
-        _union_tid_map,
-        _new_union_type,
-        ctor_takes_arg_key_directly=True
-    )
-
-
-def _new_union_type(field_elem_info_tuple) -> identity.TID:
-    assert isinstance(field_elem_info_tuple, tuple)
-
-    tid = identity.mint()
-    kind.init(tid, kind.TK.Union)
-    elem.init_union(tid, copy.deepcopy(field_elem_info_tuple))
-    return tid
-
-
-#
 #
 # Un-cached types:
 #
@@ -339,6 +310,7 @@ def new_module_type(field_elem_info_tuple) -> identity.TID:
     kind.init(tid, kind.TK.Module)
     elem.init_module(tid, copy.deepcopy(field_elem_info_tuple))
     return tid
+
 
 #
 # NOTE: variable creation is not cached, even if the created variables share a name.

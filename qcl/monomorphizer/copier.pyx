@@ -855,8 +855,7 @@ cdef instantiate_entry_point(object proj: frontend.Project):
     expected_tid = types.get_fn_type(
         types.get_unit_type(),
         types.get_int_type(32, is_unsigned=False),
-        types.side_effects.SES.ML,
-        types.closure_spec.CS.Maybe      # i.e. does not need a ctx pointer, but can be invoked with one (layout)
+        types.side_effects.SES.ML
     )
     rec_type_correct = (rec_tid == expected_tid)
     if not rec_type_correct:

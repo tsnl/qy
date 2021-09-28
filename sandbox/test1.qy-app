@@ -3,6 +3,11 @@
 // These collective contents are known as a 'module'.
 // This is a `qy-app` file and cannot be imported.
 
+// Note that identifiers that refer to types always start with an upper-case letter.
+// On the other hand, identifiers that refer to values always start with a lower-case letter.
+// All valid identifiers contain a letter (uppercase or lowercase), and if the first character isn't a letter,
+// we consider the first letter to determine this.
+
 //
 // Header:
 //

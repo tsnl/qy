@@ -129,7 +129,6 @@ class Substitution(object):
 
                 replacement_ctor_map = {
                     types.kind.TK.Struct: types.get_struct_type,
-                    types.kind.TK.Union: types.get_union_type,
                     types.kind.TK.Module: types.new_module_type
                 }
                 return replacement_ctor_map[t_kind](replacement_elem_info_tuple)
@@ -139,8 +138,7 @@ class Substitution(object):
             return types.get_fn_type(
                 self.rewrite_type(types.elem.tid_of_fn_arg(tid)),
                 self.rewrite_type(types.elem.tid_of_fn_ret(tid)),
-                types.side_effects.of(tid),
-                types.closure_spec.of(tid)
+                types.side_effects.of(tid)
             )
 
         # unknown:

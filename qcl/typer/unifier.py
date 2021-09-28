@@ -254,22 +254,3 @@ def ses_are_equal(ses1: "type_.side_effects.SES", ses2: "type_.side_effects.SES"
     else:
         return ses1 == ses2
 
-
-#
-# ClosureSpec inference:
-#
-
-CS = types.closure_spec.CS
-
-
-def unify_closure_spec(cs1: CS, cs2: CS) -> CS:
-    if CS.Yes in (cs1, cs2) and CS.No in (cs1, cs2):
-        msg_suffix = f"cannot unify opposing closure specifiers: a `ClosureBan` function uses non-local IDs"
-        raise excepts.TyperCompilationError(msg_suffix)
-    elif CS.Yes in (cs1, cs2):
-        return CS.Yes
-    elif CS.No in (cs1, cs2):
-        return CS.No
-    else:
-        assert cs1 == cs2 == CS.Maybe
-        return CS.Maybe

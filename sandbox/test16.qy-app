@@ -6,9 +6,8 @@ main_for_v1_default_loader = () -> ML {
     0
 };
 
-a ~ () -> F32;
-a = () -> {
-    x = 0;
+a ~ (I32) -> I32;
+a = (x) -> {
     embedded = () -> {x};
     embedded()
 };
