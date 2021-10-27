@@ -12,11 +12,19 @@ A vastly simplified take on Qy.
 3.  Initially, assume functions are not first-class.
     - this helps us optimize one of the most important operations we execute
 4.  Symbols denoted by back-quoted strings (?)
+5.  Syntax need not be indentation sensitive
+    - keyword-based languages typically have a terminator keyword (e.g. `end` in basic, `fi` in bash)
+    - control-flow gives us certain keywords we expect to terminate blocks-- use these
+        - only oddball: 'if': not an expression, just subdivides into more blocks
+        - block terminators: `continue`, `break`, `return`, etc
+
 
 ```
-; In Qy, lines are processed one-at-a-time.
 ; Semicolons begin line comments, and are not used as delimiters.
 ; Only top-level statements are 'def', 'use', and 'chk'
+
+; NOTE: each file is a module, and is processed as one translation unit.
+;       this lets the user define stuff out of order. ^_^
 
 ;
 ; 'USE' statement:
@@ -31,6 +39,7 @@ use basic from "random-qy3-file-path.qy3"
 
 ; used to define functions, which are polymorphically typed by default.
 ; NOTE: top-level functions are also generic type definitions.
+;       you can use a function name to identify the data-type it returns.
 
 def point_v1 (xyz, r, c) =
     return {
@@ -55,6 +64,7 @@ def point (x, y, z, r, c) =
     else
         return.Point2 point_v2()
 
+; note 'is' operator is compile-time OR run-time (unions only)
 def process_pts (pt_list) =
     for pt in pt_list do
         if pt is point.Point1 then
@@ -71,6 +81,14 @@ def process_pts (pt_list) =
 ; TODO: what about references? vectors?
 ; maybe can offer these as built-ins, with user-managed 'handles' and the option to index
 ; challenge is getting good handles-- maybe scheme locatives are what we need?
+; alternatively, can offer 'vector' as a built-in, and let the user slice it as required (no references, just indices)
+
+; TODO: what about interfaces, dynamic dispatch?
+;   - can just use a procedural approach?
+;   - pattern matching allows us to dynamic dispatch?
+;     - so optional type annotations auto-pattern-match
+;     - so overloads are a thing
+;     - can use a Nim-style de-sugaring for `.method`
 
 ;
 ; EXAMPLES OF ERRORS
@@ -83,9 +101,9 @@ def process_pts (pt_list) =
 ; WRONG
 def optional (is_some, v) =
     if is_some then
-        return (`Some`, v)
+        return {`Some`, v}
     else
-        return (`None`, void)
+        return {`None`, void}
 
 ; RIGHT
 def optional (is_some, v) =
@@ -93,7 +111,6 @@ def optional (is_some, v) =
         return.Some v
     else
         return.None void
-
 ```
 
 

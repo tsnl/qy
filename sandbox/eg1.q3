@@ -1,0 +1,24 @@
+; function parameters admit optional type specifiers.
+; 1.  if specified, can check against this type or abstract type/set of types
+; 2.  if unspecified, assume any type satisfies
+;     - this is the default-- that we bake things out with templates.
+; *   similarly, optional return type is just a check
+
+Vector3 (x: Scalar, y: Scalar, z: Scalar) = 
+    return {
+        x: x,
+        y: y,
+        z: z
+    }
+
+add (v1: Vector3, v2: Vector3) -> Vector3 =
+    return Vector3 (v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)
+
+scale (v: Vector3, s: Scalar) -> Vector3 =
+    return Vector3 (v.x * s, v.y * s, v.z * s)
+
+; example of type classes via overloaded constructors:
+Scalar (x: float32) = return x
+Scalar (x: float64) = return x
+Scalar (x: int32) = return x
+Scalar (x: uint32) = return x
