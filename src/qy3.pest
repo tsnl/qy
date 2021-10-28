@@ -1,0 +1,61 @@
+file = 
+    { SOI ~ (fileDef*) ~ EOI }
+fileDef =
+    { (procDef | gVarDef) }
+procDef = 
+    { (IDENTIFIER ~ "(" ~ argSpec* ~ ")" ~ ("->" ~ typeSpec)? ~ "=" ~ expression) 
+    | (IDENTIFIER ~ "(" ~ argSpec* ~ ")" ~ ("->" ~ typeSpec)? ~ "=>" ~ block) }
+gVarDef =
+    { (IDENTIFIER ~ "=" ~ expression) 
+    | (IDENTIFIER ~ "=>" ~ block) }
+
+block = 
+    { nonTerminalStatement* ~ terminalStatement }
+nonTerminalStatement = 
+    { bindStatement }
+terminalStatement = 
+    { returnStatement }
+returnStatement = 
+    { "return" ~ expression }
+bindStatement =
+    { IDENTIFIER ~ "=" ~ expression }
+
+argSpec = 
+    { (IDENTIFIER)
+    | (IDENTIFIER ~ ":" ~ typeSpec) }
+
+expression = 
+    { voidExpression | numberExpression | idRefExpression }
+voidExpression = 
+    { "void" }
+numberExpression = 
+    { LITERAL_DEC_INTEGER | LITERAL_HEX_INTEGER | LITERAL_BIN_INTEGER | LITERAL_FLOAT }
+idRefExpression = 
+    { IDENTIFIER }
+
+typeSpec = 
+    { postfixTypeSpec }
+primaryTypeSpec =
+    { IDENTIFIER }
+postfixTypeSpec =
+    { (primaryTypeSpec ~ ".")* ~ IDENTIFIER }
+
+LITERAL_DEC_INTEGER = 
+    @{ ("+"|"-")? ~ ASCII_DIGIT ~ (ASCII_DIGIT|"_")* }
+LITERAL_HEX_INTEGER = 
+    @{ ("+"|"-")? ~ "0x" ~ (HEX_DIGIT|"_")+ }
+LITERAL_BIN_INTEGER = 
+    @{ ("+"|"-")? ~ "0b" ~ ("0"|"1"|"_")+ }
+LITERAL_FLOAT = 
+    @{ LITERAL_DEC_INTEGER ~ "." ~ LITERAL_DEC_INTEGER ~ LITERAL_FLOAT_SUFFIX? }
+LITERAL_FLOAT_SUFFIX = 
+    @{ "f" | "F" }
+
+IDENTIFIER = 
+    @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")* }
+
+
+WHITESPACE =
+    _{ " " | "\t" | NEWLINE }
+COMMENT = 
+    _{ (";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE) }
