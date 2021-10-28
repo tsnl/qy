@@ -1,0 +1,35 @@
+; use semicolons to begin line-comments.
+
+; Qy is a sorta-dynamically typed systems-programming language.
+;   - the user can define value types
+;       - integers, imprecise floats
+;       - arrays (like in Go)
+;       - structs, unions
+;   - the user can also define 'interface' and 'box' types
+;       - 'interface' is an interface type
+;       - 'box' is a sealed class data-type-- always 'boxed' in memory
+;           - it can implement many interfaces, and can then be referenced by a pointer to an interface
+;           - like Java, they can actually be variadic, e.g. vector implemented as a variadic array pointer box
+;       - KEY: a pointer to an interface is actually just a `void*` pointer that has been checked at compile-time.
+;           - use a binary search to look up methods by an interned key name => dynamic method injection is possible!
+;   - box types are optionally manually memory managed
+;       - the BDW GC can be used
+;   - pointers can be accessed via a `libffi`-style interface, with the catch being that these are builtin ops
+;       - the user's primary environment is a high-level dynamic language, and they drop to a low-level when needed for
+;         performance
+; Note that there is good precedent for this: C was a direct successor to such a language, BCPL, and Java works this way
+; too.
+
+use "other-module.qy"
+
+pub new_random_f32 () -> F32
+def new_random_f32 () =
+    return 42.0
+
+def Iterable = interface {
+    pub next () -> box
+}
+
+def Vector = box (n) {
+    pub data Array(n)
+}
