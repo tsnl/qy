@@ -1,0 +1,1 @@
+PROJECT_FILE_EXTENSION = ".qyp.json"

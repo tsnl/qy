@@ -1,0 +1,50 @@
+// Qy is a programming language ideal for prototyping quickly.
+//   - it uses the C type system with a few enhancements and RTTI.
+//   - type specifiers are only needed for functions and type definitions.
+//   - it uses a single-pass compiler for simplicity
+
+// typing/declarations:
+// NOTE: argument names are optional, but types are mandatory
+// NOTE: functions do not need to be declared before definition unless...
+//   1. they are used before they are defined, or
+//   2. they are marked as 'public' (in which case declaration goes in a header)
+public vec3f: (x float32, y float32, z float32) -> Vec3f;
+public v3f_add: (Vec3f, Vec3f) -> Vec3f;
+public v3f_scale: (Vec3f, float32) -> Vec3f;
+
+// enums provided using 'const', which translates into preprocessor declarations
+const {
+    EC_ALL_OK = 0;
+    EC_BAD_CLI_ARGS = iota;
+    EC_BAD_FILE_PATH = iota;
+    EC_DETECTED_RUNTIME_ERROR = iota;
+};
+
+// struct definitions: (enum, union are similar)
+Point = struct {
+    pos: Vec3f
+};
+Vec3f = struct {
+    x: float32, 
+    y: float32,
+    z: float32
+};
+
+// function definitions:
+// NOTE: type inference fills in holes.
+vec3f (x, y, z) = {
+    v = Vec3f(x, y, z);
+    return v;
+};
+v3f_add (v1, v2) = {
+    vx = v1.x + v2.x;
+    vy = v1.y + v2.y;
+    vz = v1.z + v2.z;
+    return vec3f(vx, vy, vz);
+};
+v3f_scale (v, s) = {
+    sx = v.x * s;
+    sy = v.y * s;
+    sz = v.z * s;
+    return vec3f(sx, sy, sz);
+};
