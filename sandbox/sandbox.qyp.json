@@ -4,5 +4,9 @@
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
         "./v1-basics.qy"
+    ],
+    "deps": [
+        "./import-test-qyp-1/import-test-qyp-1.qyp.json",
+        "./import-test-qyp-2/import-test-qyp-2.qyp.json"
     ]
 }

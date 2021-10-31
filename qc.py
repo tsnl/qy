@@ -29,7 +29,7 @@ def main():
             qyp_path
         )
 
-    root_qyp = qcl.source.load_qyp(qyp_path)
+    root_qyp = qcl.transpile_one_package(qyp_path)
     return root_qyp
     
 
