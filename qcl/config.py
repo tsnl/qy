@@ -1,1 +1,2 @@
 PROJECT_FILE_EXTENSION = ".qyp.json"
+DEBUG_MODE = True

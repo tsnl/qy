@@ -1,8 +1,9 @@
 """
-This module handles...
-- tracking individual source files
-- tracking `Qyp`s, or Qy Packages
+`ast2` handles...
+- tracking whole source files
 - tracking `QypSet`s, or Qy Package sets: groups of interdependent packages
+- tracking `Qyp`s, or Qy Packages
+- tracking `QySourceFile`s
 """
 
 import os.path
@@ -12,7 +13,14 @@ from collections import OrderedDict
 
 from . import panic
 from . import feedback as fb
+from . import ast1
 
+
+#
+#
+# QypSet, Qyp, QySourceFile:
+#
+#
 
 class QypSet(object):
     @staticmethod
@@ -83,7 +91,7 @@ class Qyp(object):
                 panic.ExitCode.BadProjectFile,
                 f"failed to parse project file: {exc.msg} in:",
                 path_to_root_qyp_file,
-                fb.Span(fb.Loc(exc.lineno-1, exc.colno-1))
+                fb.FileSpan(fb.FilePos(exc.lineno - 1, exc.colno - 1))
             )
 
         # basic error checking: still need owner to query and report for us
@@ -110,6 +118,8 @@ class Qyp(object):
                 f"project file has {len(missing_keys)} extra keys: {extra_keys_str}"
             )
 
+        # TODO: add more checks
+
         # args look OK! Create a Qy project (Qyp)
         return Qyp(
             path_to_root_qyp_file,
@@ -123,7 +133,7 @@ class Qyp(object):
     def __init__(
         self, 
         qyp_file_path, 
-        name: str, author: str, help: str, 
+        name: str, author: str, project_help: str,
         src_list: t.List[str], 
         dep_list: t.List[str]
     ) -> None:
@@ -136,9 +146,12 @@ class Qyp(object):
         self.dir_path = os.path.dirname(qyp_file_path)
         self.js_name = name
         self.js_author = author
-        self.js_help = help
+        self.js_help = project_help
         self.js_src_list = src_list
         self.js_dep_list = dep_list
+
+    def iter_src_paths(self):
+        yield from self.js_src_list
 
 
 package_required_keys = {
@@ -148,3 +161,16 @@ package_optional_keys = {
     "deps"
 }
 package_supported_keys = package_required_keys | package_optional_keys
+
+
+class QySourceFile(object):
+    @staticmethod
+    def load(parent_package: Qyp, source_file_path: str) -> "QySourceFile":
+        # TODO: invoke the parser here.
+        #   - should return a `SourceFile` object, which...
+        #   - should contain top-level definitions
+        pass
+
+    def __init__(self, stmt_list: t.List[ast1.BaseStatement]):
+        super().__init__()
+        self.stmt_list = stmt_list

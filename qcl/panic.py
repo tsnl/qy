@@ -11,20 +11,21 @@ class ExitCode(enum.Enum):
     BadProjectFile = enum.auto()
     CompilationFailed = enum.auto()
     InterpreterError = enum.auto()
+    SyntaxError = enum.auto()
 
 
 def because(
     exit_code: ExitCode, 
     opt_msg: t.Optional[str] = None, 
     opt_file_path: t.Optional[str] = None,
-    opt_span: t.Optional[fb.Span] = None
+    opt_file_region: t.Optional[fb.BaseFileRegion] = None
 ):
     if opt_msg:
         print(f"PANIC: {opt_msg}")
     if opt_file_path:
         custom_end = '\n'
-        if opt_span is not None:
-            custom_end = f":{opt_span}\n"
+        if opt_file_region is not None:
+            custom_end = f":{str(opt_file_region)}\n"
 
         print(f"relpath: {opt_file_path}", end=custom_end)
         print(f"abspath: {os.path.abspath(opt_file_path)}", end=custom_end)

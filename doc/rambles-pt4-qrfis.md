@@ -1,4 +1,4 @@
-# Proposed Extensions
+# Proposed Extensions: QRFIs
 
 Rambles 1 to 3 describe core language functionality.
 
@@ -27,17 +27,20 @@ GNU-C extensions actually support this, so we can just generate function definit
 
 A more refined approach would involve building our own 
 system to capture implicit variables.
-- each 'closure' object is just a 2 pointers: 
+- each 'closure' object is just 2 pointers: 
   (proc-code-handle, args)
 
 ## QRFI p2: dynamic dispatch and traits
 
-Pretty similar to Go or Rust.
+Library level DD is possible using existing 'type' system
 
 ## QRFI p3: template generics
 
-Pretty straightforward, but only admit literal constants
-for evaluation.
+Pretty straightforward, but only admit literal constants for evaluation.
+
+**NOTE:** this may go against the spirit of the language, which seeks polymorphism via run-time facilities.
+
+**NOTE:** this may be a good way to do duck-typing (cf templates in C++).
 
 ## QRFI p4: static evaluation/multi-phase compilation
 
@@ -52,3 +55,7 @@ This is vital to interop with existing C libraries.
 
 Allow the user to transparently interoperate with 
 Python libraries and code.
+
+## QRFI p7: A macro system
+
+This would enable us to turn many QRFIs into libraries.
