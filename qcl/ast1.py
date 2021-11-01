@@ -92,3 +92,48 @@ class ReturnStatement(BaseStatement):
     def __init__(self, loc, returned_exp: BaseExpression):
         super().__init__(loc)
         self.returned_exp = returned_exp
+
+
+#
+#
+# Expressions:
+#
+#
+
+class BaseNumberExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, text: str, value: t.Union[int, float], width_in_bits: int):
+        super().__init__(loc)
+        self.text = text
+        self.value = value
+        self.width_in_bits = width_in_bits
+
+
+class IntExpression(BaseNumberExpression):
+    def __init__(
+            self,
+            loc: fb.ILoc,
+            text: str,
+            value: int,
+            base: int,
+            is_unsigned: bool,
+            width_in_bits: int = 32
+    ):
+        super().__init__(loc, text, value, width_in_bits)
+        self.value: int
+        self.text_base = base
+        self.is_unsigned = is_unsigned
+        print("IntExpression:", self.text)
+
+
+class FloatExpression(BaseNumberExpression):
+    def __init__(self, loc: fb.ILoc, text: str, value: float, width_in_bits=64):
+        super().__init__(loc, text, value, width_in_bits)
+        self.value: float
+        print("FloatExpression:", self.text)
+
+
+class StringExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, pieces: t.List[str], value: str):
+        super().__init__(loc)
+        self.pieces = pieces
+        self.value = value

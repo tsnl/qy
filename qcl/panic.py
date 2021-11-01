@@ -27,7 +27,12 @@ def because(
         if opt_file_region is not None:
             custom_end = f":{str(opt_file_region)}\n"
 
-        print(f"relpath: {opt_file_path}", end=custom_end)
-        print(f"abspath: {os.path.abspath(opt_file_path)}", end=custom_end)
+        rel_path = opt_file_path
+        abs_path = os.path.abspath(opt_file_path)
+        if rel_path == abs_path:
+            print(f"abspath: {opt_file_path}", end=custom_end)
+        else:
+            print(f"relpath: {rel_path}", end=custom_end)
+            print(f"abspath: {abs_path}", end=custom_end)
     
     exit(exit_code.value)

@@ -1,5 +1,6 @@
 import os.path
 import typing as t
+import re
 
 from . import antlr
 from . import feedback as fb
@@ -77,6 +78,12 @@ class QyErrorListener(antlr.ANTLR4ErrorListener):
 
 
 class AstConstructorVisitor(antlr.QySourceFileVisitor):
+    # TODO: add methods to check that input is correct
+    #   - only certain statements allowed in top-level, function bodies, etc.
+    #       - 'return', 'ite' not allowed except inside a function
+    #       - 'const', 'bind1f' only globally allowed
+    #   - `iota` expression only allowed inside a 'const' initializer
+
     def __init__(self, source_file_path: str):
         super().__init__()
         self.source_file_path = source_file_path
@@ -108,6 +115,10 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             )
         )
 
+    #
+    # Files & blocks:
+    #
+
     def visitSourceFile(self, ctx: antlr.QySourceFileParser.SourceFileContext) -> t.List[ast1.BaseStatement]:
         return self.visit(ctx.unwrapped_block)
 
@@ -120,19 +131,23 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             for statement_ctx in ctx.statements
         ]
 
+    #
+    # statement:
+    #
+
     def visitStatement(self, ctx: antlr.QySourceFileParser.StatementContext) -> ast1.BaseStatement:
         if ctx.b1v is not None:
-            return ctx.b1v
+            return self.visit(ctx.b1v)
         elif ctx.b1f is not None:
-            return ctx.b1f
+            return self.visit(ctx.b1f)
         elif ctx.b1t is not None:
-            return ctx.b1t
+            return self.visit(ctx.b1t)
         elif ctx.t1v is not None:
-            return ctx.t1v
+            return self.visit(ctx.t1v)
         elif ctx.con is not None:
-            return ctx.con
+            return self.visit(ctx.con)
         elif ctx.ite is not None:
-            return ctx.ite
+            return self.visit(ctx.ite)
         else:
             raise NotImplementedError("Unknown 'statement' kind in parser")
 
@@ -140,7 +155,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
-        arg_name_list = [arg_tk.text for arg_tk in ctx.args]
+        arg_name_list = self.visit(ctx.args)
         if ctx.body_exp is not None:
             ret_exp = self.visit(ctx.body_exp)
             body_stmt_list = [ast1.ReturnStatement(ret_exp.loc, ret_exp)]
@@ -176,10 +191,95 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitReturnStatement(self, ctx: antlr.QySourceFileParser.ReturnStatementContext) -> ast1.ReturnStatement:
         return ast1.ReturnStatement(self.loc(ctx), self.visit(ctx.ret_exp))
 
-    # TODO: implement remaining visitor methods
+    #
+    # expressions:
+    #
 
-    def visitExpression(self, ctx: antlr.QySourceFileParser.ExpressionContext):
-        raise NotImplementedError("Parsing 'expression'")
+    def visitExpression(self, ctx: antlr.QySourceFileParser.ExpressionContext) -> ast1.BaseExpression:
+        res = self.visit(ctx.through)
+        assert isinstance(res, ast1.BaseExpression)
+        return res
+
+    @staticmethod
+    def split_number_text(raw_literal_number_text):
+        match_obj = re.match(compiled_number_matcher_pattern, raw_literal_number_text)
+        numeric_text = match_obj.group(2).replace('_', '')
+        suffix_text = match_obj.group(3)
+        return numeric_text, suffix_text
+
+    def make_int_expression(self, ctx, raw_text: str, base: int):
+        # splitting the number text:
+        numeric_text, suffix_text = AstConstructorVisitor.split_number_text(raw_text)
+
+        # parsing the suffix:
+        width_in_bits = 32
+        is_unsigned = False
+        for suffix_character in suffix_text:
+            if suffix_character in ('u', 'U'):
+                is_unsigned = True
+            elif suffix_character in ('l', 'L'):
+                width_in_bits = 64
+            elif suffix_character in ('s', 'S'):
+                width_in_bits = 16
+            elif suffix_character in ('b', 'B'):
+                width_in_bits = 8
+            else:
+                raise NotImplementedError(f"Unknown integer suffix char: {repr(suffix_character)}")
+
+        # parsing the numeric text to find the Python value:
+        value = int(numeric_text, base)
+
+        # returning the new expression:
+        return ast1.IntExpression(self.loc(ctx), raw_text, value, base, is_unsigned, width_in_bits)
+
+    
+    def make_float_expression(self, ctx, raw_text: str):
+        # splitting the number text:
+        numeric_text, suffix_text = AstConstructorVisitor.split_number_text(raw_text)
+
+        # parsing the suffix:
+        width_in_bits = 64
+        for suffix_character in suffix_text:
+            if suffix_character in ('f', 'F'):
+                width_in_bits = 32
+            elif suffix_character in ('d', 'D'):
+                width_in_bits = 64
+            else:
+                raise NotImplementedError(f"Unknown float suffix char: {repr(suffix_character)}")
+
+        # parsing the numeric text to find the Python value:
+        value = float(numeric_text)
+
+        # returning the new expression:
+        return ast1.FloatExpression(self.loc(ctx), raw_text, value, width_in_bits)
+
+    def visitLitInteger(self, ctx: antlr.QySourceFileParser.LitIntegerContext) -> ast1.IntExpression:
+        raw_text = ctx.getText()
+        if ctx.deci is not None:
+            return self.make_int_expression(ctx, raw_text, 10)
+        elif ctx.hexi is not None:
+            return self.make_int_expression(ctx, raw_text, 16)
+        else:
+            raise NotImplementedError("Unknown integer literal")
+
+    def visitLitFloat(self, ctx: antlr.QySourceFileParser.LitFloatContext) -> ast1.FloatExpression:
+        raw_text = ctx.tok.text
+        return self.make_float_expression(ctx, raw_text)
+
+    #
+    # TypeSpec:
+    #
 
     def visitTypeSpec(self, ctx: antlr.QySourceFileParser.TypeSpecContext):
-        raise NotImplementedError("Parsing 'typeSpec'")
+        # raise NotImplementedError("Parsing 'typeSpec'")
+        print("WARNING: NotImplemented: Parsing 'typeSpec'")
+
+    #
+    # Misc:
+    #
+
+    def visitCsVIdList(self, ctx: antlr.QySourceFileParser.CsVIdListContext):
+        return [id_tok.text for id_tok in ctx.ids]
+
+
+compiled_number_matcher_pattern = re.compile(r"(0[xb])?([0-9_.]+)([a-zA-Z]*)")

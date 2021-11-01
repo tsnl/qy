@@ -1,3 +1,7 @@
+// FIXME: currently disabled
+
+/* 
+
 // Qy is a programming language ideal for prototyping quickly.
 //   - it uses the C type system with a few enhancements and RTTI.
 //   - type specifiers are only needed for functions and type definitions.
@@ -14,10 +18,10 @@ export v3f_scale: (Vec3f, float32) -> Vec3f;
 
 // enums provided using 'const', which translates into preprocessor declarations
 const {
-    ec_ALL_OK = 0;
-    ec_BAD_CLI_ARGS = iota;
-    ec_BAD_FILE_PATH = iota;
-    ec_DETECTED_RUNTIME_ERROR = iota;
+    error_code_all_ok = 0;
+    error_code_bad_cli_args = iota;
+    error_code_bad_file_path = iota;
+    error_code_detected_runtime_error = iota;
 };
 
 // struct definitions: (enum, union are similar)
@@ -33,6 +37,7 @@ Vec3f = struct {
 // function definitions:
 // NOTE: type inference fills in holes.
 vec3f (x, y, z) = Vec3f(x, y, z);
+
 v3f_add (v1, v2) {
     vx = v1.x + v2.x;
     vy = v1.y + v2.y;
@@ -45,3 +50,5 @@ v3f_scale (v, s) {
     sz = v.z * s;
     return vec3f(sx, sy, sz);
 };
+
+*/

@@ -2,7 +2,6 @@
 build/
 venv/
 .DS_Store
-.vscode
 .idea
 
 # Python:

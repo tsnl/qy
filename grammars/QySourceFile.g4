@@ -8,11 +8,23 @@ fragment L: [a-z] ;
 fragment U: [A-Z] ;
 fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
+fragment ANY_ESC: (
+    ('\\' ('\\' | 'n' | 'r' | 't')) |
+    ('\\u' H H H H)
+    ('\\U' H H H H H H H H)
+);
+fragment IS: [uUlLsS]+ ;
+fragment FS: [fFdD]+ ;
+
 TID: ('_'*) (U (L|U|D|'_')*) ;
 VID: ('_'*) (L (L|U|D|'_')*) ;
-LIT_DEC_INT: ('+'|'-')? D+ ;
-LIT_HEX_INT: ('+'|'-')? '0x' H+ ;
-LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT ('f')? ;
+LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
+LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
+LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
+LIT_SQ_STRING: ('\'' (ANY_ESC|'\\\''|~[\r\n\\'])*?  '\'');
+LIT_DQ_STRING: ('"'  (ANY_ESC|'\\"' |~[\r\n\\"])*?  '"');
+LIT_ML_DQ_STRING: '"""' (.)*? '"""';
+LIT_ML_SQ_STRING: '\'\'\'' (.)*? '\'\'\'';
 
 LINE_COMMENT: '//' ~[\r\n]* -> skip;
 BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> skip;
@@ -67,6 +79,7 @@ expression
 primaryExpression
     : litInteger                    #litIntPrimaryExpression
     | litFloat                      #litFloatPrimaryExpression
+    | litString                     #litStringPrimaryExpression
     | 'iota'                        #iotaPrimaryExpression
     | VID                           #vidPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
@@ -162,19 +175,9 @@ formalArgSpec
     | VID ':' typeSpec
     ;
 
-litInteger
-    : LIT_DEC_INT
-    | LIT_HEX_INT
-    ;
-litFloat
-    : LIT_FLOAT
-    ;
-csVIdList
-    : ids+=VID (',' ids+=VID)*
-    ;
-csFormalArgSpecList
-    : specs+=formalArgSpec (',' specs+=formalArgSpec)*
-    ;
-csExpressionList
-    : exps+=expression (',' exps+=expression)*
-    ;
+litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
+litFloat: tok=LIT_FLOAT;
+litString: sq=LIT_SQ_STRING | dq=LIT_DQ_STRING | mlsq=LIT_ML_SQ_STRING | mldq=LIT_ML_DQ_STRING;
+csVIdList: ids+=VID (',' ids+=VID)* ;
+csFormalArgSpecList: specs+=formalArgSpec (',' specs+=formalArgSpec)* ;
+csExpressionList: exps+=expression (',' exps+=expression)* ;

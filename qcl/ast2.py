@@ -134,6 +134,13 @@ class Qyp(object):
                     opt_file_path=abs_src_file_path
                 )
 
+            if not os.path.isfile(abs_src_file_path):
+                panic.because(
+                    panic.ExitCode.BadProjectFile,
+                    f"Source file reference does not exist: {repr(rel_src_file_path)}",
+                    opt_file_path=abs_src_file_path
+                )
+
             sf_stmt_list = parser.parse_one_file(abs_src_file_path)
             src_map[abs_src_file_path] = QySourceFile(sf_stmt_list)
 
