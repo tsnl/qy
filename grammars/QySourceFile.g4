@@ -10,6 +10,7 @@ fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
 fragment ANY_ESC: (
     ('\\' ('\\' | 'n' | 'r' | 't')) |
+    ('\\x' H H)
     ('\\u' H H H H)
     ('\\U' H H H H H H H H)
 );
@@ -177,7 +178,7 @@ formalArgSpec
 
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
-litString: sq=LIT_SQ_STRING | dq=LIT_DQ_STRING | mlsq=LIT_ML_SQ_STRING | mldq=LIT_ML_DQ_STRING;
+litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING))+;
 csVIdList: ids+=VID (',' ids+=VID)* ;
 csFormalArgSpecList: specs+=formalArgSpec (',' specs+=formalArgSpec)* ;
 csExpressionList: exps+=expression (',' exps+=expression)* ;

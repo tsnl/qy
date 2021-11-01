@@ -1,6 +1,7 @@
 import os.path
 import typing as t
 import re
+import ast as python_ast
 
 from . import antlr
 from . import feedback as fb
@@ -265,6 +266,22 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitLitFloat(self, ctx: antlr.QySourceFileParser.LitFloatContext) -> ast1.FloatExpression:
         raw_text = ctx.tok.text
         return self.make_float_expression(ctx, raw_text)
+
+    def visitLitString(self, ctx: antlr.QySourceFileParser.LitStringContext):
+        piece_text_list = []
+        piece_value_list = []
+        for piece in ctx.pieces:
+            piece_text = piece.text
+            value = python_ast.literal_eval(piece_text)
+            
+            piece_text_list.append(piece_text)
+            piece_value_list.append(value)
+        
+        value = ''.join(piece_value_list)
+        return ast1.StringExpression(self.loc(ctx), piece_text_list, value)
+
+    def visitIotaPrimaryExpression(self, ctx: antlr.QySourceFileParser.IotaPrimaryExpressionContext):
+        raise NotImplementedError("`iota` expressions for `const` statements.")
 
     #
     # TypeSpec:

@@ -137,3 +137,5 @@ class StringExpression(BaseExpression):
         super().__init__(loc)
         self.pieces = pieces
         self.value = value
+
+        print("StringExpression:", self.pieces, repr(self.value))
