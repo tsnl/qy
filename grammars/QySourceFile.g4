@@ -8,72 +8,73 @@ fragment L: [a-z] ;
 fragment U: [A-Z] ;
 fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
-TID: ('_'*) (U (L|D|'_')*) ;
-VID: ('_'*) (L (L|D|'_')*) ;
+TID: ('_'*) (U (L|U|D|'_')*) ;
+VID: ('_'*) (L (L|U|D|'_')*) ;
 LIT_DEC_INT: ('+'|'-')? D+ ;
 LIT_HEX_INT: ('+'|'-')? '0x' H+ ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT ('f')? ;
 
-LINE_COMMENT: '//' (~'\n')*? -> channel(HIDDEN);
-BLOCK_COMMENT: '/*' (.|BLOCK_COMMENT)*? '*/' -> channel(HIDDEN);
+LINE_COMMENT: '//' ~[\r\n]* -> skip;
+BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> skip;
+WHITESPACE: ('\n'|'\r'|'\t'|' ') -> skip;
 
 sourceFile
-    : unwrappedBlock EOF
+    : unwrapped_block=unwrappedBlock EOF
     ;
 
 block
-    : '{' unwrappedBlock '}'
+    : '{' unwrapped_block=unwrappedBlock '}'
     ;
 unwrappedBlock
     : (statements+=statement ';')*
     ;
 
 statement
-    : bind1vStatement
-    | bind1fStatement
-    | bind1tStatement
-    | type1vStatement
-    | constStatement
-    | iteStatement
-    | useStatement
+    : b1v=bind1vStatement
+    | b1f=bind1fStatement
+    | b1t=bind1tStatement
+    | t1v=type1vStatement
+    | con=constStatement
+    | ite=iteStatement
+    | ret=returnStatement
     ;
 bind1vStatement
-    : TID '=' expression
+    : name=VID '=' initializer=expression
     ;
 bind1fStatement
-    : TID '(' csIdentifierList ')' '=' expression
+    : name=VID '(' args=csVIdList ')' '=' body_exp=expression
+    | name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
     ;
 bind1tStatement
-    : TID '=' typeSpec
+    : name=TID '=' initializer=typeSpec
     ;
 type1vStatement
-    : VID ':' typeSpec
+    : (is_pub='export')? name=VID ':' ts=typeSpec
     ;
 constStatement
-    : 'const' block
+    : 'const' b=block
     ;
 iteStatement
     : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=unwrappedBlock))?
     ;
-useStatement
-    : 'use' vid=VID
-    | 'use' tid=TID
+returnStatement
+    : 'return' ret_exp=expression
     ;
 
 expression
-    : binaryExpression
+    : through=binaryExpression
     ;
 primaryExpression
-    : lit_integer                   #litIntPrimaryExpression
-    | lit_float                     #litFloatPrimaryExpression
+    : litInteger                    #litIntPrimaryExpression
+    | litFloat                      #litFloatPrimaryExpression
     | 'iota'                        #iotaPrimaryExpression
     | VID                           #vidPrimaryExpression
-    | TID                           #rttidPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
     ;
 postfixExpression
     : through=primaryExpression
-    | fn=postfixExpression '(' (args+=expression)* ')'
+    | fn=postfixExpression '(' args=csExpressionList ')'
+    | constructor=typeSpec '(' args=csExpressionList ')'
     | container=postfixExpression '.' key=VID
     ;
 unaryExpression
@@ -132,31 +133,48 @@ logicalOrExpression
     ;
 
 typeSpec
-    : signatureTypeSpec
+    : through=signatureTypeSpec
     ;
 primaryTypeSpec
-    : TID
+    : TID           #idRefTypeSpec
+    | 'float32'     #float32TypeSpec
+    | 'float64'     #float64TypeSpec
+    | 'int64'       #int64TypeSpec
+    | 'int32'       #int32TypeSpec
+    | 'int16'       #int16TypeSpec
+    | 'int8'        #int8TypeSpec
+    | 'uint64'      #uint64TypeSpec
+    | 'uint32'      #uint32TypeSpec
+    | 'uint16'      #uint16TypeSpec
+    | 'uint8'       #uint8TypeSpec
+    | 'bool'        #uint1TypeSpec
     ;
 adtTypeSpec
     : through=primaryTypeSpec
-    | kw=('struct'|'union') b=block
+    | kw=('struct'|'union') '{' args=csFormalArgSpecList '}'
     ;
 signatureTypeSpec
     : through=adtTypeSpec
-    | '(' (argTypeSpecs+=funcArgTypeSpec)* ')' op='->' ret=signatureTypeSpec
+    | '(' args=csFormalArgSpecList ')' op='->' ret=signatureTypeSpec
     ;
-funcArgTypeSpec
+formalArgSpec
     : typeSpec
     | VID ':' typeSpec
     ;
 
-lit_integer
+litInteger
     : LIT_DEC_INT
     | LIT_HEX_INT
     ;
-lit_float
+litFloat
     : LIT_FLOAT
     ;
-csIdentifierList
-    : ids+=TID (',' ids+=TID)*
+csVIdList
+    : ids+=VID (',' ids+=VID)*
+    ;
+csFormalArgSpecList
+    : specs+=formalArgSpec (',' specs+=formalArgSpec)*
+    ;
+csExpressionList
+    : exps+=expression (',' exps+=expression)*
     ;

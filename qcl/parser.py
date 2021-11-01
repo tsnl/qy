@@ -1,8 +1,7 @@
 import os.path
 import typing as t
 
-import antlr
-
+from . import antlr
 from . import feedback as fb
 from . import panic
 from . import ast1
@@ -16,16 +15,16 @@ def parse_one_file(abs_file_path: str) -> t.List[ast1.BaseStatement]:
     if config.DEBUG_MODE:
         assert abs_file_path == os.path.abspath(abs_file_path)
 
-    opt_cached_result = parsed_stmts_cache.get(abs_file_path, None)
+    opt_cached_result = file_parse_cache.get(abs_file_path, None)
     if opt_cached_result is not None:
         return opt_cached_result
     else:
         fresh_result = parse_one_file_without_caching(abs_file_path)
-        parsed_stmts_cache[abs_file_path] = fresh_result
+        file_parse_cache[abs_file_path] = fresh_result
         return fresh_result
 
 
-parsed_stmts_cache: t.Dict[str, t.List[ast1.BaseStatement]] = {}
+file_parse_cache: t.Dict[str, t.List[ast1.BaseStatement]] = {}
 
 
 def parse_one_file_without_caching(abs_file_path: str) -> t.List[ast1.BaseStatement]:
@@ -44,7 +43,9 @@ def parse_one_file_without_caching(abs_file_path: str) -> t.List[ast1.BaseStatem
     antlr_parser.removeErrorListeners()
     antlr_parser.addErrorListener(error_listener)
 
-    return AstConstructorVisitor(abs_file_path).visit(antlr_parser.sourceFile())
+    visitor = AstConstructorVisitor(abs_file_path)
+    source_file_parse_tree = antlr_parser.sourceFile()
+    return visitor.visit(source_file_parse_tree)
 
 
 class QyErrorListener(antlr.ANTLR4ErrorListener):
@@ -80,7 +81,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         super().__init__()
         self.source_file_path = source_file_path
 
-    def ctx_loc(self, ctx: antlr.ParserRuleContext):
+    def loc(self, ctx: antlr.ParserRuleContext):
         # setting the start line and column according to ANTLR:
         start_line_index = ctx.start.line - 1
         start_col_index = ctx.start.column
@@ -107,4 +108,78 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             )
         )
 
+    def visitSourceFile(self, ctx: antlr.QySourceFileParser.SourceFileContext) -> t.List[ast1.BaseStatement]:
+        return self.visit(ctx.unwrapped_block)
+
+    def visitBlock(self, ctx: antlr.QySourceFileParser.BlockContext) -> t.List[ast1.BaseStatement]:
+        return self.visit(ctx.unwrapped_block)
+
+    def visitUnwrappedBlock(self, ctx: antlr.QySourceFileParser.UnwrappedBlockContext) -> t.List[ast1.BaseStatement]:
+        return [
+            self.visit(statement_ctx)
+            for statement_ctx in ctx.statements
+        ]
+
+    def visitStatement(self, ctx: antlr.QySourceFileParser.StatementContext) -> ast1.BaseStatement:
+        if ctx.b1v is not None:
+            return ctx.b1v
+        elif ctx.b1f is not None:
+            return ctx.b1f
+        elif ctx.b1t is not None:
+            return ctx.b1t
+        elif ctx.t1v is not None:
+            return ctx.t1v
+        elif ctx.con is not None:
+            return ctx.con
+        elif ctx.ite is not None:
+            return ctx.ite
+        else:
+            raise NotImplementedError("Unknown 'statement' kind in parser")
+
+    def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
+        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
+
+    def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
+        arg_name_list = [arg_tk.text for arg_tk in ctx.args]
+        if ctx.body_exp is not None:
+            ret_exp = self.visit(ctx.body_exp)
+            body_stmt_list = [ast1.ReturnStatement(ret_exp.loc, ret_exp)]
+        elif ctx.body_block is not None:
+            body_stmt_list = self.visit(ctx.body_block)
+        else:
+            raise NotImplementedError("Unknown 'body' term in Bind1fStatement")
+
+        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, body_stmt_list)
+
+    def visitBind1tStatement(self, ctx: antlr.QySourceFileParser.Bind1tStatementContext) -> ast1.Bind1tStatement:
+        return ast1.Bind1tStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
+
+    def visitType1vStatement(self, ctx: antlr.QySourceFileParser.Type1vStatementContext) -> ast1.Type1vStatement:
+        is_export_line = ctx.is_pub is not None
+        return ast1.Type1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.ts), is_export_line)
+
+    def visitConstStatement(self, ctx: antlr.QySourceFileParser.ConstStatementContext) -> ast1.ConstStatement:
+        return ast1.ConstStatement(self.loc(ctx), self.visit(ctx.b))
+
+    def visitIteStatement(self, ctx: antlr.QySourceFileParser.IteStatementContext) -> ast1.IteStatement:
+        then_body = self.visit(ctx.then_body)
+
+        if ctx.elif_stmt is not None:
+            else_body = [self.visit(ctx.elif_stmt)]
+        elif ctx.else_body is not None:
+            else_body = self.visit(ctx.else_body)
+        else:
+            else_body = []
+
+        return ast1.IteStatement(self.loc(ctx), self.visit(ctx.cond), then_body, else_body)
+
+    def visitReturnStatement(self, ctx: antlr.QySourceFileParser.ReturnStatementContext) -> ast1.ReturnStatement:
+        return ast1.ReturnStatement(self.loc(ctx), self.visit(ctx.ret_exp))
+
     # TODO: implement remaining visitor methods
+
+    def visitExpression(self, ctx: antlr.QySourceFileParser.ExpressionContext):
+        raise NotImplementedError("Parsing 'expression'")
+
+    def visitTypeSpec(self, ctx: antlr.QySourceFileParser.TypeSpecContext):
+        raise NotImplementedError("Parsing 'typeSpec'")

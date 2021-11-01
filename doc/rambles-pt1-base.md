@@ -5,8 +5,10 @@ _Oct 29, 2021_
 **WHY:** a PL for iteration and prototyping that runs faster than Python.
 
 When writing prototypes...
-- must be able to write code quickly-- cannot write boilerplate or appease a type-system (quick-n-dirty)
-    - dynamic typing is a way to do generics.
+- must be able to write code quickly-- want **duck typing**
+    - (REVISION) duck-typing is inefficient, because all data must resolve core attributes at run-time via a 
+      type-independent interface
+    - instead, gun for manifest typing with interfaces and implementation (like Go)
 - want low-level memory access
     - numpy for Python is a step in the right direction
     - C-level data-types => can directly interface with C programs
@@ -18,7 +20,7 @@ Thus, design
     - in debug builds, we can track the bounds of pointers using fat pointers
     - instead of `const` to be immutable, use `mut` for mutability
     - all stack variables are immutable, but `alloca` returns a mutable pointer.
-- **no type specifiers, but manifestly typed**
+- **~~no~~ few type specifiers, but manifestly typed**
     - source libraries only, use type unification to fill in holes and exploit whole-program optimization
     - since we have all the source code, unification errors are type-checking errors
     - must use templates, but means programs look like they're written in a dynamic programming language

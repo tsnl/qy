@@ -34,6 +34,10 @@ system to capture implicit variables.
 
 Library level DD is possible using existing 'type' system
 
+Alternatively, may be able to do DD with JAI-'using'-style statements (cf embedding structs in Go)
+
+Alternatively, may be best to use custom DD system for efficient method dispatch.
+
 ## QRFI p3: template generics
 
 Pretty straightforward, but only admit literal constants for evaluation.

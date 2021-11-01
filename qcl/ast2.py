@@ -14,6 +14,7 @@ from collections import OrderedDict
 from . import panic
 from . import feedback as fb
 from . import ast1
+from . import parser
 
 
 #
@@ -118,24 +119,43 @@ class Qyp(object):
                 f"project file has {len(missing_keys)} extra keys: {extra_keys_str}"
             )
 
-        # TODO: add more checks
+        # args look OK!
 
-        # args look OK! Create a Qy project (Qyp)
+        # loading each source file, checking for duplicates or errors:
+        qyp_dir_path = os.path.dirname(path_to_root_qyp_file)
+        src_map = {}
+        for rel_src_file_path in js_map["src"]:
+            abs_src_file_path = os.path.abspath(os.path.join(qyp_dir_path, rel_src_file_path))
+
+            if abs_src_file_path in src_map:
+                panic.because(
+                    panic.ExitCode.BadProjectFile,
+                    f"Source file added multiple times to project: {path_to_root_qyp_file}\nSource file path:",
+                    opt_file_path=abs_src_file_path
+                )
+
+            sf_stmt_list = parser.parse_one_file(abs_src_file_path)
+            src_map[abs_src_file_path] = QySourceFile(sf_stmt_list)
+
+        # create a Qy project (Qyp)
         return Qyp(
             path_to_root_qyp_file,
+            qyp_dir_path,
             js_map["name"],
             js_map["author"],
             js_map["help"],
             js_map["src"],
-            js_map.get("deps", [])
+            js_map.get("deps", []),
+            src_map
         )
 
     def __init__(
         self, 
-        qyp_file_path, 
+        qyp_file_path: str, dir_path: str,
         name: str, author: str, project_help: str,
-        src_list: t.List[str], 
-        dep_list: t.List[str]
+        src_list: t.List[str],
+        dep_list: t.List[str],
+        src_map: t.Dict[str, "QySourceFile"]
     ) -> None:
         """
         WARNING: Do not instantiate this class directly.
@@ -143,12 +163,13 @@ class Qyp(object):
         """
         super().__init__()
         self.file_path = qyp_file_path
-        self.dir_path = os.path.dirname(qyp_file_path)
+        self.dir_path = dir_path
         self.js_name = name
         self.js_author = author
         self.js_help = project_help
         self.js_src_list = src_list
         self.js_dep_list = dep_list
+        self.src_map = src_map
 
     def iter_src_paths(self):
         yield from self.js_src_list

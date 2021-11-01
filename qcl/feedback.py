@@ -43,7 +43,7 @@ class FilePos(BaseFileRegion):
         self.col_index = col_index
 
     def __str__(self) -> str:
-        return f"{self.line_index}:{self.col_index}"
+        return f"{self.line_num}:{self.col_num}"
 
     @property
     def line_num(self):
