@@ -37,6 +37,20 @@ Library level DD is possible using existing 'type' system
 Alternatively, may be able to do DD with JAI-'using'-style statements (cf embedding structs in Go)
 
 Alternatively, may be best to use custom DD system for efficient method dispatch.
+-   concede orthogonality of type system (like C++)
+-   introduce **duck-typed objects**: `interface` and `module`
+    -   each 'module' is analogous to a class, except named to discourage users
+        from modelling individual objects, but rather whole systems.
+    -   each 'module' instance is a boxed instance with a virtual table pointer
+        in the box.
+        -   boxing enforced by constructor, which returns a pointer that must be freed
+        -   cf function pointers in C
+    -   **methods are defined separately from modules, which are data-only.**
+    -   `interface{...}` instances are pointers to modules that, by static 
+        typing, are guaranteed to provide methods required by interface
+-   for maximum dynamism, allow method invocation by string!
+    -   can translate function name to an index using a statically baked
+        symbol table.
 
 ## QRFI p3: template generics
 
