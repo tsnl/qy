@@ -1,7 +1,5 @@
 // FIXME: currently disabled
 
-/* 
-
 // Qy is a programming language ideal for prototyping quickly.
 //   - it uses the C type system with a few enhancements and RTTI.
 //   - type specifiers are only needed for functions and type definitions.
@@ -50,5 +48,3 @@ v3f_scale (v, s) {
     sz = v.z * s;
     return vec3f(sx, sy, sz);
 };
-
-*/

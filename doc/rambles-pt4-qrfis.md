@@ -48,8 +48,20 @@ Pretty straightforward, but only admit literal constants for evaluation.
 
 ## QRFI p4: static evaluation/multi-phase compilation
 
-Iteratively build and execute the program to evaluate
-constants at compile-time.
+Iteratively build and execute the program to evaluate constants at compile-time.
+
+**IDEA:**
+
+If we build a separate 'compile-time' program and execute it, we would have
+an efficient way to evaluate code at compile-time, even with a compiler in Python.
+
+The problem is that information is tricky to pass between the compiled program and
+the final program.
+
+Perhaps FlatBuffer IDL files can be generated from user data-types for constant 
+evaluation, such that...
+- each phase except the last uses a generated interface to write its output to a binary file
+- each phase except the first may open the previous phase's binary file
 
 ## QRFI p5: A C FFI mechanism
 

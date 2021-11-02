@@ -4,8 +4,70 @@
 
 import abc
 import typing as t
+import enum
 
 from . import feedback as fb
+
+#
+#
+# Helpers:
+#
+#
+
+OptStr = t.Optional[str]
+
+
+#
+#
+# Constants:
+#
+#
+
+class UnaryOperator(enum.Enum):
+    Deref = enum.auto()
+    LogicalNot = enum.auto()
+    Minus = enum.auto()
+    Plus = enum.auto()
+
+
+class BinaryOperator(enum.Enum):
+    Mul = enum.auto()
+    Div = enum.auto()
+    Mod = enum.auto()
+    Add = enum.auto()
+    Sub = enum.auto()
+    LSh = enum.auto()
+    RSh = enum.auto()
+    LThan = enum.auto()
+    GThan = enum.auto()
+    LEq = enum.auto()
+    GEq = enum.auto()
+    Eq = enum.auto()
+    NEq = enum.auto()
+    BitwiseAnd = enum.auto()
+    BitwiseXOr = enum.auto()
+    BitwiseOr = enum.auto()
+    LogicalAnd = enum.auto()
+    LogicalOr = enum.auto()
+
+
+class BuiltinPrimitiveTypeIdentity(enum.Enum):
+    Float32 = enum.auto()
+    Float64 = enum.auto()
+    Int64 = enum.auto()
+    Int32 = enum.auto()
+    Int16 = enum.auto()
+    Int8 = enum.auto()
+    UInt64 = enum.auto()
+    UInt32 = enum.auto()
+    UInt16 = enum.auto()
+    UInt8 = enum.auto()
+    Bool = enum.auto()
+
+
+class LinearTypeOp(enum.Enum):
+    Product = enum.auto()
+    Sum = enum.auto()
 
 
 #
@@ -17,6 +79,7 @@ from . import feedback as fb
 class BaseFileNode(object, metaclass=abc.ABCMeta):
     def __init__(self, loc: fb.ILoc):
         super().__init__()
+        self.loc = loc
 
 
 class BaseTypeSpec(BaseFileNode):
@@ -122,14 +185,14 @@ class IntExpression(BaseNumberExpression):
         self.value: int
         self.text_base = base
         self.is_unsigned = is_unsigned
-        print("IntExpression:", self.text)
+        # print("IntExpression:", self.text)
 
 
 class FloatExpression(BaseNumberExpression):
     def __init__(self, loc: fb.ILoc, text: str, value: float, width_in_bits=64):
         super().__init__(loc, text, value, width_in_bits)
         self.value: float
-        print("FloatExpression:", self.text)
+        # print("FloatExpression:", self.text)
 
 
 class StringExpression(BaseExpression):
@@ -137,5 +200,87 @@ class StringExpression(BaseExpression):
         super().__init__(loc)
         self.pieces = pieces
         self.value = value
+        # print("StringExpression:", self.pieces, repr(self.value))
 
-        print("StringExpression:", self.pieces, repr(self.value))
+
+class IotaExpression(BaseExpression):
+    pass
+
+
+class VIdRefExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, name: str):
+        super().__init__(loc)
+        self.name = name
+
+
+class ProcCallExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, proc: BaseExpression, arg_exps: t.List[BaseExpression]):
+        super().__init__(loc)
+        self.proc = proc
+        self.arg_exps = arg_exps
+
+
+class ConstructorExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression]):
+        super().__init__(loc)
+        self.made_ts = made_ts
+        self.initializer_list = initializer_list
+
+
+class DotIdExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, container: BaseExpression, key: str):
+        super().__init__(loc)
+        self.container = container
+        self.key = key
+
+
+class UnaryOpExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, operator: UnaryOperator, operand: BaseExpression):
+        super().__init__(loc)
+        self.operator = operator
+        self.operand = operand
+
+
+class BinaryOpExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, operator: BinaryOperator, lt_operand: BaseExpression, rt_operand: BaseExpression):
+        super().__init__(loc)
+        self.operator = operator
+        self.lt_operand = lt_operand
+        self.rt_operand = rt_operand
+
+
+#
+#
+# Type specifiers:
+#
+#
+
+class IdRefTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, name: str):
+        super().__init__(loc)
+        self.name = name
+
+
+class BuiltinPrimitiveTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, identity: BuiltinPrimitiveTypeIdentity):
+        super().__init__(loc)
+        self.identity = identity
+
+
+class AdtTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, linear_op: LinearTypeOp, args: t.List[t.Tuple[OptStr, BaseTypeSpec]]):
+        super().__init__(loc)
+        self.linear_op = linear_op
+        self.fields_list = args
+        self.fields_dict = {
+            arg_pair[0]: arg_pair[1]
+            for arg_pair in args
+            if arg_pair[0] is not None
+        }
+
+
+class ProcSignatureTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, args: t.List[t.Tuple[OptStr, BaseTypeSpec]], ret_ts: BaseTypeSpec):
+        super().__init__(loc)
+        self.args_list = args
+        self.ret_ts = ret_ts

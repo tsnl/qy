@@ -17,8 +17,8 @@ fragment ANY_ESC: (
 fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
-TID: ('_'*) (U (L|U|D|'_')*) ;
-VID: ('_'*) (L (L|U|D|'_')*) ;
+TID: (U (L|U|D|'_')*) ;
+VID: ((L|'_') (L|U|D|'_')*) ;
 LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
 LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
@@ -82,32 +82,31 @@ primaryExpression
     | litFloat                      #litFloatPrimaryExpression
     | litString                     #litStringPrimaryExpression
     | 'iota'                        #iotaPrimaryExpression
-    | VID                           #vidPrimaryExpression
+    | id_tok=VID                    #vidPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
     ;
 postfixExpression
-    : through=primaryExpression
-    | fn=postfixExpression '(' args=csExpressionList ')'
-    | constructor=typeSpec '(' args=csExpressionList ')'
-    | container=postfixExpression '.' key=VID
+    : through=primaryExpression                             #throughPostfixExpression
+    | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
+    | made_ts=typeSpec '(' args=csExpressionList ')'        #constructorExpression
+    | container=postfixExpression '.' key=VID               #dotIdExpression
     ;
 unaryExpression
-    : through=postfixExpression
-    | op=unaryOperator e=unaryExpression
+    : through=postfixExpression             #throughUnaryExpression
+    | op=unaryOperator e=unaryExpression    #unaryOpExpression
     ;
 unaryOperator
     : '*'
-    | '&'
     | 'not'
     | '-'
     | '+'
     ;
 binaryExpression
-    : logicalOrExpression
+    : through=logicalOrExpression
     ;
 multiplicativeExpression
     : through=unaryExpression
-    | lt=multiplicativeExpression op=('*'|'/'|'//'|'%') rt=unaryExpression
+    | lt=multiplicativeExpression op=('*'|'/'|'%') rt=unaryExpression
     ;
 additiveExpression
     : through=multiplicativeExpression
@@ -139,29 +138,29 @@ orExpression
     ;
 logicalAndExpression
     : through=orExpression
-    | logicalAndExpression op=('and'|'&&') orExpression
+    | lt=logicalAndExpression op=('and'|'&&') rt=orExpression
     ;
 logicalOrExpression
     : through=logicalAndExpression
-    | lt=logicalOrExpression op='or' rt=logicalAndExpression
+    | lt=logicalOrExpression op=('or'|'||') rt=logicalAndExpression
     ;
 
 typeSpec
     : through=signatureTypeSpec
     ;
 primaryTypeSpec
-    : TID           #idRefTypeSpec
-    | 'float32'     #float32TypeSpec
-    | 'float64'     #float64TypeSpec
-    | 'int64'       #int64TypeSpec
-    | 'int32'       #int32TypeSpec
-    | 'int16'       #int16TypeSpec
-    | 'int8'        #int8TypeSpec
-    | 'uint64'      #uint64TypeSpec
-    | 'uint32'      #uint32TypeSpec
-    | 'uint16'      #uint16TypeSpec
-    | 'uint8'       #uint8TypeSpec
-    | 'bool'        #uint1TypeSpec
+    : id_tok=TID
+    | tok='float32'
+    | tok='float64'
+    | tok='int64'
+    | tok='int32'
+    | tok='int16'
+    | tok='int8'
+    | tok='uint64'
+    | tok='uint32'
+    | tok='uint16'
+    | tok='uint8'
+    | tok='bool'
     ;
 adtTypeSpec
     : through=primaryTypeSpec
@@ -169,11 +168,11 @@ adtTypeSpec
     ;
 signatureTypeSpec
     : through=adtTypeSpec
-    | '(' args=csFormalArgSpecList ')' op='->' ret=signatureTypeSpec
+    | '(' args=csFormalArgSpecList ')' '->' ret=signatureTypeSpec
     ;
 formalArgSpec
-    : typeSpec
-    | VID ':' typeSpec
+    : ts=typeSpec
+    | name_tok=VID ':' ts=typeSpec
     ;
 
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
