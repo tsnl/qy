@@ -10,9 +10,9 @@
 // NOTE: functions do not need to be declared before definition unless...
 //   1. they are used before they are defined, or
 //   2. they are marked as 'public' (in which case declaration goes in a header)
-export vec3f: (x: float32, y: float32, z: float32) -> Vec3f;
-export v3f_add: (Vec3f, Vec3f) -> Vec3f;
-export v3f_scale: (Vec3f, float32) -> Vec3f;
+export vec3f: (x: float32, y: float32, z: float32) => Vec3f;
+export v3f_add: (Vec3f, Vec3f) => Vec3f;
+export v3f_scale: (Vec3f, float32) => Vec3f;
 
 // enums provided using 'const', which translates into preprocessor declarations
 const {

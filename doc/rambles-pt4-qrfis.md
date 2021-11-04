@@ -21,6 +21,8 @@ Note that the ordering is not significant. The `p#` notation indicates `prototyp
 
 I think QRFIs p5, p2, p1 are most important (most to least).
 
+---
+
 ## QRFI p1: first-class functions
 
 GNU-C extensions actually support this, so we can just generate function definitions locally.
@@ -30,27 +32,54 @@ system to capture implicit variables.
 - each 'closure' object is just 2 pointers: 
   (proc-code-handle, args)
 
+---
+
 ## QRFI p2: dynamic dispatch and traits
 
-Library level DD is possible using existing 'type' system
+In this language, 'interface' is replaced with 'class', as in a category.
 
-Alternatively, may be able to do DD with JAI-'using'-style statements (cf embedding structs in Go)
+Classes are defined in terms of methods they support. 
+They do not encapsulate any data. 
+Classes may extend other classes.
 
-Alternatively, may be best to use custom DD system for efficient method dispatch.
--   concede orthogonality of type system (like C++)
--   introduce **duck-typed objects**: `interface` and `module`
-    -   each 'module' is analogous to a class, except named to discourage users
-        from modelling individual objects, but rather whole systems.
-    -   each 'module' instance is a boxed instance with a virtual table pointer
-        in the box.
-        -   boxing enforced by constructor, which returns a pointer that must be freed
-        -   cf function pointers in C
-    -   **methods are defined separately from modules, which are data-only.**
-    -   `interface{...}` instances are pointers to modules that, by static 
-        typing, are guaranteed to provide methods required by interface
--   for maximum dynamism, allow method invocation by string!
-    -   can translate function name to an index using a statically baked
-        symbol table.
+Any concrete datatype may be 'added' to a class by implementing all the class' methods for the datatype.
+
+Classes are of two kinds: Normative Classes (NClass) and Positive Classes (PClass).
+Although both kinds of classes use the same data representation, they are defined in different ways.
+-   NClasses admit one fixed set of methods, after which the class' definition is sealed.
+    
+    If an NClass instance invokes a method that is not included in this body, the compiler generates an error.
+-   PClasses automatically expand to allow all used methods.
+    
+    The compiler will only generate an error if a method is not defined.
+
+PClasses are ideal for writing code in a dynamic style. They facilitate duck-typing.
+
+NClasses are ideal for providing robust interfaces to third-parties.
+
+Note that PClasses admit partial definition blocks that can be aggregated into an NClass later.
+
+Note that in practice...
+- all class instances **must be boxed in practice**
+- methods must be annotated with `->` instead of `.` for PClass inference to work well.
+  - maybe some methods can be 'getters'? 0 arg procedure automatically if method?
+
+```
+Vector = class(p);
+
+add_vec_in_place: (&Vector, &Vector) => void;
+add_vec (v, w) {
+    if v->dim() != w->dim() {
+        panic("Whoops");
+    } else {
+        for i = 0; i < v->dim()-1; i = i+1 {
+            v->set_data(v->data(i) + w->data(i));
+        };
+    };
+};
+```
+
+---
 
 ## QRFI p3: template generics
 
@@ -59,6 +88,8 @@ Pretty straightforward, but only admit literal constants for evaluation.
 **NOTE:** this may go against the spirit of the language, which seeks polymorphism via run-time facilities.
 
 **NOTE:** this may be a good way to do duck-typing (cf templates in C++).
+
+---
 
 ## QRFI p4: static evaluation/multi-phase compilation
 
@@ -77,14 +108,20 @@ evaluation, such that...
 - each phase except the last uses a generated interface to write its output to a binary file
 - each phase except the first may open the previous phase's binary file
 
+---
+
 ## QRFI p5: A C FFI mechanism
 
 This is vital to interop with existing C libraries.
+
+---
 
 ## QRFI p6: Python interop (maybe via `libffi`)
 
 Allow the user to transparently interoperate with 
 Python libraries and code.
+
+---
 
 ## QRFI p7: A macro system
 

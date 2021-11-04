@@ -161,6 +161,7 @@ primaryTypeSpec
     | tok='uint16'
     | tok='uint8'
     | tok='bool'
+    | tok='void'
     ;
 adtTypeSpec
     : through=primaryTypeSpec
@@ -168,7 +169,7 @@ adtTypeSpec
     ;
 signatureTypeSpec
     : through=adtTypeSpec
-    | '(' args=csFormalArgSpecList ')' '->' ret=signatureTypeSpec
+    | '(' args=csFormalArgSpecList ')' '=>' ret=signatureTypeSpec
     ;
 formalArgSpec
     : ts=typeSpec
