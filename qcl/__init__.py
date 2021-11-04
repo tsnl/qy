@@ -30,14 +30,14 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
     vec3 = types.StructType([('x', types.FloatType(32)), ('y', types.FloatType(32)), ('z', types.FloatType(32))])
     print("... Types test:")
     print('\t' + '\n\t'.join(map(str, [
-        types.IntType(8, True),
-        types.IntType(16, True),
-        types.IntType(32, True),
-        types.IntType(64, True),
-        types.IntType(8, False),
-        types.IntType(16, False),
-        types.IntType(32, False),
-        types.IntType(64, False),
+        types.IntType.get(8, True),
+        types.IntType.get(16, True),
+        types.IntType.get(32, True),
+        types.IntType.get(64, True),
+        types.IntType.get(8, False),
+        types.IntType.get(16, False),
+        types.IntType.get(32, False),
+        types.IntType.get(64, False),
         vec2,
         vec3,
         types.UnionType([('v3', vec3), ('v2', vec2)]),
@@ -47,7 +47,7 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
     h_a = types.BoundVarType('a')
     h_b = types.BoundVarType('b')
     scm = scheme.Scheme([h_a, h_b], types.StructType([('x', h_a), ('y', h_b)]))
-    instantiate_sub, instantiated_type = scm.instantiate()
+    instantiate_sub, instantiated_type = scm.instantiate([types.IntType.get(32, True), types.IntType.get(64, True)])
     print("... Scheme test:")
     print('\tScheme:            ' + str(scm))
     print('\tInstantiation sub: ' + str(instantiate_sub))

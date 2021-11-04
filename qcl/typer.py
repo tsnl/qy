@@ -73,8 +73,9 @@ class Substitution(object):
     empty = None
 
     def __init__(self, sub_map: t.List[t.Tuple[types.BaseVarType, types.BaseConcreteType]]) -> None:
+        # print("Sub map:", sub_map)
         assert isinstance(sub_map, list)
-        assert all((isinstance(key, types.BaseType) and key.is_var for key, _ in zip(*sub_map)))
+        assert all((isinstance(key, types.BaseType) and key.is_var for key, _ in sub_map))
         super().__init__()
         self.sub_map = sub_map
 
@@ -97,7 +98,7 @@ class Substitution(object):
             return Substitution(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self) -> str:
-        return json.dumps({str(key): str(val) for key, val in self.sub_map})
+        return '{' + ','.join((f"{str(key)}->{str(val)}" for key, val in self.sub_map)) + '}'
 
     def rewrite_type(self, t: types.BaseType) -> types.BaseType:
         return self._rewrite_type(t, None)

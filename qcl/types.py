@@ -14,6 +14,9 @@ class BaseType(object, metaclass=abc.ABCMeta):
     def __str__(self) -> str:
         return self.text
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __eq__(self, o: object) -> bool:
         return self is o
 
@@ -41,7 +44,7 @@ class BaseVarType(BaseType):
         self.opt_loc = opt_loc
 
     def __str__(self) -> str:
-        return self.name
+        return '\'' + self.name
 
 
 class BoundVarType(BaseVarType):
@@ -82,7 +85,7 @@ class IntType(AtomicConcreteType):
         self.is_signed = is_signed
 
     def __str__(self) -> str:
-        return f"{'u' if self.is_signed else ''}int{self.width_in_bits}"
+        return f"{'u' if not self.is_signed else ''}int{self.width_in_bits}"
 
     @staticmethod
     def get(width_in_bits: int, is_signed: bool) -> "IntType":
@@ -120,6 +123,10 @@ class FloatType(AtomicConcreteType):
 
 
 class BaseCompositeType(BaseConcreteType):
+    """
+    subclasses must preserve the same '__init__.py' signature.
+    """
+
     def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None) -> None:
         assert isinstance(fields, list)
         assert ((isinstance(field_name, str) and isinstance(field_type, BaseType) for field_name, field_type in fields))
@@ -130,8 +137,7 @@ class BaseCompositeType(BaseConcreteType):
         self.opt_name = opt_name
 
     def copy_with_elements(self, new_elements: t.List[BaseType]) -> "BaseCompositeType":
-        res = self.__class__(new_elements)
-        return res
+        return self.__class__(new_elements)
 
 
 class PointerType(BaseConcreteType):
