@@ -1,8 +1,16 @@
+import sys
 import typing as t
 import enum
 import os
 
 from . import feedback as fb
+
+
+class PanicException(BaseException):
+    def __init__(self, exit_code, msg) -> None:
+        super().__init__(msg)
+        self.exit_code = exit_code
+        self.msg = msg
 
 
 class ExitCode(enum.Enum):
@@ -12,7 +20,7 @@ class ExitCode(enum.Enum):
     CompilationFailed = enum.auto()
     InterpreterError = enum.auto()
     SyntaxError = enum.auto()
-    TyperError = enum.auto()
+    TyperUnificationError = enum.auto()
 
 
 def because(
@@ -22,7 +30,11 @@ def because(
     opt_file_region: t.Optional[fb.BaseFileRegion] = None
 ):
     if opt_msg:
-        print(f"PANIC: {opt_msg}")
+        msg = f"PANIC: {opt_msg}"
+    else:
+        msg = f"PANIC: a fatal error has occurred"
+    print(msg, file=sys.stderr)
+    
     if opt_file_path:
         custom_end = '\n'
         if opt_file_region is not None:
@@ -31,9 +43,9 @@ def because(
         rel_path = opt_file_path
         abs_path = os.path.abspath(opt_file_path)
         if rel_path == abs_path:
-            print(f"abspath: {opt_file_path}", end=custom_end)
+            print(f"abspath: {opt_file_path}", end=custom_end, file=sys.stderr)
         else:
-            print(f"relpath: {rel_path}", end=custom_end)
-            print(f"abspath: {abs_path}", end=custom_end)
+            print(f"relpath: {rel_path}", end=custom_end, file=sys.stderr)
+            print(f"abspath: {abs_path}", end=custom_end, file=sys.stderr)
     
-    exit(exit_code.value)
+    raise PanicException(exit_code, msg)

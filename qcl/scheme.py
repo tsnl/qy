@@ -29,4 +29,4 @@ class Scheme(object):
         return sub, res
 
     def __str__(self) -> str:
-        return f"({','.join((var.name for var in self.vars))})=>{self.body}"
+        return f"({','.join(map(str, self.vars))})=>{self.body}"

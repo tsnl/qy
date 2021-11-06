@@ -76,11 +76,25 @@ def print_unification_subs():
     t6 = types.ProcedureType.new([t2, t2, t5], t2)
     t7 = types.ProcedureType.new([t2, t3, t4], t1)
 
-    # TODO: in t6 U t7, a is mapped to 'int' twice-- what if mapped to 2 different types? Do we produce an error?
+    # attempting to unify one var to two conflicting types:
+    ft = types.FloatType.get(32)
+    t8 = types.ProcedureType.new([ft], t2)
+    t9 = types.ProcedureType.new([t1], t1)
 
-    def verbose_unify(t, u):
-        print('\tinput:  ' + str(t) + " U " + str(u))
-        print('\toutput: ' + str(typer.unify(t, u)))
+    def verbose_unify(t, u, annotation=""):
+        print('\tinput1: ' + str(t))
+        print('\tinput2: ' + str(u))
+        
+        output_str = "<UNKNOWN_ERROR>"
+        try:
+            output_str = str(typer.unify(t, u))
+        except panic.PanicException as pe:
+            if pe.exit_code == panic.ExitCode.TyperUnificationError:
+                output_str = "<UNIFICATION_ERROR>"
+
+        print('\toutput: ' + output_str)
+        if annotation:
+            print(f"\t*** {annotation}")
 
     print("... Unifier print-test:")
     verbose_unify(t1, t2)
@@ -89,3 +103,4 @@ def print_unification_subs():
     verbose_unify(t4, t5)
     verbose_unify(t5, t4)
     verbose_unify(t6, t7)
+    verbose_unify(t8, t9)

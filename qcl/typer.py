@@ -62,7 +62,7 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
 
 def raise_unification_error(t: types.BaseType, u: types.BaseType):
     panic.because(
-        panic.ExitCode.TyperError,
+        panic.ExitCode.TyperUnificationError,
         f"UNIFICATION_ERROR: Cannot unify {t} and {u}"
     )
 
@@ -167,6 +167,25 @@ class Substitution(object):
         elif s2 is Substitution.empty:
             return s1
         else:
+            intersecting_key_set = set(s1.sub_map.keys()) & set(s2.sub_map.keys())
+            if intersecting_key_set:
+                mismatch = False
+                for key in intersecting_key_set:
+                    s1_t = s1.sub_map[key]
+                    s2_t = s2.sub_map[key]
+                    if s1_t != s2_t:
+                        mismatch = True
+                        break
+
+                if mismatch:
+                    s1_problem_map = {key: s1.sub_map[key] for key in intersecting_key_set}
+                    s2_problem_map = {key: s2.sub_map[key] for key in intersecting_key_set}
+                    panic.because(
+                        panic.ExitCode.TyperUnificationError,
+                        f"Conflicting substitutions detected:"
+                        f"\n\t* from set 1: {s1_problem_map}\n\t* from set 2: {s2_problem_map}"
+                    )
+            
             s1_sub_map = s1.sub_map
             s2_sub_map = {
                 key: s1.rewrite_type(value)
