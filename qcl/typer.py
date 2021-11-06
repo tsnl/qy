@@ -4,6 +4,67 @@ import json
 
 from . import types
 from . import pair
+from . import feedback
+from . import panic
+
+
+#
+# TODO: implement unification
+#
+
+def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
+    """
+    Returns the most general substitution that would make these types identical when both are rewritten.
+    WARNING: 
+        types must be checked for infinite-size (aka loops in composites) before-hand-- otherwise, will stack overflow.
+    """
+
+    # if already equal, return empty sub
+    if t1 == t2:
+        return Substitution.empty
+    
+    # var -> anything else
+    if t1.is_var ^ t2.is_var:
+        if t1.is_var:
+            var_type = t1
+            rewritten_type = t2
+        else:
+            var_type = t2
+            rewritten_type = t1
+
+        # TODO: perform an occurs-check here:
+        # - ensure 'var_type' is not one of the free variables of 'rewritten_type'
+        # - can define a method named 'free_vars' on types that returns the set of free type variables 
+        #   recursively
+        # cf https://en.wikipedia.org/wiki/Occurs_check
+
+        return Substitution.get({var_type: rewritten_type})
+
+
+    # composite types => just unify each field recursively.
+    elif t1.kind() == t2.kind() and t1.is_composite:
+        assert t2.is_composite
+
+        # ensure field names & field counts are identical:
+        if t1.field_names != t2.field_names:
+            raise_unification_error()
+
+        # generate a substitution by unifying matching fields:
+        s = Substitution.empty
+        for ft1, ft2 in zip(t1.field_types, t2.field_types):
+            s = unify(ft1, ft2).compose(s)
+        return s
+
+    # any other case: raise a unification error.
+    else:
+        raise_unification_error()
+
+
+def raise_unification_error(t: types.BaseType, u: types.BaseType):
+    panic.because(
+        panic.ExitCode.TyperError,
+        f"UNIFICATION_ERROR: Cannot unify {t} and {u}"
+    )
 
 
 #
@@ -70,12 +131,28 @@ class TypeDefinition(BaseDefinition):
 #
 
 class Substitution(object):
-    empty = None
+    empty: t.Optional["Substitution"] = None
 
-    def __init__(self, sub_map: t.List[t.Tuple[types.BaseVarType, types.BaseConcreteType]]) -> None:
+    @staticmethod
+    def get(sub_map: t.Dict[types.VarType, types.BaseConcreteType]) -> "Substitution":
+        if sub_map:
+            return Substitution(sub_map)
+        else:
+            assert isinstance(Substitution.empty, Substitution)
+            return Substitution.empty
+
+    def __init__(
+        self, 
+        sub_map: t.List[t.Tuple[types.VarType, types.BaseConcreteType]], 
+        _suppress_construct_empty_error=False
+    ) -> None:
+        if not _suppress_construct_empty_error:
+            if not sub_map:
+                raise ValueError("Cannot construct an empty substitution: use `Substitution.empty` instead.")
+
         # print("Sub map:", sub_map)
-        assert isinstance(sub_map, list)
-        assert all((isinstance(key, types.BaseType) and key.is_var for key, _ in sub_map))
+        assert isinstance(sub_map, dict)
+        assert all((isinstance(key, types.BaseType) and key.is_var for key, _ in sub_map.items()))
         super().__init__()
         self.sub_map = sub_map
 
@@ -98,7 +175,7 @@ class Substitution(object):
             return Substitution(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self) -> str:
-        return '{' + ','.join((f"{str(key)}->{str(val)}" for key, val in self.sub_map)) + '}'
+        return '{' + ','.join((f"{str(key)}->{str(val)}" for key, val in self.sub_map.items())) + '}'
 
     def rewrite_type(self, t: types.BaseType) -> types.BaseType:
         return self._rewrite_type(t, None)
@@ -133,11 +210,14 @@ class Substitution(object):
         return t
 
     def _get(self, t):
-        for cmp_t, replacement_t in self.sub_map:
+        for cmp_t, replacement_t in self.sub_map.items():
             if cmp_t == t:
                 return replacement_t
         else:
             return None
+
+
+Substitution.empty = Substitution({}, _suppress_construct_empty_error=True)
 
 
 class InfiniteSizeTypeException(BaseException):

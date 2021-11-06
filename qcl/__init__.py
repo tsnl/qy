@@ -5,32 +5,36 @@ from . import panic
 from . import feedback as fb
 from . import ast2
 from . import types
+from . import typer
 from . import scheme
 
 
 def transpile_one_package_set(path_to_root_qyp_file: str):
     qyp_set = ast2.QypSet.load(path_to_root_qyp_file)
-    
-    #
-    # Debug: printing all loaded modules
-    #
+    debug_routine_after_compilation(qyp_set)
 
+
+def debug_routine_after_compilation(qyp_set):
+    print_qyp_set_summary(qyp_set)
+    print_types()
+    print_schemes()
+    print_unification_subs()
+
+
+def print_qyp_set_summary(qyp_set):
     print("INFO: Module summary:")
     for qyp_name, qyp in qyp_set.qyp_name_map.items():
         print(f"- qyp {repr(qyp_name)} @ path({repr(qyp.file_path)})")
         for src_file in qyp.iter_src_paths():
             print(f"  - Qy source file @ path({repr(src_file)})")
 
-    #
-    # Debug: type tests
-    #
 
-    # testing types:
+def print_types():
     vec2 = types.StructType([('x', types.FloatType(32)), ('y', types.FloatType(32))])
     vec3 = types.StructType([('x', types.FloatType(32)), ('y', types.FloatType(32)), ('z', types.FloatType(32))])
-    print("... Types test:")
+    print("... Types print-test:")
     print('\t' + '\n\t'.join(map(str, [
-        types.IntType.get(8, True),
+    types.IntType.get(8, True),
         types.IntType.get(16, True),
         types.IntType.get(32, True),
         types.IntType.get(64, True),
@@ -43,12 +47,45 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
         types.UnionType([('v3', vec3), ('v2', vec2)]),
     ])))
 
-    # testing schemes:
-    h_a = types.BoundVarType('a')
-    h_b = types.BoundVarType('b')
+
+def print_schemes():
+    h_a = types.VarType('a')
+    h_b = types.VarType('b')
     scm = scheme.Scheme([h_a, h_b], types.StructType([('x', h_a), ('y', h_b)]))
     instantiate_sub, instantiated_type = scm.instantiate([types.IntType.get(32, True), types.IntType.get(64, True)])
-    print("... Scheme test:")
+    print("... Scheme print-test:")
     print('\tScheme:            ' + str(scm))
     print('\tInstantiation sub: ' + str(instantiate_sub))
     print('\tInstantiated type: ' + str(instantiated_type))
+
+
+def print_unification_subs():
+    t1 = types.VarType("a")
+    t2 = types.IntType.get(32, True)
+
+    t3 = types.VarType("b")
+    t4 = types.StructType([
+        ('field1', t1), 
+        ('field2', t2)
+    ])
+    t5 = types.StructType([
+        ('field1', t2),
+        ('field2', t2)
+    ])
+
+    t6 = types.ProcedureType.new([t2, t2, t5], t2)
+    t7 = types.ProcedureType.new([t2, t3, t4], t1)
+
+    # TODO: in t6 U t7, a is mapped to 'int' twice-- what if mapped to 2 different types? Do we produce an error?
+
+    def verbose_unify(t, u):
+        print('\tinput:  ' + str(t) + " U " + str(u))
+        print('\toutput: ' + str(typer.unify(t, u)))
+
+    print("... Unifier print-test:")
+    verbose_unify(t1, t2)
+    verbose_unify(t3, t4)
+    verbose_unify(t4, t3)
+    verbose_unify(t4, t5)
+    verbose_unify(t5, t4)
+    verbose_unify(t6, t7)

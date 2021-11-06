@@ -12,6 +12,7 @@ class ExitCode(enum.Enum):
     CompilationFailed = enum.auto()
     InterpreterError = enum.auto()
     SyntaxError = enum.auto()
+    TyperError = enum.auto()
 
 
 def because(

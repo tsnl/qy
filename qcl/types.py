@@ -4,9 +4,22 @@ Types
 """
 
 import abc
+import enum
 import typing as t
 
 from . import feedback as fb
+
+
+class TypeKind(enum.Enum):
+    Var_Bound = enum.auto()
+    Var = enum.auto()
+    Void = enum.auto()
+    Int = enum.auto()
+    Float = enum.auto()
+    Pointer = enum.auto()
+    Procedure = enum.auto()
+    Struct = enum.auto()
+    Union = enum.auto()
 
 
 class BaseType(object, metaclass=abc.ABCMeta):
@@ -25,19 +38,28 @@ class BaseType(object, metaclass=abc.ABCMeta):
         return isinstance(self, BaseConcreteType)
 
     @property
+    def is_composite(self):
+        return isinstance(self, BaseCompositeType)
+
+    @property
     def is_var(self):
-        return isinstance(self, BaseVarType)
+        return isinstance(self, VarType)
 
     @property
     def is_atomic(self):
         return isinstance(self, AtomicConcreteType)
+
+    @classmethod
+    @abc.abstractmethod
+    def kind(cls):
+        pass
 
 
 #
 # TypeVars:
 #
 
-class BaseVarType(BaseType):
+class VarType(BaseType):
     def __init__(self, name: str, opt_loc: t.Optional[fb.ILoc] = None) -> None:
         super().__init__()
         self.name = name
@@ -46,13 +68,12 @@ class BaseVarType(BaseType):
     def __str__(self) -> str:
         return '\'' + self.name
 
+    def __hash__(self) -> int:
+        return id(self)
 
-class BoundVarType(BaseVarType):
-    pass
-
-
-class FreeVarType(BaseVarType):
-    pass
+    @classmethod
+    def kind(cls):
+        return TypeKind.Var
 
 
 #
@@ -70,6 +91,10 @@ class AtomicConcreteType(BaseConcreteType):
 class VoidType(AtomicConcreteType):
     def __str__(self) -> str:
         return "void"
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.Void
 
 
 class IntType(AtomicConcreteType):
@@ -98,6 +123,10 @@ class IntType(AtomicConcreteType):
             IntType.cache[key] = new_cached_type
             return new_cached_type
 
+    @classmethod
+    def kind(cls):
+        return TypeKind.Int
+
 
 class FloatType(AtomicConcreteType):
     cache = {}
@@ -121,6 +150,10 @@ class FloatType(AtomicConcreteType):
             FloatType.cache[key] = new_cached_type
             return new_cached_type
 
+    @classmethod
+    def kind(cls):
+        return TypeKind.Float
+
 
 class BaseCompositeType(BaseConcreteType):
     """
@@ -143,7 +176,7 @@ class BaseCompositeType(BaseConcreteType):
 class PointerType(BaseConcreteType):
     def __init__(self, pointee_type: BaseConcreteType) -> None:
         super().__init__([('pointee', pointee_type)])
-    
+
     @property
     def pointee_type(self):
         return self.elements[0]
@@ -155,34 +188,45 @@ class PointerType(BaseConcreteType):
     def new(pointee_type: BaseConcreteType):
         return PointerType([pointee_type])
 
+    @classmethod
+    def kind(cls):
+        return TypeKind.Pointer
+
 
 class ProcedureType(BaseCompositeType):
     @property
     def ret_type(self):
-        return self.fields[0]
-    
+        _, ret_type = self.fields[0]
+        return ret_type
+
     @property
     def arg_count(self):
         return len(self.fields) - 1
 
-    @property
     def arg_type(self, index):
-        return self.fields[1 + index]
+        _, arg_type = self.fields[1 + index]
+        return arg_type
 
     @property
     def arg_types(self) -> t.Iterable[BaseType]:
-        for i in range(self.arg_count):
-            yield self.arg_type(i)
+        return (
+            self.arg_type(i)
+            for i in range(self.arg_count)
+        )
 
     def __str__(self) -> str:
-        return f"({', '.join(self.arg_types)}) => {self.ret_type}"
+        return f"({', '.join(map(str, self.arg_types))}) => {self.ret_type}"
 
     @staticmethod
-    def new(arg_types: t.Iterable[BaseConcreteType], ret_type: BaseConcreteType):
+    def new(arg_types: t.Iterable[BaseConcreteType], ret_type: BaseConcreteType) -> "ProcedureType":
         return ProcedureType(
-            [('ret_type', ret_type)] + 
-            [((f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types))]
+            [('ret_type', ret_type)] +
+            [(f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types)]
         )
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.Procedure
 
 
 class BaseAlgebraicType(BaseCompositeType):
@@ -202,7 +246,15 @@ class StructType(BaseAlgebraicType):
     def prefix(cls):
         return "struct"
 
+    @classmethod
+    def kind(cls):
+        return TypeKind.Struct
+
 
 class UnionType(BaseAlgebraicType):
     def prefix(cls):
         return "union"
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.Union

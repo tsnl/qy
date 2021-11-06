@@ -79,6 +79,11 @@ add_vec (v, w) {
 };
 ```
 
+**IDEA:** how to go beyond C++?
+-   sometimes, method overrides are used to return simple data that could be variables.
+-   what if 'classmethods' and 'classdata' were unified, such that the user had more control over the vtable?
+-   interfaces would then be typing specifiers upon the vtable.
+
 ---
 
 ## QRFI p3: template generics
