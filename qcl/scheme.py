@@ -5,7 +5,7 @@ from . import typer
 
 
 class Scheme(object):
-    def __init__(self, vars: t.List[types.VarType], body: types.BaseConcreteType) -> None:
+    def __init__(self, vars: t.List[types.VarType], body: types.BaseType) -> None:
         assert all((isinstance(it, types.VarType) for it in vars))
         super().__init__()
         self.vars = vars
@@ -14,7 +14,7 @@ class Scheme(object):
     def instantiate(
         self, 
         opt_actual_args_list: t.Optional[t.List[types.BaseType]]=None
-    ) -> t.Tuple[typer.Substitution, types.BaseConcreteType]:
+    ) -> t.Tuple["typer.Substitution", types.BaseType]:
         if opt_actual_args_list is None:
             actual_arg_types = list((types.VarType(f"new({var})") for var in self.vars))
         else:

@@ -100,7 +100,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
         # setting the end line and column according to ANTLR:
         if ctx.stop is not None:
-            end_line_index = ctx.stop.line
+            end_line_index = ctx.stop.line - 1
             end_col_index = ctx.stop.column
 
             # extending the end column by the length of the last token:

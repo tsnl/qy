@@ -65,6 +65,6 @@ class FileSpan(BaseFileRegion):
             if self.first_pos.col_num == self.last_pos.col_num:
                 return f"{self.first_pos}"
             else:
-                return f"{self.first_pos.line_num}:{self.first_pos.line_num}-{self.last_pos.line_num}"
+                return f"{self.first_pos.line_num}:{self.first_pos.col_num}-{self.last_pos.col_num}"
         else:
             return f"{self.first_pos}-{self.last_pos}"

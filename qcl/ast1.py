@@ -82,6 +82,10 @@ class BaseFileNode(object, metaclass=abc.ABCMeta):
         super().__init__()
         self.loc = loc
 
+    @property
+    def desc(self):
+        return self.__class__.__name__
+
 
 class BaseTypeSpec(BaseFileNode):
     pass

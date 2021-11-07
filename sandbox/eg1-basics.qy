@@ -48,3 +48,4 @@ v3f_scale (v, s) {
     sz = v.z * s;
     return vec3f(sx, sy, sz);
 };
+

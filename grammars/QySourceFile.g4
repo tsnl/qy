@@ -68,7 +68,7 @@ constStatement
     : 'const' b=block
     ;
 iteStatement
-    : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=unwrappedBlock))?
+    : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=block))?
     ;
 returnStatement
     : 'return' ret_exp=expression
@@ -84,6 +84,7 @@ primaryExpression
     | 'iota'                        #iotaPrimaryExpression
     | id_tok=VID                    #vidPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
+/*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
     ;
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression

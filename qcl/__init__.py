@@ -11,6 +11,11 @@ from . import scheme
 
 def transpile_one_package_set(path_to_root_qyp_file: str):
     qyp_set = ast2.QypSet.load(path_to_root_qyp_file)
+    for _, _, source_file in qyp_set.iter_source_files():
+        typer.seed_one_source_file(source_file)
+    for _, _, source_file in qyp_set.iter_source_files():
+        typer.solve_one_source_file(source_file)
+
     debug_routine_after_compilation(qyp_set)
 
 

@@ -1,5 +1,5 @@
 """
-`ast2` handles...
+`ast2` handles higher-level node organization, like...
 - tracking whole source files
 - tracking `QypSet`s, or Qy Package sets: groups of interdependent packages
 - tracking `Qyp`s, or Qy Packages
@@ -80,6 +80,12 @@ class QypSet(object):
         super().__init__()
         self.qyp_name_map = qyp_name_map
 
+    def iter_source_files(self) -> t.Iterable[t.Tuple[str, str, "QySourceFile"]]:
+        for qyp_name, qyp in self.qyp_name_map.items():
+            assert isinstance(qyp, Qyp)
+            for src_file_path, qy_source_file in qyp.src_map.items():
+                yield qyp_name, src_file_path, qy_source_file
+
 
 class Qyp(object):
     @staticmethod
@@ -141,8 +147,7 @@ class Qyp(object):
                     opt_file_path=abs_src_file_path
                 )
 
-            sf_stmt_list = parser.parse_one_file(abs_src_file_path)
-            src_map[abs_src_file_path] = QySourceFile(sf_stmt_list)
+            src_map[abs_src_file_path] = QySourceFile.load(abs_src_file_path)
 
         # create a Qy project (Qyp)
         return Qyp(
@@ -193,12 +198,14 @@ package_supported_keys = package_required_keys | package_optional_keys
 
 class QySourceFile(object):
     @staticmethod
-    def load(parent_package: Qyp, source_file_path: str) -> "QySourceFile":
-        # TODO: invoke the parser here.
-        #   - should return a `SourceFile` object, which...
-        #   - should contain top-level definitions
-        pass
+    def load(source_file_path: str) -> "QySourceFile":
+        stmt_list = parser.parse_one_file(source_file_path)
+        return QySourceFile(source_file_path, stmt_list)
 
-    def __init__(self, stmt_list: t.List[ast1.BaseStatement]):
+    def __init__(self, source_file_path: str, stmt_list: t.List[ast1.BaseStatement]):
         super().__init__()
+        self.file_path = source_file_path
         self.stmt_list = stmt_list
+
+        # properties computed over the course of evaluation:
+        self.x_typer_ctx = None

@@ -32,5 +32,12 @@ def main():
     return root_qyp
 
 
+def main_wrapper():
+    try:
+        main()
+    except qcl.panic.PanicException as exc:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    main_wrapper()

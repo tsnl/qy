@@ -1,15 +1,115 @@
 import abc
 import typing as t
-import json
+import sys
 
-from . import types
-from . import pair
-from . import feedback
 from . import panic
+from . import config
+from . import pair
+from . import feedback as fb
+from . import types
+from . import scheme
+from . import ast1
+from . import ast2
+
 
 #
-# 
+# source file typing: part 1: seeding
 #
+
+def seed_one_source_file(sf: ast2.QySourceFile):
+    """
+    defines global symbols in a context using free variables, then sets it on `x_typer_ctx`
+    """
+
+    new_ctx = Context(Context.builtin_root)
+
+    for top_level_stmt in sf.stmt_list:
+        seed_one_top_level_stmt(new_ctx, top_level_stmt)
+
+    sf.x_typer_ctx = new_ctx
+
+
+def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
+    #
+    # Handling 'bind' statements:
+    #
+    
+    new_definition = None
+    if isinstance(stmt, ast1.Bind1vStatement):
+        new_definition = ValueDefinition(
+            stmt.loc,
+            stmt.name, 
+            scheme.Scheme([], types.VarType(f"bind1v:{stmt.name}"))
+        )
+    elif isinstance(stmt, ast1.Bind1fStatement):
+        new_definition = ValueDefinition(
+            stmt.loc,
+            stmt.name,
+            scheme.Scheme([], types.VarType(f"bind1f:{stmt.name}"))
+        )
+    elif isinstance(stmt, ast1.Bind1tStatement):
+        new_definition = ValueDefinition(
+            stmt.loc,
+            stmt.name,
+            scheme.Scheme([], types.VarType(f"bind1t:{stmt.name}"))
+        )
+    
+    if new_definition is not None:
+        old_definition = bind_in_ctx.try_define(new_definition)    
+        if old_definition is not None:
+            panic.because(
+                panic.ExitCode.TyperSeedingDoubleBindError,
+                f"Symbol {stmt.name} was defined twice:\n"
+                f"- first: {old_definition.loc}\n"
+                f"- later: {new_definition.loc}",
+                opt_loc=stmt.loc
+            )
+        return
+
+    #
+    # Handling 'type' statements:
+    #
+
+    if isinstance(stmt, ast1.Type1vStatement):
+        # ignore definitions-- but mark as public if export:
+        if stmt.is_export_line:
+            bind_in_ctx.export_name_set.add(stmt.name)
+        return
+
+    #
+    # Handling 'const' statements:
+    #
+
+    if isinstance(stmt, ast1.ConstStatement):
+        for nested_stmt in stmt.body:
+            if not isinstance(nested_stmt, ast1.Bind1vStatement):
+                panic.because(
+                    panic.ExitCode.SyntaxError,
+                    "In 'const' block, expected only 'Bind1v' statements",
+                    opt_loc=stmt.loc
+                )
+            seed_one_top_level_stmt(bind_in_ctx, nested_stmt)
+
+        return 
+
+    #
+    # All other statements => error
+    #
+
+    panic.because(
+        panic.ExitCode.TyperSeedingInputError,
+        f"Invalid statement in top-level file: {stmt.desc}",
+        opt_loc=stmt.loc
+    )
+
+
+#
+# source file typing: part II: solving
+#
+
+def solve_one_source_file(sf: ast2.QySourceFile):
+    print("WARNING: NotImplemented: 'solve_one_source_file'", file=sys.stderr)
+
 
 #
 # Unification
@@ -87,22 +187,31 @@ def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None)
 #
 
 class Context(object):
-    def __init__(self, opt_parent=None) -> None:
+    builtin_root: "Context" = None
+
+    def __init__(self, parent=None) -> None:
         super().__init__()
         self.symbol_table = {}
-        self.opt_parent = opt_parent
+        self.opt_parent = parent
+        self.export_name_set = set()
 
-    def try_define(self, name: str, definition: "BaseDefinition") -> t.Optional["BaseDefinition"]:
+        if config.DEBUG_MODE:
+            self.dbg_children = []
+            if self.opt_parent is not None:
+                self.dbg_children.append(self)
+
+    def try_define(self, definition: "BaseDefinition") -> t.Optional["BaseDefinition"]:
         """
         Defines a fresh symbol in this context, returns 'None'.
         If a symbol already exists by this name, it is left as is and this definition is returned instead.
         """
 
-        opt_existing_definition = self.symbol_table.get(name, None)
+        opt_existing_definition = self.symbol_table.get(definition.name, None)
         if opt_existing_definition is not None:
             return opt_existing_definition
         else:
-            self.symbol_table[name] = definition
+            self.symbol_table[definition.name] = definition
+            definition.bound_in_ctx = self
             return None
 
     def try_lookup(self, name: str) -> t.Optional["BaseDefinition"]:
@@ -118,27 +227,45 @@ class Context(object):
         else:
             return None
 
+    def print(self):
+        pass
+
+
+Context.builtin_root = Context()
+
 
 #
 # Definitions:
 #
 
 class BaseDefinition(object, metaclass=abc.ABCMeta):
-    def __init__(self, name: str) -> None:
+    def __init__(self, loc: fb.ILoc, name: str, scm: scheme.Scheme) -> None:
         super().__init__()
+        self.loc = loc
         self.name = name
+        self.scheme = scm
+        self.bound_in_ctx = None
+
+    @property
+    def is_value_definition(self):
+        return isinstance(self, ValueDefinition)
+
+    @property
+    def is_type_definition(self):
+        return isinstance(self, TypeDefinition)
+
+    @property
+    def is_public(self):
+        assert isinstance(self.bound_in_ctx, Context)
+        return self.name in self.bound_in_ctx.export_name_set
 
 
 class ValueDefinition(BaseDefinition):
-    def __init__(self, name: str, value_type: types.BaseType) -> None:
-        super().__init__(name, value_type)
-        self.value_type = self.related_type
-
+    pass
+        
 
 class TypeDefinition(BaseDefinition):
-    def __init__(self, name: str, bound_type: types.BaseType) -> None:
-        super().__init__(name, bound_type)
-        self.bound_type = self.related_type
+    pass
 
 
 #
