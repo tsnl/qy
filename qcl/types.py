@@ -54,6 +54,9 @@ class BaseType(object, metaclass=abc.ABCMeta):
     def kind(cls):
         pass
 
+    def iter_free_vars(self):
+        return iter(())
+
 
 #
 # TypeVars:
@@ -74,6 +77,10 @@ class VarType(BaseType):
     @classmethod
     def kind(cls):
         return TypeKind.Var
+
+    def iter_free_vars(self):
+        # assume every Var is free, as though the symbol is written on its own.
+        yield self
 
 
 #
@@ -172,6 +179,14 @@ class BaseCompositeType(BaseConcreteType):
     def copy_with_elements(self, new_elements: t.List[BaseType]) -> "BaseCompositeType":
         return self.__class__(new_elements)
 
+    @classmethod
+    def has_user_defined_field_names(cls) -> bool:
+        return False
+
+    def iter_free_vars(self):
+        for field_type in self.field_types:
+            yield from field_type.iter_free_vars()
+
 
 class PointerType(BaseConcreteType):
     def __init__(self, pointee_type: BaseConcreteType) -> None:
@@ -234,10 +249,16 @@ class BaseAlgebraicType(BaseCompositeType):
     def prefix(cls):
         pass
 
+    @classmethod
+    def has_user_defined_field_names(cls) -> bool:
+        return True
+
     def __str__(self) -> str:
         if self.opt_name is None:
             body_text = ','.join((f"{field_name}:{field_type}" for field_name, field_type in self.fields))
-            return f"{self.prefix()}.{hex(id(self)//8 % 0x1000)}{{{body_text}}}"
+            id_suffix_w = 4
+            id_suffix = hex(id(self)//8 % 0x10**id_suffix_w)[2:].rjust(id_suffix_w, '0')
+            return f"{self.prefix()}#{id_suffix}{{{body_text}}}"
         else:
             return self.opt_name
 

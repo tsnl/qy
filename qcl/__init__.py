@@ -60,9 +60,14 @@ def print_schemes():
 
 
 def print_unification_subs():
+    print("... Unifier print-test:")
+
+    # unifying an atomic type to a single variable (simple)
     t1 = types.VarType("a")
     t2 = types.IntType.get(32, True)
+    verbose_unify(t1, t2)
 
+    # unifying structs:
     t3 = types.VarType("b")
     t4 = types.StructType([
         ('field1', t1), 
@@ -72,35 +77,36 @@ def print_unification_subs():
         ('field1', t2),
         ('field2', t2)
     ])
+    verbose_unify(t3, t4)
+    verbose_unify(t4, t3)
+    verbose_unify(t4, t5)
+    verbose_unify(t5, t4)
 
+    # unifying procedures:
+    # attempting to unify one var to two matching types:
     t6 = types.ProcedureType.new([t2, t2, t5], t2)
     t7 = types.ProcedureType.new([t2, t3, t4], t1)
+    verbose_unify(t6, t7)
 
     # attempting to unify one var to two conflicting types:
     ft = types.FloatType.get(32)
     t8 = types.ProcedureType.new([ft], t2)
     t9 = types.ProcedureType.new([t1], t1)
-
-    def verbose_unify(t, u, annotation=""):
-        print('\tinput1: ' + str(t))
-        print('\tinput2: ' + str(u))
-        
-        output_str = "<UNKNOWN_ERROR>"
-        try:
-            output_str = str(typer.unify(t, u))
-        except panic.PanicException as pe:
-            if pe.exit_code == panic.ExitCode.TyperUnificationError:
-                output_str = "<UNIFICATION_ERROR>"
-
-        print('\toutput: ' + output_str)
-        if annotation:
-            print(f"\t*** {annotation}")
-
-    print("... Unifier print-test:")
-    verbose_unify(t1, t2)
-    verbose_unify(t3, t4)
-    verbose_unify(t4, t3)
-    verbose_unify(t4, t5)
-    verbose_unify(t5, t4)
-    verbose_unify(t6, t7)
     verbose_unify(t8, t9)
+
+
+def verbose_unify(t, u, annotation=""):
+    print('\tinput1: ' + str(t))
+    print('\tinput2: ' + str(u))
+    
+    output_str = "<UNKNOWN_ERROR>"
+    try:
+        output_str = str(typer.unify(t, u))
+    except panic.PanicException as pe:
+        if pe.exit_code == panic.ExitCode.TyperUnificationError:
+            output_str = "<UNIFICATION_ERROR>"
+
+    print('\toutput: ' + output_str)
+    if annotation:
+        print(f"\t*** {annotation}")
+

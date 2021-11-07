@@ -7,9 +7,12 @@ from . import pair
 from . import feedback
 from . import panic
 
+#
+# 
+#
 
 #
-# TODO: implement unification
+# Unification
 #
 
 def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
@@ -32,11 +35,13 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
             var_type = t2
             rewritten_type = t1
 
-        # TODO: perform an occurs-check here:
+        # perform an occurs-check here:
         # - ensure 'var_type' is not one of the free variables of 'rewritten_type'
         # - can define a method named 'free_vars' on types that returns the set of free type variables 
         #   recursively
         # cf https://en.wikipedia.org/wiki/Occurs_check
+        if var_type in rewritten_type.iter_free_vars():
+            raise_unification_error(t1, t2, "occurs check failed (see https://en.wikipedia.org/wiki/Occurs_check)")
 
         return Substitution.get({var_type: rewritten_type})
 
@@ -45,9 +50,14 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
     elif t1.kind() == t2.kind() and t1.is_composite:
         assert t2.is_composite
 
-        # ensure field names & field counts are identical:
-        if t1.field_names != t2.field_names:
-            raise_unification_error()
+        if t1.has_user_defined_field_names():
+            # ensure field names & field counts are identical:
+            if t1.field_names != t2.field_names:
+                raise_unification_error()
+        else:
+            # just check field counts (optimization)
+            if len(t1.field_names) != len(t2.field_names):
+                raise_unification_error()
 
         # generate a substitution by unifying matching fields:
         s = Substitution.empty
@@ -60,10 +70,15 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
         raise_unification_error()
 
 
-def raise_unification_error(t: types.BaseType, u: types.BaseType):
+def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None):
+    msg_lines = [f"UNIFICATION_ERROR: Cannot unify {t} and {u}"]
+    if opt_more is not None:
+        assert isinstance(opt_more, str)
+        msg_lines.append('\t' + opt_more)
+    
     panic.because(
         panic.ExitCode.TyperUnificationError,
-        f"UNIFICATION_ERROR: Cannot unify {t} and {u}"
+        '\n'.join(msg_lines)
     )
 
 
