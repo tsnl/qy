@@ -15,6 +15,10 @@ class Scheme(object):
         self, 
         opt_actual_args_list: t.Optional[t.List[types.BaseType]]=None
     ) -> t.Tuple["typer.Substitution", types.BaseType]:
+        if not self.vars:
+            assert not opt_actual_args_list
+            return self.body
+        
         if opt_actual_args_list is None:
             actual_arg_types = list((types.VarType(f"new({var})") for var in self.vars))
         else:

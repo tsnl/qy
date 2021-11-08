@@ -3,7 +3,6 @@
     "author": "TSNL",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
-        "./eg1-basics.qy",
         "./eg2-literals.qy"
     ],
     "deps": [

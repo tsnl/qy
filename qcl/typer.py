@@ -108,8 +108,41 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 #
 
 def solve_one_source_file(sf: ast2.QySourceFile):
-    print("WARNING: NotImplemented: 'solve_one_source_file'", file=sys.stderr)
+    sf_top_level_context = sf.x_typer_ctx
+    assert isinstance(sf_top_level_context, Context)
+    
+    for top_level_stmt in sf.stmt_list:
+        solve_one_stmt(sf_top_level_context, top_level_stmt)
 
+
+def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution":
+    if isinstance(stmt, ast1.Bind1vStatement):
+        definition = ctx.try_lookup(stmt.name)
+        assert definition is not None
+        def_type = definition.scheme.instantiate()
+        exp_sub, exp_type = solve_one_exp(ctx, stmt.initializer)
+        return unify(def_type, exp_type).compose(exp_sub)
+    # elif isinstance(stmt, ast1.Bind1fStatement):
+    #     pass
+    # elif isinstance(stmt, ast1.Bind1tStatement):
+    #     pass
+    # elif isinstance(stmt, ast1.Type1vStatement):
+    #     pass
+    else:
+        raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
+
+
+def solve_one_exp(ctx: "Context", exp) -> t.Tuple["Substitution", types.BaseType]:
+    if isinstance(exp, ast1.IntExpression):
+        return Substitution.empty, types.IntType.get(exp.width_in_bits, not exp.is_unsigned)
+    elif isinstance(exp, ast1.FloatExpression):
+        return Substitution.empty, types.FloatType.get(exp.width_in_bits)
+    elif isinstance(exp, ast1.StringExpression):
+        return Substitution.empty, types.StringType.singleton
+    # elif isinstance(exp, ast1.IotaExpression):
+    #     pass
+
+    raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
 #
 # Unification

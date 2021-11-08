@@ -163,6 +163,7 @@ primaryTypeSpec
     | tok='uint8'
     | tok='bool'
     | tok='void'
+    | tok='string'
     ;
 adtTypeSpec
     : through=primaryTypeSpec

@@ -14,6 +14,7 @@ class TypeKind(enum.Enum):
     Var_Bound = enum.auto()
     Var = enum.auto()
     Void = enum.auto()
+    String = enum.auto()
     Int = enum.auto()
     Float = enum.auto()
     Pointer = enum.auto()
@@ -96,12 +97,31 @@ class AtomicConcreteType(BaseConcreteType):
 
 
 class VoidType(AtomicConcreteType):
+    singleton = None
+
     def __str__(self) -> str:
         return "void"
 
     @classmethod
     def kind(cls):
         return TypeKind.Void
+
+
+VoidType.singleton = VoidType()
+
+
+class StringType(AtomicConcreteType):
+    singleton = None
+
+    def __str__(self) -> str:
+        return "string"
+    
+    @classmethod
+    def kind(cls):
+        return TypeKind.String
+
+
+StringType.singleton = StringType()
 
 
 class IntType(AtomicConcreteType):
