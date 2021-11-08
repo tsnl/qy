@@ -1,6 +1,8 @@
 import abc
 import typing as t
 import sys
+import enum
+import textwrap
 
 from . import panic
 from . import config
@@ -21,7 +23,7 @@ def seed_one_source_file(sf: ast2.QySourceFile):
     defines global symbols in a context using free variables, then sets it on `x_typer_ctx`
     """
 
-    new_ctx = Context(Context.builtin_root)
+    new_ctx = Context(ContextKind.TopLevelOfSourceFile, Context.builtin_root)
 
     for top_level_stmt in sf.stmt_list:
         seed_one_top_level_stmt(new_ctx, top_level_stmt)
@@ -111,38 +113,163 @@ def solve_one_source_file(sf: ast2.QySourceFile):
     sf_top_level_context = sf.x_typer_ctx
     assert isinstance(sf_top_level_context, Context)
     
-    for top_level_stmt in sf.stmt_list:
-        solve_one_stmt(sf_top_level_context, top_level_stmt)
+    solve_one_block(sf_top_level_context, sf.stmt_list)
+
+
+
+def solve_one_block(ctx: "Context", stmt_list: t.List[ast1.BaseStatement]) -> "Substitution":
+    sub = Substitution.empty
+    for stmt in stmt_list:
+        stmt_sub = solve_one_stmt(ctx, stmt)
+        sub = stmt_sub.compose(sub)
+    return sub
+
+
+def solve_one_block_in_function(
+    ctx: "Context",
+    arg_name_type_list: t.List[t.Tuple[str, types.BaseType]],
+    statements: t.List[ast1.BaseStatement]
+) -> t.Tuple["Substitution", types.BaseType]:
+    fn_ctx = Context(ContextKind.FunctionBlock, ctx)
+    fn_ctx.local_return_type = types.VarType(f"fn_return")
+    
+    # defining each formal argument for this function:
+    for arg_index, (arg_name, arg_type) in enumerate(arg_name_type_list):
+        loc = fb.BuiltinLoc(f"arg({arg_index}):{arg_name}")
+        scm = scheme.Scheme([], arg_type)
+        fn_ctx.try_define(ValueDefinition(loc, arg_name, scm))
+
+    # solving the block statements:
+    #   - any 'return' statements are associated with the nearest 'return_type' attribute
+    sub = solve_one_block(fn_ctx, statements)
+    
+    return sub, fn_ctx.local_return_type
 
 
 def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution":
     if isinstance(stmt, ast1.Bind1vStatement):
         definition = ctx.try_lookup(stmt.name)
         assert definition is not None
-        def_type = definition.scheme.instantiate()
+        def_sub, def_type = definition.scheme.instantiate()
         exp_sub, exp_type = solve_one_exp(ctx, stmt.initializer)
-        return unify(def_type, exp_type).compose(exp_sub)
-    # elif isinstance(stmt, ast1.Bind1fStatement):
-    #     pass
-    # elif isinstance(stmt, ast1.Bind1tStatement):
-    #     pass
-    # elif isinstance(stmt, ast1.Type1vStatement):
-    #     pass
+        return unify(def_type, exp_type).compose(exp_sub).compose(def_sub)
+    elif isinstance(stmt, ast1.Bind1fStatement):
+        arg_name_type_list = [
+            (arg_name, types.VarType(f"arg{arg_index}:{arg_name}"))
+            for arg_index, arg_name in enumerate(stmt.args)
+        ]
+        ret_sub, ret_type = solve_one_block_in_function(ctx, arg_name_type_list, stmt.body)
+        return unify().compose(ret_sub)
+    elif isinstance(stmt, ast1.Bind1tStatement):
+        definition = ctx.try_lookup(stmt.name)
+        assert definition is not None
+        def_sub, def_type = definition.scheme.instantiate()
+        ts_sub, ts_type = solve_one_type_spec(ctx, stmt.initializer)
+        return unify(def_type, ts_type).compose(ts_sub).compose(def_sub)
+    elif isinstance(stmt, ast1.Type1vStatement):
+        definition = ctx.try_lookup(stmt.name)
+        t_sub, t = definition.scheme.instantiate()
+        ts_sub, ts_type = solve_one_type_spec(ctx, stmt.ts)
+        return unify(t, ts_type).compose(ts_sub).compose(t_sub)
+    elif isinstance(stmt, ast1.ConstStatement):
+        sub = Substitution.empty
+        for const_bind_stmt in stmt.body:
+            assert isinstance(const_bind_stmt, ast1.Bind1vStatement)
+            definition = ctx.try_lookup(const_bind_stmt.name)
+            assert definition is not None
+            const_sub, const_type = definition.scheme.instantiate()
+            sub = const_sub.compose(sub)
+            # TODO: check the constant's type
+        return sub
+    elif isinstance(stmt, ast1.ReturnStatement):
+        if ctx.return_type is None:
+            panic.because(
+                panic.ExitCode.SyntaxError,
+                "Cannot 'return' outside a function block",
+                opt_loc=stmt.loc
+            )
+        ret_exp_sub, ret_exp_type = solve_one_exp(ctx, stmt.returned_exp)
+        return unify(ret_exp_type, ctx.return_type).compose(ret_exp_sub)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
 
-def solve_one_exp(ctx: "Context", exp) -> t.Tuple["Substitution", types.BaseType]:
+def solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Substitution", types.BaseType]:
     if isinstance(exp, ast1.IntExpression):
         return Substitution.empty, types.IntType.get(exp.width_in_bits, not exp.is_unsigned)
     elif isinstance(exp, ast1.FloatExpression):
         return Substitution.empty, types.FloatType.get(exp.width_in_bits)
     elif isinstance(exp, ast1.StringExpression):
         return Substitution.empty, types.StringType.singleton
-    # elif isinstance(exp, ast1.IotaExpression):
-    #     pass
+    elif isinstance(exp, ast1.ConstructorExpression):
+        raise NotImplementedError("ConstructorExpression")
+    elif isinstance(exp, ast1.UnaryOpExpression):
+        raise NotImplementedError("UnaryOpExpression")
+    elif isinstance(exp, ast1.BinaryOpExpression):
+        raise NotImplementedError("BinaryOpExpression")
+    elif isinstance(exp, ast1.ProcCallExpression):
+        raise NotImplementedError("ProcCallExpression")
+    elif isinstance(exp, ast1.IotaExpression):
+        raise NotImplementedError("IotaExpression")
 
     raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
+
+
+def solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Substitution", types.BaseType]:
+    if isinstance(ts, ast1.BuiltinPrimitiveTypeSpec):
+        return Substitution.empty, {
+            ast1.BuiltinPrimitiveTypeIdentity.Float32: types.FloatType.get(32),
+            ast1.BuiltinPrimitiveTypeIdentity.Float64: types.FloatType.get(64),
+            ast1.BuiltinPrimitiveTypeIdentity.Int8: types.IntType.get(8, is_signed=True),
+            ast1.BuiltinPrimitiveTypeIdentity.Int16: types.IntType.get(16, is_signed=True),
+            ast1.BuiltinPrimitiveTypeIdentity.Int32: types.IntType.get(32, is_signed=True),
+            ast1.BuiltinPrimitiveTypeIdentity.Int64: types.IntType.get(64, is_signed=True),
+            ast1.BuiltinPrimitiveTypeIdentity.Bool: types.IntType.get(1, is_signed=False),
+            ast1.BuiltinPrimitiveTypeIdentity.UInt8: types.IntType.get(8, is_signed=False),
+            ast1.BuiltinPrimitiveTypeIdentity.UInt16: types.IntType.get(16, is_signed=False),
+            ast1.BuiltinPrimitiveTypeIdentity.UInt32: types.IntType.get(32, is_signed=False),
+            ast1.BuiltinPrimitiveTypeIdentity.UInt64: types.IntType.get(64, is_signed=False),
+            ast1.BuiltinPrimitiveTypeIdentity.String: types.StringType.singleton,
+            ast1.BuiltinPrimitiveTypeIdentity.Void: types.VoidType.singleton
+        }[ts.identity]
+    elif isinstance(ts, ast1.IdRefTypeSpec):
+        found_definition = ctx.try_lookup(ts.name)
+        if found_definition is None:
+            panic.because(
+                panic.ExitCode.TyperSolverUndefinedIdError,
+                f"Undefined ID used: {ts.name}",
+                opt_loc=ts.loc
+            )
+        return found_definition.scheme.instantiate()
+    elif isinstance(ts, ast1.ProcSignatureTypeSpec):
+        all_args_sub = Substitution.empty
+        all_arg_types = []
+        for opt_arg_name, arg_type in ts.args_list:
+            arg_sub, arg_type = solve_one_type_spec(ctx, arg_type)
+            all_args_sub = arg_sub.compose(all_args_sub)
+            all_arg_types.append(arg_type)
+        
+        ret_sub, ret_type = solve_one_type_spec(ctx, ts.ret_ts)
+        
+        sub = ret_sub.compose(all_args_sub)
+        return sub, types.ProcedureType.new(all_arg_types, ret_type)
+    elif isinstance(ts, ast1.AdtTypeSpec):
+        sub = Substitution.empty
+        fields = []
+        for field_name, field_ts in ts.fields_list:
+            assert field_name is not None
+            field_sub, field_type  = solve_one_type_spec(ctx, field_ts)
+            sub = field_sub.compose(sub)
+            fields.append((field_name, field_type))
+        if ts.linear_op == ast1.LinearTypeOp.Product:
+            return sub, types.StructType(fields)
+        elif ts.linear_op == ast1.LinearTypeOp.Sum:
+            return sub, types.UnionType(fields)
+        else:
+            raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
+    else:
+        raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
+
 
 #
 # Unification
@@ -219,19 +346,28 @@ def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None)
 # Contexts:
 #
 
+class ContextKind(enum.Enum):
+    BuiltinRoot = enum.auto()
+    TopLevelOfSourceFile = enum.auto()
+    FunctionArgs = enum.auto()
+    FunctionBlock = enum.auto()
+    
+
 class Context(object):
     builtin_root: "Context" = None
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, kind: ContextKind, parent: t.Optional["Context"]) -> None:
         super().__init__()
+        self.kind = kind
         self.symbol_table = {}
         self.opt_parent = parent
         self.export_name_set = set()
+        self.local_return_type = None
 
         if config.DEBUG_MODE:
             self.dbg_children = []
             if self.opt_parent is not None:
-                self.dbg_children.append(self)
+                self.opt_parent.dbg_children.append(self)
 
     def try_define(self, definition: "BaseDefinition") -> t.Optional["BaseDefinition"]:
         """
@@ -260,11 +396,40 @@ class Context(object):
         else:
             return None
 
+    @property
+    def return_type(self):
+        if self.local_return_type is not None:
+            return self.local_return_type
+        elif self.opt_parent is not None:
+            return self.opt_parent.return_type
+        else:
+            return None
+
     def print(self):
-        pass
+        self.print_impl(0)
+
+    def print_impl(self, indent_count: int):
+        indent = '  ' * indent_count
+        lines = [f"+ {self.kind.name}"]
+        for sym_name, sym_definition in self.symbol_table.items():
+            if isinstance(sym_definition, ValueDefinition):
+                def_sub, def_type = sym_definition.scheme.instantiate()
+                line = f"  - {sym_name}: {def_type} [public={sym_definition.is_public}]"
+            elif isinstance(sym_definition, TypeDefinition):
+                def_sub, def_type = sym_definition.scheme.instantiate()
+                line = f"  - {sym_name} = {def_type} [public={sym_definition.is_public}]"
+            else:
+                raise NotImplementedError("Printing unknown definition")
+            lines.append(line)
+    
+        for child_context in self.dbg_children:
+            child_context.print_impl(1+indent_count)
+
+        for line in lines:
+            print(indent, line, sep='')
 
 
-Context.builtin_root = Context()
+Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
 
 
 #

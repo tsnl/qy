@@ -24,6 +24,7 @@ def debug_routine_after_compilation(qyp_set):
     print_types()
     print_schemes()
     print_unification_subs()
+    print_contexts(qyp_set)
 
 
 def print_qyp_set_summary(qyp_set):
@@ -115,3 +116,8 @@ def verbose_unify(t, u, annotation=""):
     if annotation:
         print(f"\t*** {annotation}")
 
+
+def print_contexts(qyp_set):
+    print("... Contexts output")
+    for _, _, source_file in qyp_set.iter_source_files():
+        source_file.x_typer_ctx.print()
