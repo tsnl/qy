@@ -230,6 +230,12 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
             )
         ret_exp_sub, ret_exp_type = solve_one_exp(ctx, stmt.returned_exp)
         return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type)).compose(ret_exp_sub)
+    elif isinstance(stmt, ast1.IteStatement):
+        then_sub = solve_one_block(ctx, stmt.then_block)
+        else_sub = Substitution.empty
+        if stmt.else_block is not None:
+            else_sub = solve_one_block(ctx, stmt.else_block)
+        return then_sub.compose(else_sub)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
@@ -379,21 +385,11 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
     
     # var -> anything else (including var)
     if t1.is_var or t2.is_var:
-        if t1.is_var and t2.is_var:
-            # in this case, want a consistent way to eliminate variables independently of the order of arguments 
-            # received.
-            # We choose (arbitrarily) to eliminate values with a higher `id`
-            if id(t1) < id(t2):
-                var_type = t2
-                replacement_type = t1
-            else:
-                assert id(t1) > id(t2)
-                var_type = t1
-                replacement_type = t2
-        elif t1.is_var:
+        if t1.is_var:
             var_type = t1
             replacement_type = t2
         else:
+            # includes the case where both types are variables.
             var_type = t2
             replacement_type = t1
 
@@ -418,12 +414,15 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
         else:
             # just check field counts (optimization)
             if len(t1.field_names) != len(t2.field_names):
-                raise_unification_error()
+                raise_unification_error(t1, t2)
 
         # generate a substitution by unifying matching fields:
         s = Substitution.empty
         for ft1, ft2 in zip(t1.field_types, t2.field_types):
-            s = unify(ft1, ft2).compose(s)
+            s = unify(
+                s.rewrite_type(ft1), 
+                s.rewrite_type(ft2)
+            ).compose(s)
         return s
 
     # any other case: raise a unification error.
@@ -626,7 +625,29 @@ class Substitution(object):
                 key: s1.rewrite_type(value)
                 for key, value in s2.sub_map.items()
             }
-            # always preserve sub in s2 over s1 if conflict occurs.
+            
+            # if a conflict between s1 and s2 occurs, need to ensure s1 and s2 do not diverge.
+            intersecting_key_set = set(s1_sub_map.keys()) & set(s2_sub_map.keys())
+            if intersecting_key_set:
+                offending_intersecting_key_set = {
+                    key
+                    for key in intersecting_key_set
+                    if s1_sub_map[key] != s2_sub_map[key] 
+                }
+                can_overwrite = all((
+                    s1_sub_map[key].is_var and not s2_sub_map[key].is_var
+                    for key in offending_intersecting_key_set
+                ))
+                if offending_intersecting_key_set and not can_overwrite:
+                    s1_intersect_map = {key: s1_sub_map[key] for key in offending_intersecting_key_set}
+                    s2_intersect_map = {key: s2_sub_map[key] for key in offending_intersecting_key_set}
+                    panic.because(
+                        panic.ExitCode.TyperUnificationError,
+                        f"Unification error: conflicting substitutions composed:\n"
+                        f"first: {Substitution.get(s1_intersect_map)}\n"
+                        f"later: {Substitution.get(s2_intersect_map)}"
+                    )
+
             return Substitution.get(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self) -> str:

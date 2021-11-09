@@ -78,7 +78,8 @@ expression
     : through=binaryExpression
     ;
 primaryExpression
-    : litInteger                    #litIntPrimaryExpression
+    : litBoolean                    #litBoolPrimaryExpression
+    | litInteger                    #litIntPrimaryExpression
     | litFloat                      #litFloatPrimaryExpression
     | litString                     #litStringPrimaryExpression
     | 'iota'                        #iotaPrimaryExpression
@@ -178,9 +179,10 @@ formalArgSpec
     | name_tok=VID ':' ts=typeSpec
     ;
 
+litBoolean: is_true='true' | 'false';
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
 litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING))+;
 csVIdList: (ids+=VID (',' ids+=VID)*)? ;
 csFormalArgSpecList: (specs+=formalArgSpec (',' specs+=formalArgSpec)*)? ;
-csExpressionList: exps+=expression (',' exps+=expression)* ;
+csExpressionList: (exps+=expression (',' exps+=expression)*)? ;

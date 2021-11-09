@@ -9,4 +9,21 @@ def hello (x) {
     return x;
 };
 
+def wrong_phi (b, x, y) {
+    if b {
+        return x;
+    } else {
+        return y;
+    };
+};
+
 let w = hello(13);
+let j = wrong_phi(true, 15, 32);
+
+// def fibonacci (x) {
+//     if x == 0 or x == 1 {
+//         return x;
+//     } else {
+//         return fibonacci(x - 1) + fibonacci(x - 2);
+//     };
+// };

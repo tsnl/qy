@@ -259,6 +259,12 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         suffix_text = match_obj.group(3)
         return numeric_text, suffix_text
 
+    def visitLitBoolean(self, ctx: antlr.QySourceFileParser.LitBooleanContext):
+        if ctx.is_true:
+            return ast1.IntExpression(self.loc(ctx), text="1", value=1, base=10, is_unsigned=True, width_in_bits=1)
+        else:
+            return ast1.IntExpression(self.loc(ctx), text="0", value=0, base=10, is_unsigned=True, width_in_bits=1)
+    
     def visitLitInteger(self, ctx: antlr.QySourceFileParser.LitIntegerContext) -> ast1.IntExpression:
         raw_text = ctx.getText()
         if ctx.deci is not None:

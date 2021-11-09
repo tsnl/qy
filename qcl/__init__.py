@@ -21,9 +21,9 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
 
 def debug_routine_after_compilation(qyp_set):
     print_qyp_set_summary(qyp_set)
-    # print_types()
-    # print_schemes()
-    # print_unification_subs()
+    print_types()
+    print_schemes()
+    print_unification_subs()
     print_contexts(qyp_set)
 
 
@@ -120,4 +120,5 @@ def verbose_unify(t, u, annotation=""):
 def print_contexts(qyp_set):
     print("... Contexts output")
     for _, _, source_file in qyp_set.iter_source_files():
-        source_file.x_typer_ctx.print()
+        if source_file.x_typer_ctx is not None:
+            source_file.x_typer_ctx.print()
