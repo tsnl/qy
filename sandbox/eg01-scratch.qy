@@ -1,10 +1,10 @@
-pub x: int32;
-val x: int32;
+pub x: i32;
+val x: i32;
 
 let x = 2;
 let y = 4;
 
-pub hello: (int32)=>int32;
+pub hello: (i32)=>i32;
 def hello (x) {
     return x;
 };

@@ -8,3 +8,5 @@ let s2 = """
     Scooby Dooby Doo,
     Where are you
 """;
+
+pub s2: str;

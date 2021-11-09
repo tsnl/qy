@@ -152,19 +152,19 @@ typeSpec
     ;
 primaryTypeSpec
     : id_tok=TID
-    | tok='float32'
-    | tok='float64'
-    | tok='int64'
-    | tok='int32'
-    | tok='int16'
-    | tok='int8'
-    | tok='uint64'
-    | tok='uint32'
-    | tok='uint16'
-    | tok='uint8'
+    | tok='f32'
+    | tok='f64'
+    | tok='i64'
+    | tok='i32'
+    | tok='i16'
+    | tok='i8'
+    | tok='u64'
+    | tok='u32'
+    | tok='u16'
+    | tok='u8'
     | tok='bool'
     | tok='void'
-    | tok='string'
+    | tok='str'
     ;
 adtTypeSpec
     : through=primaryTypeSpec

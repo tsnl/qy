@@ -10,9 +10,9 @@
 // NOTE: functions do not need to be declared before definition unless...
 //   1. they are used before they are defined, or
 //   2. they are marked as 'public' (in which case declaration goes in a header)
-pub vec3f: (x: float32, y: float32, z: float32) => Vec3f;
+pub vec3f: (x: f32, y: f32, z: f32) => Vec3f;
 pub v3f_add: (Vec3f, Vec3f) => Vec3f;
-pub v3f_scale: (Vec3f, float32) => Vec3f;
+pub v3f_scale: (Vec3f, f32) => Vec3f;
 
 // enums p./rovided using 'const', which translates into preprocessor declarations
 const {
@@ -27,9 +27,9 @@ def Point = struct {
     pos: Vec3f
 };
 def Vec3f = struct {
-    x: float32,
-    y: float32,
-    z: float32
+    x: f32,
+    y: f32,
+    z: f32
 };
 
 // function definitions:

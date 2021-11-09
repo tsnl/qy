@@ -116,7 +116,7 @@ class StringType(AtomicConcreteType):
     singleton = None
 
     def __str__(self) -> str:
-        return "string"
+        return "str"
     
     @classmethod
     def kind(cls):
@@ -139,7 +139,10 @@ class IntType(AtomicConcreteType):
         self.is_signed = is_signed
 
     def __str__(self) -> str:
-        return f"{'u' if not self.is_signed else ''}int{self.width_in_bits}"
+        if self.width_in_bits == 1 and not self.is_signed:
+            return 'bool'
+        else:
+            return ('i' if self.is_signed else 'u') + str(self.width_in_bits)
 
     @staticmethod
     def get(width_in_bits: int, is_signed: bool) -> "IntType":
@@ -166,7 +169,7 @@ class FloatType(AtomicConcreteType):
         self.width_in_bits = width_in_bits
 
     def __str__(self) -> str:
-        return f"float{self.width_in_bits}"
+        return 'f' + str(self.width_in_bits)
 
     @staticmethod
     def get(width_in_bits: int) -> "FloatType":
@@ -252,7 +255,7 @@ class ProcedureType(BaseCompositeType):
         )
 
     def __str__(self) -> str:
-        return f"({', '.join(map(str, self.arg_types))})=>{self.ret_type}"
+        return f"({','.join(map(str, self.arg_types))})=>{self.ret_type}"
 
     @staticmethod
     def new(arg_types: t.Iterable[BaseConcreteType], ret_type: BaseConcreteType) -> "ProcedureType":
