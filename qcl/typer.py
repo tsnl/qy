@@ -113,19 +113,20 @@ def solve_one_source_file(sf: ast2.QySourceFile):
     sf_top_level_context = sf.x_typer_ctx
     assert isinstance(sf_top_level_context, Context)
     
-    sol_sub = solve_one_block(sf_top_level_context, sf.stmt_list)
+    sol_sub = solve_one_block(sf_top_level_context, sf.stmt_list, is_top_level=True)
     # sf.x_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
     # print(f"Applying `sol_sub`: {sol_sub}")
     
     # TODO: solve deferred constraints in a separate pass
 
 
-def solve_one_block(ctx: "Context", stmt_list: t.List[ast1.BaseStatement]) -> "Substitution":
+def solve_one_block(ctx: "Context", stmt_list: t.List[ast1.BaseStatement], is_top_level=False) -> "Substitution":
     sub = Substitution.empty
     for stmt in stmt_list:
         stmt_sub = solve_one_stmt(ctx, stmt)
         sub = stmt_sub.compose(sub)
-        ctx.apply_sub_in_place_to_sub_tree(sub)
+        if is_top_level:
+            ctx.apply_sub_in_place_to_sub_tree(sub)
     return sub
 
 
