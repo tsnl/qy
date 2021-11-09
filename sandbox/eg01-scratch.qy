@@ -1,2 +1,12 @@
-export x: int32;
-x = 2;
+pub x: int32;
+val x: int32;
+
+let x = 2;
+let y = 4;
+
+pub hello: (int32)=>int32;
+def hello (x) {
+    return x;
+};
+
+let w = hello(13);

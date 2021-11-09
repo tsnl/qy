@@ -52,17 +52,17 @@ statement
     | ret=returnStatement
     ;
 bind1vStatement
-    : name=VID '=' initializer=expression
+    : 'let' name=VID '=' initializer=expression
     ;
 bind1fStatement
-    : name=VID '(' args=csVIdList ')' '=' body_exp=expression
-    | name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
+    : 'def' name=VID '(' args=csVIdList ')' '=' body_exp=expression
+    | 'def' name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
     ;
 bind1tStatement
-    : name=TID '=' initializer=typeSpec
+    : 'def' name=TID '=' initializer=typeSpec
     ;
 type1vStatement
-    : (is_pub='export')? name=VID ':' ts=typeSpec
+    : ((is_pub='pub')|'val') name=VID ':' ts=typeSpec
     ;
 constStatement
     : 'const' b=block
@@ -181,6 +181,6 @@ formalArgSpec
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
 litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING))+;
-csVIdList: ids+=VID (',' ids+=VID)* ;
-csFormalArgSpecList: specs+=formalArgSpec (',' specs+=formalArgSpec)* ;
+csVIdList: (ids+=VID (',' ids+=VID)*)? ;
+csFormalArgSpecList: (specs+=formalArgSpec (',' specs+=formalArgSpec)*)? ;
 csExpressionList: exps+=expression (',' exps+=expression)* ;

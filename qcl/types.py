@@ -4,7 +4,9 @@ Types
 """
 
 import abc
+import sys
 import enum
+import math
 import typing as t
 
 from . import feedback as fb
@@ -33,6 +35,9 @@ class BaseType(object, metaclass=abc.ABCMeta):
 
     def __eq__(self, o: object) -> bool:
         return self is o
+
+    def __hash__(self) -> int:
+        return id(self)
 
     @property
     def is_concrete(self):
@@ -71,9 +76,6 @@ class VarType(BaseType):
 
     def __str__(self) -> str:
         return '\'' + self.name
-
-    def __hash__(self) -> int:
-        return id(self)
 
     @classmethod
     def kind(cls):
@@ -250,7 +252,7 @@ class ProcedureType(BaseCompositeType):
         )
 
     def __str__(self) -> str:
-        return f"({', '.join(map(str, self.arg_types))}) => {self.ret_type}"
+        return f"({', '.join(map(str, self.arg_types))})=>{self.ret_type}"
 
     @staticmethod
     def new(arg_types: t.Iterable[BaseConcreteType], ret_type: BaseConcreteType) -> "ProcedureType":
@@ -277,7 +279,7 @@ class BaseAlgebraicType(BaseCompositeType):
         if self.opt_name is None:
             body_text = ','.join((f"{field_name}:{field_type}" for field_name, field_type in self.fields))
             id_suffix_w = 4
-            id_suffix = hex(id(self)//8 % 0x10**id_suffix_w)[2:].rjust(id_suffix_w, '0')
+            id_suffix = hex(id(self)//word_size_in_bytes % 0x10**id_suffix_w)[2:].rjust(id_suffix_w, '0')
             return f"{self.prefix()}#{id_suffix}{{{body_text}}}"
         else:
             return self.opt_name
@@ -299,3 +301,7 @@ class UnionType(BaseAlgebraicType):
     @classmethod
     def kind(cls):
         return TypeKind.Union
+
+
+word_size_in_bits = int(1+math.log2(sys.maxsize))
+word_size_in_bytes = word_size_in_bits // 8

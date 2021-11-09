@@ -289,7 +289,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.IotaExpression(self.loc(ctx))
 
     def visitVidPrimaryExpression(self, ctx: antlr.QySourceFileParser.VidPrimaryExpressionContext):
-        return ast1.VIdRefExpression(self.loc(ctx), ctx.id_tok.text)
+        return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)
 
     def visitParenPrimaryExpression(self, ctx: antlr.QySourceFileParser.ParenPrimaryExpressionContext):
         return self.visit(ctx.through)

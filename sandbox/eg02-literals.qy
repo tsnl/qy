@@ -1,10 +1,10 @@
-x = 42;
-y = 100.0;
-z = 42.0f;
-w = 0x100lu;
+let x = 42;
+let y = 100.0;
+let z = 42.0f;
+let w = 0x100lu;
 
-s1 = "hello " "world";
-s2 = """
+let s1 = "hello " "world";
+let s2 = """
     Scooby Dooby Doo,
     Where are you
 """;

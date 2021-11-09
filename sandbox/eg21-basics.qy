@@ -10,9 +10,9 @@
 // NOTE: functions do not need to be declared before definition unless...
 //   1. they are used before they are defined, or
 //   2. they are marked as 'public' (in which case declaration goes in a header)
-export vec3f: (x: float32, y: float32, z: float32) => Vec3f;
-export v3f_add: (Vec3f, Vec3f) => Vec3f;
-export v3f_scale: (Vec3f, float32) => Vec3f;
+pub vec3f: (x: float32, y: float32, z: float32) => Vec3f;
+pub v3f_add: (Vec3f, Vec3f) => Vec3f;
+pub v3f_scale: (Vec3f, float32) => Vec3f;
 
 // enums provided using 'const', which translates into preprocessor declarations
 const {
@@ -23,10 +23,10 @@ const {
 };
 
 // struct definitions: (enum, union are similar)
-Point = struct {
+def Point = struct {
     pos: Vec3f
 };
-Vec3f = struct {
+def Vec3f = struct {
     x: float32,
     y: float32,
     z: float32
@@ -34,18 +34,17 @@ Vec3f = struct {
 
 // function definitions:
 // NOTE: type inference fills in holes.
-vec3f (x, y, z) = Vec3f(x, y, z);
+def vec3f (x, y, z) = Vec3f(x, y, z);
 
-v3f_add (v1, v2) {
-    vx = v1.x + v2.x;
-    vy = v1.y + v2.y;
-    vz = v1.z + v2.z;
+def v3f_add (v1, v2) {
+    let vx = v1.x + v2.x;
+    let vy = v1.y + v2.y;
+    let vz = v1.z + v2.z;
     return vec3f(vx, vy, vz);
 };
-v3f_scale (v, s) {
-    sx = v.x * s;
-    sy = v.y * s;
-    sz = v.z * s;
+def v3f_scale (v, s) {
+    let sx = v.x * s;
+    let sy = v.y * s;
+    let sz = v.z * s;
     return vec3f(sx, sy, sz);
 };
-

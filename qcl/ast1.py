@@ -213,7 +213,7 @@ class IotaExpression(BaseExpression):
     pass
 
 
-class VIdRefExpression(BaseExpression):
+class IdRefExpression(BaseExpression):
     def __init__(self, loc: fb.ILoc, name: str):
         super().__init__(loc)
         self.name = name

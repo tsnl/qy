@@ -41,19 +41,19 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name, 
-            scheme.Scheme([], types.VarType(f"bind1v:{stmt.name}"))
+            scheme.Scheme([], types.VarType(f"bind1v_{stmt.name}"))
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            scheme.Scheme([], types.VarType(f"bind1f:{stmt.name}"))
+            scheme.Scheme([], types.VarType(f"bind1f_{stmt.name}"))
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            scheme.Scheme([], types.VarType(f"bind1t:{stmt.name}"))
+            scheme.Scheme([], types.VarType(f"bind1t_{stmt.name}"))
         )
     
     if new_definition is not None:
@@ -113,8 +113,12 @@ def solve_one_source_file(sf: ast2.QySourceFile):
     sf_top_level_context = sf.x_typer_ctx
     assert isinstance(sf_top_level_context, Context)
     
-    solve_one_block(sf_top_level_context, sf.stmt_list)
-
+    sol_sub = solve_one_block(sf_top_level_context, sf.stmt_list)
+    sf.x_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
+    print(f"Applying `sol_sub`: {sol_sub}")
+    # TODO: apply 'sol_sub' to the whole system before solving deferred constraints
+    
+    # TODO: solve deferred constraints in a separate pass
 
 
 def solve_one_block(ctx: "Context", stmt_list: t.List[ast1.BaseStatement]) -> "Substitution":
@@ -154,12 +158,15 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
         exp_sub, exp_type = solve_one_exp(ctx, stmt.initializer)
         return unify(def_type, exp_type).compose(exp_sub).compose(def_sub)
     elif isinstance(stmt, ast1.Bind1fStatement):
-        arg_name_type_list = [
-            (arg_name, types.VarType(f"arg{arg_index}:{arg_name}"))
+        arg_type_list = [
+            types.VarType(f"arg{arg_index}:{arg_name}")
             for arg_index, arg_name in enumerate(stmt.args)
         ]
+        arg_name_type_list = list(zip(stmt.args, arg_type_list))
         ret_sub, ret_type = solve_one_block_in_function(ctx, arg_name_type_list, stmt.body)
-        return unify().compose(ret_sub)
+        proc_type = types.ProcedureType.new(arg_type_list, ret_type)
+        def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
+        return unify(proc_type, def_type).compose(def_sub).compose(ret_sub)
     elif isinstance(stmt, ast1.Bind1tStatement):
         definition = ctx.try_lookup(stmt.name)
         assert definition is not None
@@ -195,24 +202,62 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
 
 
 def solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Substitution", types.BaseType]:
-    if isinstance(exp, ast1.IntExpression):
+    if isinstance(exp, ast1.IdRefExpression):
+        found_definition = ctx.try_lookup(exp.name)
+        if found_definition is None:
+            panic.because(
+                panic.ExitCode.TyperSolverUndefinedIdError,
+                f"Value identifier {exp.name} used, but not defined or declared",
+                opt_loc=exp.loc
+            )
+        sub, id_type = found_definition.scheme.instantiate()
+        return sub, id_type
+    elif isinstance(exp, ast1.IntExpression):
         return Substitution.empty, types.IntType.get(exp.width_in_bits, not exp.is_unsigned)
     elif isinstance(exp, ast1.FloatExpression):
         return Substitution.empty, types.FloatType.get(exp.width_in_bits)
     elif isinstance(exp, ast1.StringExpression):
         return Substitution.empty, types.StringType.singleton
     elif isinstance(exp, ast1.ConstructorExpression):
-        raise NotImplementedError("ConstructorExpression")
+        made_ts_sub, made_type = solve_one_type_spec(ctx, exp.made_ts)
+        args_sub = Substitution.empty
+        initializer_type_list = []
+        for initializer_arg_exp in exp.initializer_list:
+            initializer_arg_sub, initializer_arg_type = solve_one_exp(initializer_arg_exp)
+            args_sub = initializer_arg_sub.compose(args_sub)
+            initializer_type_list.append(initializer_arg_type)
+        # TODO: check the arguments against the made type, maybe using a deferred query.
+        sub = args_sub.compose(made_ts_sub)
+        return sub, made_type
     elif isinstance(exp, ast1.UnaryOpExpression):
+        # TODO: use a deferred query to resolve this.
         raise NotImplementedError("UnaryOpExpression")
     elif isinstance(exp, ast1.BinaryOpExpression):
+        # TODO: use a deferred query to resolve this.
         raise NotImplementedError("BinaryOpExpression")
     elif isinstance(exp, ast1.ProcCallExpression):
-        raise NotImplementedError("ProcCallExpression")
+        # collecting actual procedure type information:
+        # type based on how the procedure is used, derived from 'actual' arguments and 'actual' return type
+        all_arg_sub = Substitution.empty
+        arg_type_list = []
+        for arg_exp in exp.arg_exps:
+            arg_sub, arg_type = solve_one_exp(ctx, arg_exp)
+            arg_type_list.append(arg_type)
+            all_arg_sub = arg_sub.compose(all_arg_sub)
+        proxy_ret_type = types.VarType(f"proc_call_ret")
+        actual_proc_type = types.ProcedureType.new(arg_type_list, proxy_ret_type)
+        
+        # collecting formal procedure type information:
+        # type based on how the procedure was defined in this context:
+        formal_proc_sub, formal_proc_type = solve_one_exp(ctx, exp.proc)
+
+        # unifying, returning:
+        sub = unify(formal_proc_type, actual_proc_type).compose(formal_proc_sub).compose(all_arg_sub)
+        return sub, proxy_ret_type
     elif isinstance(exp, ast1.IotaExpression):
         raise NotImplementedError("IotaExpression")
-
-    raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
+    else:
+        raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
 
 def solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Substitution", types.BaseType]:
@@ -240,7 +285,8 @@ def solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Sub
                 f"Undefined ID used: {ts.name}",
                 opt_loc=ts.loc
             )
-        return found_definition.scheme.instantiate()
+        sub, def_type = found_definition.scheme.instantiate()
+        return sub, def_type
     elif isinstance(ts, ast1.ProcSignatureTypeSpec):
         all_args_sub = Substitution.empty
         all_arg_types = []
@@ -248,9 +294,7 @@ def solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Sub
             arg_sub, arg_type = solve_one_type_spec(ctx, arg_type)
             all_args_sub = arg_sub.compose(all_args_sub)
             all_arg_types.append(arg_type)
-        
         ret_sub, ret_type = solve_one_type_spec(ctx, ts.ret_ts)
-        
         sub = ret_sub.compose(all_args_sub)
         return sub, types.ProcedureType.new(all_arg_types, ret_type)
     elif isinstance(ts, ast1.AdtTypeSpec):
@@ -286,24 +330,35 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
     if t1 == t2:
         return Substitution.empty
     
-    # var -> anything else
-    if t1.is_var ^ t2.is_var:
-        if t1.is_var:
+    # var -> anything else (including var)
+    if t1.is_var or t2.is_var:
+        if t1.is_var and t2.is_var:
+            # in this case, want a consistent way to eliminate variables independently of the order of arguments 
+            # received.
+            # We choose (arbitrarily) to eliminate values with a higher `id`
+            if id(t1) < id(t2):
+                var_type = t2
+                replacement_type = t1
+            else:
+                assert id(t1) > id(t2)
+                var_type = t1
+                replacement_type = t2
+        elif t1.is_var:
             var_type = t1
-            rewritten_type = t2
+            replacement_type = t2
         else:
             var_type = t2
-            rewritten_type = t1
+            replacement_type = t1
 
         # perform an occurs-check here:
         # - ensure 'var_type' is not one of the free variables of 'rewritten_type'
         # - can define a method named 'free_vars' on types that returns the set of free type variables 
         #   recursively
         # cf https://en.wikipedia.org/wiki/Occurs_check
-        if var_type in rewritten_type.iter_free_vars():
+        if var_type in replacement_type.iter_free_vars():
             raise_unification_error(t1, t2, "occurs check failed (see https://en.wikipedia.org/wiki/Occurs_check)")
 
-        return Substitution.get({var_type: rewritten_type})
+        return Substitution.get({var_type: replacement_type})
 
 
     # composite types => just unify each field recursively.
@@ -327,7 +382,7 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
 
     # any other case: raise a unification error.
     else:
-        raise_unification_error()
+        raise_unification_error(t1, t2)
 
 
 def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None):
@@ -364,10 +419,9 @@ class Context(object):
         self.export_name_set = set()
         self.local_return_type = None
 
-        if config.DEBUG_MODE:
-            self.dbg_children = []
-            if self.opt_parent is not None:
-                self.opt_parent.dbg_children.append(self)
+        self.children = []
+        if self.opt_parent is not None:
+            self.opt_parent.children.append(self)
 
     def try_define(self, definition: "BaseDefinition") -> t.Optional["BaseDefinition"]:
         """
@@ -407,6 +461,7 @@ class Context(object):
 
     def print(self):
         self.print_impl(0)
+        print()
 
     def print_impl(self, indent_count: int):
         indent = '  ' * indent_count
@@ -422,11 +477,22 @@ class Context(object):
                 raise NotImplementedError("Printing unknown definition")
             lines.append(line)
     
-        for child_context in self.dbg_children:
+        for child_context in self.children:
             child_context.print_impl(1+indent_count)
 
         for line in lines:
             print(indent, line, sep='')
+
+    def apply_sub_in_place_to_sub_tree(self, sub: "Substitution"):
+        # applying to 'self'
+        for def_obj in self.symbol_table.values():
+            assert isinstance(def_obj, BaseDefinition)
+            def_obj.scheme = sub.rewrite_scheme(def_obj.scheme)
+
+        # applying to 'self.children'
+        for child_ctx in self.children:
+            child_ctx.apply_sub_in_place_to_sub_tree(sub)
+
 
 
 Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
@@ -483,7 +549,7 @@ class Substitution(object):
 
     def __init__(
         self, 
-        sub_map: t.List[t.Tuple[types.VarType, types.BaseConcreteType]], 
+        sub_map: t.Dict[types.VarType, types.BaseConcreteType], 
         _suppress_construct_empty_error=False
     ) -> None:
         if not _suppress_construct_empty_error:
@@ -496,7 +562,7 @@ class Substitution(object):
         super().__init__()
         self.sub_map = sub_map
 
-    def compose(self, applied_first: "Substitution"):
+    def compose(self, applied_first: "Substitution") -> "Substitution":
         # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1
 
         s1 = self
@@ -507,31 +573,13 @@ class Substitution(object):
         elif s2 is Substitution.empty:
             return s1
         else:
-            intersecting_key_set = set(s1.sub_map.keys()) & set(s2.sub_map.keys())
-            if intersecting_key_set:
-                mismatch = False
-                for key in intersecting_key_set:
-                    s1_t = s1.sub_map[key]
-                    s2_t = s2.sub_map[key]
-                    if s1_t != s2_t:
-                        mismatch = True
-                        break
-
-                if mismatch:
-                    s1_problem_map = {key: s1.sub_map[key] for key in intersecting_key_set}
-                    s2_problem_map = {key: s2.sub_map[key] for key in intersecting_key_set}
-                    panic.because(
-                        panic.ExitCode.TyperUnificationError,
-                        f"Conflicting substitutions detected:"
-                        f"\n\t* from set 1: {s1_problem_map}\n\t* from set 2: {s2_problem_map}"
-                    )
-            
             s1_sub_map = s1.sub_map
             s2_sub_map = {
                 key: s1.rewrite_type(value)
                 for key, value in s2.sub_map.items()
             }
-            return Substitution(sub_map=(s1_sub_map | s2_sub_map))
+            # always preserve sub in s2 over s1 if conflict occurs.
+            return Substitution.get(sub_map=(s1_sub_map | s2_sub_map))
 
     def __str__(self) -> str:
         return '{' + ','.join((f"{str(key)}->{str(val)}" for key, val in self.sub_map.items())) + '}'
@@ -549,7 +597,7 @@ class Substitution(object):
 
         # BoundVar in `sub_map` -> replacement
         # FreeVar in `sub_map` -> replacement
-        opt_replacement_t = self._get(t)
+        opt_replacement_t = self._get_replacement_type_for(t)
         if opt_replacement_t is not None:
             return opt_replacement_t
         
@@ -568,12 +616,20 @@ class Substitution(object):
         assert t.is_atomic or t.is_var
         return t
 
-    def _get(self, t):
-        for cmp_t, replacement_t in self.sub_map.items():
-            if cmp_t == t:
-                return replacement_t
+    def _get_replacement_type_for(self, t):
+        return self.sub_map.get(t, t)
+
+    def rewrite_scheme(self, s: scheme.Scheme) -> scheme.Scheme:
+        if s.vars:
+            # NOTE: any bound vars mapped in this substitution must be removed from the substitution, since these 
+            # variables must be free in the body of the scheme to be substituted out by instantiation.
+            # If we rewrote these bound vars, then they would not be unique to each instantiation.
+            new_sub_map = {var: self.sub_map[var] for var in s.vars}
+            new_sub = Substitution.get(new_sub_map)
         else:
-            return None
+            new_sub = self
+
+        return scheme.Scheme(s.vars, new_sub.rewrite_type(s.body))
 
 
 Substitution.empty = Substitution({}, _suppress_construct_empty_error=True)
