@@ -21,9 +21,9 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
 
 def debug_routine_after_compilation(qyp_set):
     print_qyp_set_summary(qyp_set)
-    print_types()
-    print_schemes()
-    print_unification_subs()
+    # print_types()
+    # print_schemes()
+    # print_unification_subs()
     print_contexts(qyp_set)
 
 

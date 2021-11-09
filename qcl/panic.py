@@ -24,6 +24,7 @@ class ExitCode(enum.Enum):
     TyperSeedingInputError = enum.auto()
     TyperSeedingDoubleBindError = enum.auto()
     TyperSolverUndefinedIdError = enum.auto()
+    TyperSolverRedefinedIdError = enum.auto()
 
 
 
