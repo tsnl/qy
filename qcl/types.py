@@ -75,7 +75,7 @@ class VarType(BaseType):
         self.opt_loc = opt_loc
 
     def __str__(self) -> str:
-        return '\'' + self.name
+        return '\'' + self.name + '#' + get_id_str_suffix(self)
 
     @classmethod
     def kind(cls):
@@ -212,6 +212,13 @@ class BaseCompositeType(BaseConcreteType):
         for field_type in self.field_types:
             yield from field_type.iter_free_vars()
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, *self.field_types))
+
+    def __eq__(self, o: object) -> bool:
+        return self.__class__ == o.__class__ and self.fields == o.fields
+
+
 
 class PointerType(BaseConcreteType):
     def __init__(self, pointee_type: BaseConcreteType) -> None:
@@ -281,8 +288,7 @@ class BaseAlgebraicType(BaseCompositeType):
     def __str__(self) -> str:
         if self.opt_name is None:
             body_text = ','.join((f"{field_name}:{field_type}" for field_name, field_type in self.fields))
-            id_suffix_w = 4
-            id_suffix = hex(id(self)//word_size_in_bytes % 0x10**id_suffix_w)[2:].rjust(id_suffix_w, '0')
+            id_suffix = get_id_str_suffix(self)
             return f"{self.prefix()}#{id_suffix}{{{body_text}}}"
         else:
             return self.opt_name
@@ -304,6 +310,12 @@ class UnionType(BaseAlgebraicType):
     @classmethod
     def kind(cls):
         return TypeKind.Union
+
+
+def get_id_str_suffix(it, id_suffix_w=4):
+    trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
+    return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
+    
 
 
 word_size_in_bits = int(1+math.log2(sys.maxsize))

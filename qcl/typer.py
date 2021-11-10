@@ -106,34 +106,40 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 
 
 #
-# source file typing: part II: solving
+# source file typing: part II: modelling
 #
 
-def solve_one_source_file(sf: ast2.QySourceFile):
+def model_one_source_file(sf: ast2.QySourceFile, dto_list: "DTOList"):
     sf_top_level_context = sf.x_typer_ctx
     assert isinstance(sf_top_level_context, Context)
     
-    sol_sub = solve_one_block(sf_top_level_context, sf.stmt_list, is_top_level=True)
+    sol_sub = model_one_block(sf_top_level_context, sf.stmt_list, dto_list, is_top_level=True)
     # sf.x_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
     # print(f"Applying `sol_sub`: {sol_sub}")
     
     # TODO: solve deferred constraints in a separate pass
 
 
-def solve_one_block(ctx: "Context", stmt_list: t.List[ast1.BaseStatement], is_top_level=False) -> "Substitution":
+def model_one_block(
+    ctx: "Context", 
+    stmt_list: t.List[ast1.BaseStatement], 
+    dto_list: "DTOList", 
+    is_top_level=False
+) -> "Substitution":
     sub = Substitution.empty
     for stmt in stmt_list:
-        stmt_sub = solve_one_stmt(ctx, stmt)
+        stmt_sub = model_one_stmt(ctx, stmt, dto_list)
         sub = stmt_sub.compose(sub)
         if is_top_level:
             ctx.apply_sub_in_place_to_sub_tree(sub)
     return sub
 
 
-def solve_one_block_in_function(
+def model_one_block_in_function(
     ctx: "Context",
     arg_name_type_list: t.List[t.Tuple[str, types.BaseType]],
-    statements: t.List[ast1.BaseStatement]
+    statements: t.List[ast1.BaseStatement],
+    dto_list: "DTOList"
 ) -> t.Tuple["Substitution", types.BaseType]:
     fn_ctx = Context(ContextKind.FunctionBlock, ctx)
     fn_ctx.local_return_type = types.VarType(f"fn_return")
@@ -146,14 +152,14 @@ def solve_one_block_in_function(
 
     # solving the block statements:
     #   - any 'return' statements are associated with the nearest 'return_type' attribute
-    sub = solve_one_block(fn_ctx, statements)
+    sub = model_one_block(fn_ctx, statements, dto_list, is_top_level=False)
     
     return sub, fn_ctx.local_return_type
 
 
-def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution":
+def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOList") -> "Substitution":
     if isinstance(stmt, ast1.Bind1vStatement):
-        exp_sub, exp_type = solve_one_exp(ctx, stmt.initializer)
+        exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
         if ctx.kind == ContextKind.TopLevelOfSourceFile:
             # definition is already seeded-- just retrieve and unify.
             definition = ctx.symbol_table[stmt.name]
@@ -169,7 +175,7 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
             conflicting_def = ctx.try_define(definition)
             if conflicting_def is not None:
                 panic.because(
-                    panic.ExitCode.TyperSolverRedefinedIdError,
+                    panic.ExitCode.TyperModelerRedefinedIdError,
                     f"Local value identifier {stmt.name} bound twice:\n"
                     f"first: {conflicting_def.loc}\n"
                     f"later: {definition.loc}"
@@ -183,7 +189,7 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
             for arg_index, arg_name in enumerate(stmt.args)
         ]
         arg_name_type_list = list(zip(stmt.args, arg_type_list))
-        ret_sub, ret_type = solve_one_block_in_function(ctx, arg_name_type_list, stmt.body)
+        ret_sub, ret_type = model_one_block_in_function(ctx, arg_name_type_list, stmt.body, dto_list)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
         last_sub = def_sub.compose(ret_sub)
@@ -195,7 +201,7 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
         definition = ctx.try_lookup(stmt.name)
         assert definition is not None
         def_sub, def_type = definition.scheme.instantiate()
-        ts_sub, ts_type = solve_one_type_spec(ctx, stmt.initializer)
+        ts_sub, ts_type = model_one_type_spec(ctx, stmt.initializer, dto_list)
         last_sub = ts_sub.compose(def_sub)
         return unify(
             last_sub.rewrite_type(def_type), 
@@ -204,7 +210,7 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
     elif isinstance(stmt, ast1.Type1vStatement):
         definition = ctx.try_lookup(stmt.name)
         def_sub, def_type = definition.scheme.instantiate()
-        ts_sub, ts_type = solve_one_type_spec(ctx, stmt.ts)
+        ts_sub, ts_type = model_one_type_spec(ctx, stmt.ts, dto_list)
         last_sub = ts_sub.compose(def_sub)
         return unify(
             last_sub.rewrite_type(def_type), 
@@ -228,29 +234,37 @@ def solve_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement") -> "Substitution"
                 "Cannot 'return' outside a function block",
                 opt_loc=stmt.loc
             )
-        ret_exp_sub, ret_exp_type = solve_one_exp(ctx, stmt.returned_exp)
+        ret_exp_sub, ret_exp_type = model_one_exp(ctx, stmt.returned_exp, dto_list)
         return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type)).compose(ret_exp_sub)
     elif isinstance(stmt, ast1.IteStatement):
-        then_sub = solve_one_block(ctx, stmt.then_block)
+        then_sub = model_one_block(ctx, stmt.then_block, dto_list)
         else_sub = Substitution.empty
         if stmt.else_block is not None:
-            else_sub = solve_one_block(ctx, stmt.else_block)
+            else_sub = model_one_block(ctx, stmt.else_block, dto_list)
         return then_sub.compose(else_sub)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
 
-def solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Substitution", types.BaseType]:
-    exp_sub, exp_type = help_solve_one_exp(ctx, exp)
+def model_one_exp(
+    ctx: "Context", 
+    exp: ast1.BaseExpression, 
+    dto_list: "DTOList"
+) -> t.Tuple["Substitution", types.BaseType]:
+    exp_sub, exp_type = help_model_one_exp(ctx, exp, dto_list)
     return exp_sub, exp_sub.rewrite_type(exp_type)
 
 
-def help_solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Substitution", types.BaseType]:
+def help_model_one_exp(
+    ctx: "Context", 
+    exp: ast1.BaseExpression, 
+    dto_list: "DTOList"
+) -> t.Tuple["Substitution", types.BaseType]:
     if isinstance(exp, ast1.IdRefExpression):
         found_definition = ctx.try_lookup(exp.name)
         if found_definition is None:
             panic.because(
-                panic.ExitCode.TyperSolverUndefinedIdError,
+                panic.ExitCode.TyperModelerUndefinedIdError,
                 f"Value identifier {exp.name} used, but not defined or declared",
                 opt_loc=exp.loc
             )
@@ -263,29 +277,35 @@ def help_solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Sub
     elif isinstance(exp, ast1.StringExpression):
         return Substitution.empty, types.StringType.singleton
     elif isinstance(exp, ast1.ConstructorExpression):
-        made_ts_sub, made_type = solve_one_type_spec(ctx, exp.made_ts)
+        made_ts_sub, made_type = model_one_type_spec(ctx, exp.made_ts, dto_list)
         args_sub = Substitution.empty
         initializer_type_list = []
         for initializer_arg_exp in exp.initializer_list:
-            initializer_arg_sub, initializer_arg_type = solve_one_exp(ctx, initializer_arg_exp)
+            initializer_arg_sub, initializer_arg_type = model_one_exp(ctx, initializer_arg_exp, dto_list)
             args_sub = initializer_arg_sub.compose(args_sub)
             initializer_type_list.append(initializer_arg_type)
         # TODO: check the arguments against the made type, maybe using a deferred query.
         sub = args_sub.compose(made_ts_sub)
         return sub, made_type
     elif isinstance(exp, ast1.UnaryOpExpression):
-        # TODO: use a deferred query to resolve this.
-        raise NotImplementedError("UnaryOpExpression")
+        res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
+        operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
+        dto_list.add(UnaryOpDTO(exp.operator, res_type, operand_type))
+        return operand_sub, res_type
     elif isinstance(exp, ast1.BinaryOpExpression):
-        # TODO: use a deferred query to resolve this.
-        raise NotImplementedError("BinaryOpExpression")
+        res_type = types.VarType(f"binary_op_{exp.operator.name.lower()}_res")
+        lt_operand_sub, lt_operand_type = model_one_exp(ctx, exp.lt_operand, dto_list)
+        rt_operand_sub, rt_operand_type = model_one_exp(ctx, exp.rt_operand, dto_list)
+        sub = rt_operand_sub.compose(lt_operand_sub)
+        dto_list.add(BinaryOpDTO(exp.operator, res_type, lt_operand_type, rt_operand_type))
+        return sub, res_type
     elif isinstance(exp, ast1.ProcCallExpression):
         # collecting actual procedure type information:
         # type based on how the procedure is used, derived from 'actual' arguments and 'actual' return type
         all_arg_sub = Substitution.empty
         arg_type_list = []
         for arg_exp in exp.arg_exps:
-            arg_sub, arg_type = solve_one_exp(ctx, arg_exp)
+            arg_sub, arg_type = model_one_exp(ctx, arg_exp, dto_list)
             arg_type_list.append(all_arg_sub.rewrite_type(arg_type))
             all_arg_sub = arg_sub.compose(all_arg_sub)
         proxy_ret_type = types.VarType(f"proc_call_ret")
@@ -293,7 +313,7 @@ def help_solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Sub
         
         # collecting formal procedure type information:
         # type based on how the procedure was defined in this context:
-        formal_proc_sub, formal_proc_type = solve_one_exp(ctx, exp.proc)
+        formal_proc_sub, formal_proc_type = model_one_exp(ctx, exp.proc, dto_list)
         last_sub = formal_proc_sub.compose(all_arg_sub)
 
         # unifying, returning:
@@ -308,12 +328,20 @@ def help_solve_one_exp(ctx: "Context", exp: ast1.BaseExpression) -> t.Tuple["Sub
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
 
-def solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Substitution", types.BaseType]:
-    ts_sub, ts_type = help_solve_one_type_spec(ctx, ts)
+def model_one_type_spec(
+    ctx: "Context", 
+    ts: "ast1.BaseTypeSpec", 
+    dto_list: "DTOList"
+) -> t.Tuple["Substitution", types.BaseType]:
+    ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
     return ts_sub, ts_sub.rewrite_type(ts_type)
 
 
-def help_solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple["Substitution", types.BaseType]:
+def help_model_one_type_spec(
+    ctx: "Context", 
+    ts: "ast1.BaseTypeSpec", 
+    dto_list: "DTOList"
+) -> t.Tuple["Substitution", types.BaseType]:
     if isinstance(ts, ast1.BuiltinPrimitiveTypeSpec):
         return Substitution.empty, {
             ast1.BuiltinPrimitiveTypeIdentity.Float32: types.FloatType.get(32),
@@ -334,7 +362,7 @@ def help_solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple
         found_definition = ctx.try_lookup(ts.name)
         if found_definition is None:
             panic.because(
-                panic.ExitCode.TyperSolverUndefinedIdError,
+                panic.ExitCode.TyperModelerUndefinedIdError,
                 f"Undefined ID used: {ts.name}",
                 opt_loc=ts.loc
             )
@@ -344,10 +372,10 @@ def help_solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple
         all_args_sub = Substitution.empty
         all_arg_types = []
         for opt_arg_name, arg_type in ts.args_list:
-            arg_sub, arg_type = solve_one_type_spec(ctx, arg_type)
+            arg_sub, arg_type = model_one_type_spec(ctx, arg_type, dto_list)
             all_args_sub = arg_sub.compose(all_args_sub)
             all_arg_types.append(arg_type)
-        ret_sub, ret_type = solve_one_type_spec(ctx, ts.ret_ts)
+        ret_sub, ret_type = model_one_type_spec(ctx, ts.ret_ts, dto_list)
         sub = ret_sub.compose(all_args_sub)
         return sub, types.ProcedureType.new(all_arg_types, ret_type)
     elif isinstance(ts, ast1.AdtTypeSpec):
@@ -355,7 +383,7 @@ def help_solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple
         fields = []
         for field_name, field_ts in ts.fields_list:
             assert field_name is not None
-            field_sub, field_type  = solve_one_type_spec(ctx, field_ts)
+            field_sub, field_type  = model_one_type_spec(ctx, field_ts, dto_list)
             sub = field_sub.compose(sub)
             fields.append((field_name, field_type))
         if ts.linear_op == ast1.LinearTypeOp.Product:
@@ -366,6 +394,110 @@ def help_solve_one_type_spec(ctx: "Context", ts: "ast1.BaseTypeSpec") -> t.Tuple
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
+
+
+#
+# source file typing: part III: deferred resolution (solving)
+#
+
+class DTOList(object): 
+    def __init__(self):
+        self.internal_dto_list: t.List[BaseDTO] = []
+
+    def add(self, dto: "BaseDTO"):
+        self.internal_dto_list.append(dto)
+
+    def solve(self) -> "Substitution":
+        finished = False
+        while not finished:
+            # solving one iteration:
+            old_dto_list = self.internal_dto_list
+            finished, new_dto_list, sub = DTOList.solve_one_iteration(old_dto_list)
+            
+            # ensuring solving hasn't stalled:
+            if len(new_dto_list) == len(old_dto_list):
+                panic.because(
+                    panic.ExitCode.TyperDtoSolverStalledError,
+                    f"Solution stalled with {len(new_dto_list)} constraints remaining:\n" +
+                    '\n'.join(map(str, new_dto_list))
+                )
+
+            # applying the substitution:
+            Context.builtin_root.apply_sub_in_place_to_sub_tree(sub)
+            for dto in new_dto_list:
+                dto.rewrite_with_sub(sub)
+
+            self.internal_dto_list = new_dto_list
+
+    @staticmethod
+    def solve_one_iteration(dto_list: t.List["BaseDTO"]) -> t.Tuple[bool, t.List["BaseDTO"], "Substitution"]:
+        new_dto_list = []
+        sub = Substitution.empty
+        all_finished = True
+        for dto in dto_list:
+            dto_finished, dto_sub = dto.increment_solution()
+            if not dto_finished:
+                new_dto_list.append(dto)
+                all_finished = False
+            sub = sub.compose(dto_sub)
+        return all_finished, new_dto_list, sub
+
+
+class BaseDTO(object, metaclass=abc.ABCMeta):
+    def __init__(self, arg_type_list):
+        super().__init__()
+        self.arg_type_list = arg_type_list
+
+    @abc.abstractmethod
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        pass
+
+    def rewrite_with_sub(self, sub: "Substitution"):
+        for i in range(len(self.arg_type_list)):
+            self.arg_type_list[i] = sub.rewrite_type(self.arg_type_list[i])
+
+
+class UnaryOpDTO(BaseDTO):
+    def __init__(self, unary_op: ast1.UnaryOperator, res_type: types.BaseType, arg_type: types.BaseType):
+        super().__init__([res_type, arg_type])
+        self.unary_op = unary_op
+    
+    @property
+    def return_type(self):
+        return self.arg_type_list[0]
+
+    @property
+    def operand_type(self):
+        return self.arg_type_list[1]
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        raise NotImplementedError("Solving one iter for UnaryOpDTO")
+
+
+class BinaryOpDTO(BaseDTO):
+    def __init__(
+        self, 
+        binary_op: ast1.BinaryOperator, 
+        res_type: types.BaseType, 
+        lt_arg_type: types.BaseType, rt_arg_type: types.BaseType
+    ):
+        super().__init__([res_type, lt_arg_type, rt_arg_type])
+        self.binary_op = binary_op
+
+    @property
+    def return_type(self):
+        return self.arg_type_list[0]
+
+    @property
+    def lt_operand_type(self):
+        return self.arg_type_list[1]
+
+    @property
+    def rt_operand_type(self):
+        return self.arg_type_list[2]
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        raise NotImplementedError("Solving one iter for BinaryOpDTO")
 
 
 #
@@ -632,7 +764,7 @@ class Substitution(object):
                 offending_intersecting_key_set = {
                     key
                     for key in intersecting_key_set
-                    if s1_sub_map[key] != s2_sub_map[key] 
+                    if s1_sub_map[key] != s2_sub_map[key]
                 }
                 can_overwrite = all((
                     s1_sub_map[key].is_var and not s2_sub_map[key].is_var
