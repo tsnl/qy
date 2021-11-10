@@ -472,6 +472,8 @@ class UnaryOpDTO(BaseDTO):
 
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
         raise NotImplementedError("Solving one iter for UnaryOpDTO")
+        # print("WARNING: NotImplemented: Solving one iter for UnaryOpDTO")
+        # return True, Substitution.empty
 
 
 class BinaryOpDTO(BaseDTO):
@@ -498,6 +500,8 @@ class BinaryOpDTO(BaseDTO):
 
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
         raise NotImplementedError("Solving one iter for BinaryOpDTO")
+        # print("WARNING: NotImplemented: Solving one iter for BinaryOpDTO")
+        # return True, Substitution.empty
 
 
 #
@@ -767,7 +771,7 @@ class Substitution(object):
                     if s1_sub_map[key] != s2_sub_map[key]
                 }
                 can_overwrite = all((
-                    s1_sub_map[key].is_var and not s2_sub_map[key].is_var
+                    Substitution.can_overwrite_t1_with_t2(s1_sub_map[key], s2_sub_map[key])
                     for key in offending_intersecting_key_set
                 ))
                 if offending_intersecting_key_set and not can_overwrite:
@@ -829,6 +833,24 @@ class Substitution(object):
             new_sub = self
 
         return scheme.Scheme(s.vars, new_sub.rewrite_type(s.body))
+
+    @staticmethod
+    def can_overwrite_t1_with_t2(t1: types.BaseType, t2: types.BaseType):
+        assert t1 != t2
+        
+        # if t1 is a variable, we prefer t2 as a replacement (be it a var or not)
+        if t1.is_var:
+            return True
+
+        # if t1 is composite, check if t2 has preferable fields.
+        if t1.is_composite and t2.is_composite:
+            if t1.kind == t2.kind and len(t1.fields) == len(t2.fields):
+                return all((
+                    Substitution.can_overwrite_t1_with_t2(field_type1, field_type2)
+                    for field_type1, field_type2 in zip(t1.field_types, t2.field_types)
+                ))
+
+        return False
 
 
 Substitution.empty = Substitution({}, _suppress_construct_empty_error=True)

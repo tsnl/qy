@@ -216,7 +216,7 @@ class BaseCompositeType(BaseConcreteType):
         return hash((self.__class__, *self.field_types))
 
     def __eq__(self, o: object) -> bool:
-        return self.__class__ == o.__class__ and self.fields == o.fields
+        return self.kind == o.kind and self.fields == o.fields
 
 
 
