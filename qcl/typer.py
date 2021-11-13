@@ -168,7 +168,8 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
             last_sub = def_sub.compose(exp_sub)
             return unify(
                 last_sub.rewrite_type(def_type), 
-                last_sub.rewrite_type(exp_type)
+                last_sub.rewrite_type(exp_type),
+                opt_loc=stmt.loc
             ).compose(last_sub)
         else:
             # try to create a local definition using the expression type.
@@ -196,7 +197,8 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
         last_sub = def_sub.compose(ret_sub)
         return unify(
             last_sub.rewrite_type(proc_type), 
-            last_sub.rewrite_type(def_type)
+            last_sub.rewrite_type(def_type),
+            opt_loc=stmt.loc
         ).compose(last_sub)
     elif isinstance(stmt, ast1.Bind1tStatement):
         definition = ctx.try_lookup(stmt.name)
@@ -206,7 +208,8 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
         last_sub = ts_sub.compose(def_sub)
         return unify(
             last_sub.rewrite_type(def_type), 
-            last_sub.rewrite_type(ts_type)
+            last_sub.rewrite_type(ts_type),
+            opt_loc=stmt.loc
         ).compose(last_sub)
     elif isinstance(stmt, ast1.Type1vStatement):
         definition = ctx.try_lookup(stmt.name)
@@ -215,7 +218,8 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
         last_sub = ts_sub.compose(def_sub)
         return unify(
             last_sub.rewrite_type(def_type), 
-            last_sub.rewrite_type(ts_type)
+            last_sub.rewrite_type(ts_type),
+            opt_loc=stmt.loc
         ).compose(last_sub)
     elif isinstance(stmt, ast1.ConstStatement):
         sub = Substitution.empty
@@ -236,7 +240,7 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
                 opt_loc=stmt.loc
             )
         ret_exp_sub, ret_exp_type = model_one_exp(ctx, stmt.returned_exp, dto_list)
-        return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type)).compose(ret_exp_sub)
+        return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type), opt_loc=stmt.loc).compose(ret_exp_sub)
     elif isinstance(stmt, ast1.IteStatement):
         condition_sub, condition_type = model_one_exp(ctx, stmt.cond, dto_list)
         dto_list.add(IteCondTypeCheckDTO(stmt.loc, condition_type))
@@ -320,7 +324,8 @@ def help_model_one_exp(
         # unifying, returning:
         sub = unify(
             last_sub.rewrite_type(formal_proc_type), 
-            last_sub.rewrite_type(actual_proc_type)
+            last_sub.rewrite_type(actual_proc_type),
+            opt_loc=exp.loc
         ).compose(last_sub)
         return sub, proxy_ret_type
     elif isinstance(exp, ast1.IotaExpression):
@@ -512,8 +517,8 @@ class UnaryOpDTO(BaseDTO):
 
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
         if self.unary_op == ast1.UnaryOperator.LogicalNot:
-            arg_u_sub = unify(self.operand_type, types.IntType.get(1, is_signed=False))
-            ret_u_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
+            arg_u_sub = unify(self.operand_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
+            ret_u_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
             return True, ret_u_sub.compose(arg_u_sub)
         elif self.unary_op in (ast1.UnaryOperator.Minus, ast1.UnaryOperator.Plus):
             if self.operand_type.is_var:
@@ -522,15 +527,15 @@ class UnaryOpDTO(BaseDTO):
                 if self.operand_type.kind == types.IntType:
                     if self.operand_type.is_signed:
                         # + <int> => return identity
-                        ret_sub = unify(self.operand_type, self.return_type)
+                        ret_sub = unify(self.operand_type, self.return_type, opt_loc=self.loc)
                         return True, ret_sub
                     else:
                         # + <uint> => return a signed integer of the same width
                         ret_type = types.IntType.get(self.operand_type.width_in_bits, is_signed=True)
-                        ret_sub = unify(ret_type, self.return_type)
+                        ret_sub = unify(ret_type, self.return_type, opt_loc=self.loc)
                         return True, ret_sub
                 elif self.operand_type.kind == types.TypeKind.Float:
-                    ret_sub = unify(self.return_type, self.operand_type)
+                    ret_sub = unify(self.return_type, self.operand_type, opt_loc=self.loc)
                     return True, ret_sub
                 else:
                     panic.because(
@@ -598,14 +603,14 @@ class BinaryOpDTO(BaseDTO):
         # arithmetic operators
         if self.binary_op in BinaryOpDTO.arithmetic_binary_operator_set:
             # arithmetic binary operators are symmetrically typed: arguments must have the same type.
-            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type)
+            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type, opt_loc=self.loc)
             lt_operand_type = symmetric_args_sub.rewrite_type(self.lt_operand_type)
             rt_operand_type = symmetric_args_sub.rewrite_type(self.rt_operand_type)
 
             # dispatching based on atomicity:
             if lt_operand_type.is_atomic:
                 if isinstance(lt_operand_type, (types.IntType, types.FloatType)):
-                    ret_sub = unify(lt_operand_type, self.return_type)
+                    ret_sub = unify(lt_operand_type, self.return_type, opt_loc=self.loc)
                     return True, ret_sub.compose(symmetric_args_sub)
                 else:
                     panic.because(
@@ -626,7 +631,7 @@ class BinaryOpDTO(BaseDTO):
         # comparison operators
         elif self.binary_op in BinaryOpDTO.comparison_binary_operator_set:
             # comparison operators are symmetrically typed: arguments must have the same type.
-            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type)
+            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type, opt_loc=self.loc)
             lt_operand_type = symmetric_args_sub.rewrite_type(self.lt_operand_type)
             rt_operand_type = symmetric_args_sub.rewrite_type(self.rt_operand_type)
 
@@ -637,7 +642,7 @@ class BinaryOpDTO(BaseDTO):
                 lt_operand_type.is_atomic
             )
             if builtin_operation_is_defined:
-                ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
+                ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
                 return True, ret_sub.compose(symmetric_args_sub)
             elif not lt_operand_type.is_atomic:
                 panic.because(
@@ -657,12 +662,10 @@ class BinaryOpDTO(BaseDTO):
         # boolean operators
         elif self.binary_op in BinaryOpDTO.logical_binary_operator_set:
             # NOTE: for now, forcing to be boolean. Can expand once operator overloading is supported.
-            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type)
-            args_check_sub = unify(
-                symmetric_args_sub.rewrite_type(self.lt_operand_type), 
-                types.IntType.get(1, is_signed=False)
-            )
-            ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
+            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type, opt_loc=self.loc)
+            bool_type = types.IntType.get(1, is_signed=False)
+            args_check_sub = unify(symmetric_args_sub.rewrite_type(self.lt_operand_type), bool_type, opt_loc=self.loc)
+            ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
             return True, ret_sub.compose(args_check_sub).compose(symmetric_args_sub)
         
         else:
@@ -676,7 +679,11 @@ class BinaryOpDTO(BaseDTO):
 # Unification
 #
 
-def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
+def unify(
+    t1: types.BaseType, 
+    t2: types.BaseType, 
+    opt_loc: t.Optional[fb.ILoc] = None
+) -> "Substitution":
     """
     Returns the most general substitution that would make these types identical when both are rewritten.
     WARNING: 
@@ -725,24 +732,26 @@ def unify(t1: types.BaseType, t2: types.BaseType) -> "Substitution":
         for ft1, ft2 in zip(t1.field_types, t2.field_types):
             s = unify(
                 s.rewrite_type(ft1), 
-                s.rewrite_type(ft2)
+                s.rewrite_type(ft2),
+                opt_loc=opt_loc
             ).compose(s)
         return s
 
     # any other case: raise a unification error.
     else:
-        raise_unification_error(t1, t2)
+        raise_unification_error(t1, t2, opt_loc=opt_loc)
 
 
-def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None):
-    msg_lines = [f"UNIFICATION_ERROR: Cannot unify {t} and {u}"]
+def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None, opt_loc=None):
+    msg_chunks = [f"UNIFICATION_ERROR: Cannot unify {t} and {u}"]
     if opt_more is not None:
         assert isinstance(opt_more, str)
-        msg_lines.append('\t' + opt_more)
+        msg_chunks.append(textwrap.indent(opt_more, ' '*4))
     
     panic.because(
         panic.ExitCode.TyperUnificationError,
-        '\n'.join(msg_lines)
+        '\n'.join(msg_chunks),
+        opt_loc=opt_loc
     )
 
 
