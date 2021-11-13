@@ -819,7 +819,7 @@ class Context(object):
 
     def print(self):
         self.print_impl(0)
-        print()
+        # print()
 
     def print_impl(self, indent_count: int):
         indent = '  ' * indent_count
@@ -834,12 +834,12 @@ class Context(object):
             else:
                 raise NotImplementedError("Printing unknown definition")
             lines.append(line)
-    
-        for child_context in self.children:
-            child_context.print_impl(1+indent_count)
 
         for line in lines:
             print(indent, line, sep='')
+    
+        for child_context in self.children:
+            child_context.print_impl(1+indent_count)
 
     def apply_sub_in_place_to_sub_tree(self, sub: "Substitution"):
         # applying to 'self'

@@ -31,6 +31,6 @@ def fibonacci (x) {
     };
 };
 
-let b1 = 13;
-let b2 = 42;
+let b1 = true;
+let b2 = false;
 let m = b1 or b2;
