@@ -132,6 +132,7 @@ def model_one_block(
         sub = stmt_sub.compose(sub)
         if is_top_level:
             ctx.apply_sub_in_place_to_sub_tree(sub)
+            dto_list.update(sub)
     return sub
 
 
@@ -290,14 +291,14 @@ def help_model_one_exp(
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
         operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
-        dto_list.add(UnaryOpDTO(exp.operator, res_type, operand_type))
+        dto_list.add(UnaryOpDTO(exp.loc, exp.operator, res_type, operand_type))
         return operand_sub, res_type
     elif isinstance(exp, ast1.BinaryOpExpression):
         res_type = types.VarType(f"binary_op_{exp.operator.name.lower()}_res")
         lt_operand_sub, lt_operand_type = model_one_exp(ctx, exp.lt_operand, dto_list)
         rt_operand_sub, rt_operand_type = model_one_exp(ctx, exp.rt_operand, dto_list)
         sub = rt_operand_sub.compose(lt_operand_sub)
-        dto_list.add(BinaryOpDTO(exp.operator, res_type, lt_operand_type, rt_operand_type))
+        dto_list.add(BinaryOpDTO(exp.loc, exp.operator, res_type, lt_operand_type, rt_operand_type))
         return sub, res_type
     elif isinstance(exp, ast1.ProcCallExpression):
         # collecting actual procedure type information:
@@ -407,6 +408,16 @@ class DTOList(object):
     def add(self, dto: "BaseDTO"):
         self.internal_dto_list.append(dto)
 
+    def update(self, sub, opt_replacement_internal_dto_list=None):
+        if opt_replacement_internal_dto_list is not None:
+            dto_list = opt_replacement_internal_dto_list
+            self.internal_dto_list = dto_list
+        else:
+            dto_list = self.internal_dto_list
+
+        for dto in dto_list:
+            dto.rewrite_with_sub(sub)
+
     def solve(self) -> "Substitution":
         finished = False
         while not finished:
@@ -424,10 +435,7 @@ class DTOList(object):
 
             # applying the substitution:
             Context.builtin_root.apply_sub_in_place_to_sub_tree(sub)
-            for dto in new_dto_list:
-                dto.rewrite_with_sub(sub)
-
-            self.internal_dto_list = new_dto_list
+            self.update(sub, new_dto_list)
 
     @staticmethod
     def solve_one_iteration(dto_list: t.List["BaseDTO"]) -> t.Tuple[bool, t.List["BaseDTO"], "Substitution"]:
@@ -444,13 +452,21 @@ class DTOList(object):
 
 
 class BaseDTO(object, metaclass=abc.ABCMeta):
-    def __init__(self, arg_type_list):
+    def __init__(self, loc: fb.ILoc, arg_type_list):
         super().__init__()
+        self.loc = loc
         self.arg_type_list = arg_type_list
 
     @abc.abstractmethod
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
         pass
+
+    @abc.abstractmethod
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        return str(self)
 
     def rewrite_with_sub(self, sub: "Substitution"):
         for i in range(len(self.arg_type_list)):
@@ -458,32 +474,72 @@ class BaseDTO(object, metaclass=abc.ABCMeta):
 
 
 class UnaryOpDTO(BaseDTO):
-    def __init__(self, unary_op: ast1.UnaryOperator, res_type: types.BaseType, arg_type: types.BaseType):
-        super().__init__([res_type, arg_type])
+    def __init__(self, loc: fb.ILoc, unary_op: ast1.UnaryOperator, res_type: types.BaseType, arg_type: types.BaseType):
+        super().__init__(loc, [res_type, arg_type])
         self.unary_op = unary_op
     
     @property
-    def return_type(self):
+    def return_type(self) -> types.BaseType:
         return self.arg_type_list[0]
 
     @property
-    def operand_type(self):
+    def operand_type(self) -> types.BaseType:
         return self.arg_type_list[1]
 
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
-        raise NotImplementedError("Solving one iter for UnaryOpDTO")
-        # print("WARNING: NotImplemented: Solving one iter for UnaryOpDTO")
-        # return True, Substitution.empty
+        if self.unary_op == ast1.UnaryOperator.LogicalNot:
+            arg_u_sub = unify(self.operand_type, types.IntType.get(1, is_signed=False))
+            ret_u_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
+            return True, ret_u_sub.compose(arg_u_sub)
+        elif self.unary_op in (ast1.UnaryOperator.Minus, ast1.UnaryOperator.Plus):
+            if self.operand_type.is_var:
+                return False, Substitution.empty
+            else:
+                if self.operand_type.kind == types.IntType:
+                    if self.operand_type.is_signed:
+                        # + <int> => return identity
+                        ret_sub = unify(self.operand_type, self.return_type)
+                        return True, ret_sub
+                    else:
+                        # + <uint> => return a signed integer of the same width
+                        ret_type = types.IntType(self.operand_type.width_in_bits, is_signed=True)
+                        ret_sub = unify(ret_type, self.return_type)
+                        return True, ret_sub
+                elif self.operand_type.kind == types.TypeKind.Float:
+                    ret_sub = unify(self.return_type, self.operand_type)
+                    return True, ret_sub
+                else:
+                    panic.because(
+                        panic.ExitCode.TyperDtoSolverFailedError,
+                        f"Cannot apply {self.unary_op.name} to argument of non-atomic type: {self.operand_type}",
+                        opt_loc=self.loc
+                    )
+        else:
+            raise NotImplementedError(f"Solving one iter for UnaryOpDTO for unary op: {self.unary_op.name}")
+            # print("WARNING: NotImplemented: Solving one iter for UnaryOpDTO")
+            # return True, Substitution.empty
+    
+    def __str__(self):
+        return f"{self.unary_op}({self.operand_type})"
 
 
 class BinaryOpDTO(BaseDTO):
+    arithmetic_binary_operator_set = {
+        ast1.BinaryOperator.Mul,
+        ast1.BinaryOperator.Div,
+        ast1.BinaryOperator.Mod,
+        ast1.BinaryOperator.Add,
+        ast1.BinaryOperator.Sub
+    }
+
     def __init__(
         self, 
+        loc: fb.ILoc,
         binary_op: ast1.BinaryOperator, 
         res_type: types.BaseType, 
         lt_arg_type: types.BaseType, rt_arg_type: types.BaseType
     ):
-        super().__init__([res_type, lt_arg_type, rt_arg_type])
+        super().__init__(loc, [res_type, lt_arg_type, rt_arg_type])
         self.binary_op = binary_op
 
     @property
@@ -499,9 +555,44 @@ class BinaryOpDTO(BaseDTO):
         return self.arg_type_list[2]
 
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
-        raise NotImplementedError("Solving one iter for BinaryOpDTO")
+        if self.binary_op in BinaryOpDTO.arithmetic_binary_operator_set:
+            # arithmetic operators
+            # can infer if we have either argument type
+            # NOTE: can infer from return type as well, but would lose ability to handle operator overloads.
+            if self.lt_operand_type.is_var and self.rt_operand_type.is_var:
+                return False, Substitution.empty
+            
+            # arithmetic binary operators are symmetrically typed: arguments must have the same type.
+            symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type)
+            lt_operand_type = symmetric_args_sub.rewrite_type(self.lt_operand_type)
+            rt_operand_type = symmetric_args_sub.rewrite_type(self.rt_operand_type)
+
+            if lt_operand_type.is_atomic:
+                if isinstance(lt_operand_type, (types.IntType, types.FloatType)):
+                    ret_sub = unify(lt_operand_type, rt_operand_type)
+                    return True, ret_sub.compose(symmetric_args_sub)
+                else:
+                    panic.because(
+                        panic.ExitCode.TyperDtoSolverFailedError,
+                        f"Cannot apply binary operator {self.binary_op.name} to these arguments:\n"
+                        f"left argument:  {lt_operand_type}\n"
+                        f"right argument: {rt_operand_type}"
+                    )
+            else:
+                # NOTE: operator overloading can be added later very easily here.
+                panic.because(
+                    panic.ExitCode.TyperDtoSolverFailedError,
+                    f"Cannot apply binary operator {self.binary_op.name} to non-atomic arguments:\n"
+                    f"left argument:  {lt_operand_type}\n"
+                    f"right argument: {rt_operand_type}"
+                )
+        else:
+            raise NotImplementedError(f"Solving one iter for BinaryOpDTO for binary op: {self.binary_op.name}")
         # print("WARNING: NotImplemented: Solving one iter for BinaryOpDTO")
         # return True, Substitution.empty
+
+    def __str__(self):
+        return f"{self.binary_op}({self.lt_operand_type}, {self.rt_operand_type})"
 
 
 #
