@@ -658,8 +658,12 @@ class BinaryOpDTO(BaseDTO):
         elif self.binary_op in BinaryOpDTO.logical_binary_operator_set:
             # NOTE: for now, forcing to be boolean. Can expand once operator overloading is supported.
             symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type)
-            args_typing_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
-            return True, args_typing_sub.compose(symmetric_args_sub)
+            args_check_sub = unify(
+                symmetric_args_sub.rewrite_type(self.lt_operand_type), 
+                types.IntType.get(1, is_signed=False)
+            )
+            ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False))
+            return True, ret_sub.compose(args_check_sub).compose(symmetric_args_sub)
         
         else:
             raise NotImplementedError(f"Solving one iter for BinaryOpDTO for binary op: {self.binary_op.name}")

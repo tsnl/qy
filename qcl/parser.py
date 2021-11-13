@@ -392,6 +392,20 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                 self.visit(ctx.rt),
             )
 
+    def visitEqualityExpression(self, ctx: antlr.QySourceFileParser.EqualityExpressionContext):
+        if ctx.through is not None:
+            return self.visit(ctx.through)
+        else:
+            return ast1.BinaryOpExpression(
+                self.loc(ctx),
+                {
+                    '==': ast1.BinaryOperator.Eq,
+                    '!=': ast1.BinaryOperator.NEq
+                }[ctx.op.text],
+                self.visit(ctx.lt),
+                self.visit(ctx.rt)
+            )
+
     def visitAndExpression(self, ctx: antlr.QySourceFileParser.AndExpressionContext):
         if ctx.through is not None:
             return self.visit(ctx.through)

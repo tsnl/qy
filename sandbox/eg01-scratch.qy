@@ -30,3 +30,7 @@ def fibonacci (x) {
         return fibonacci(x - 1) + fibonacci(x - 2);
     };
 };
+
+let b1 = 42;
+let b2 = 15;
+let m = b1 or b2;
