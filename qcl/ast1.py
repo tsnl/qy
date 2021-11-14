@@ -24,7 +24,7 @@ OptStr = t.Optional[str]
 #
 
 class UnaryOperator(enum.Enum):
-    Deref = enum.auto()
+    DeRef = enum.auto()
     LogicalNot = enum.auto()
     Minus = enum.auto()
     Plus = enum.auto()
@@ -137,10 +137,11 @@ class Type1vStatement(BaseStatement):
 
 
 class ConstStatement(BaseStatement):
-    def __init__(self, loc: fb.ILoc, body: t.List[BaseStatement]):
+    def __init__(self, loc: fb.ILoc, body: t.List[BaseStatement], const_type_spec: "BaseTypeSpec"):
         super().__init__(loc)
         self.loc = loc
         self.body = body
+        self.const_type_spec = const_type_spec
 
 
 class IteStatement(BaseStatement):

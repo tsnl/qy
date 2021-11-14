@@ -226,7 +226,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.Type1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.ts), is_export_line)
 
     def visitConstStatement(self, ctx: antlr.QySourceFileParser.ConstStatementContext) -> ast1.ConstStatement:
-        return ast1.ConstStatement(self.loc(ctx), self.visit(ctx.b))
+        return ast1.ConstStatement(self.loc(ctx), self.visit(ctx.b), self.visit(ctx.type_spec))
 
     def visitIteStatement(self, ctx: antlr.QySourceFileParser.IteStatementContext) -> ast1.IteStatement:
         then_body = self.visit(ctx.then_body)
@@ -324,7 +324,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
     def visitUnaryOperator(self, ctx: antlr.QySourceFileParser.UnaryOperatorContext) -> ast1.UnaryOperator:
         return {
-            '*': ast1.UnaryOperator.Deref,
+            '*': ast1.UnaryOperator.DeRef,
             'not': ast1.UnaryOperator.LogicalNot,
             '-': ast1.UnaryOperator.Minus,
             '+': ast1.UnaryOperator.Plus

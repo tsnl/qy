@@ -8,7 +8,6 @@ from . import typer
 from . import cpp_emitter
 from . import base_emitter
 from . import types
-from . import scheme
 
 
 def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter):
@@ -29,10 +28,11 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     emitter.emit_qyp_set(qyp_set)
 
     # debug routine:
-    # debug_routine_after_compilation(qyp_set)
+    debug_routine_after_compilation(qyp_set)
 
 
 def debug_routine_after_compilation(qyp_set):
+    print("INFO: Post-compilation Debug Dump")
     print_qyp_set_summary(qyp_set)
     print_types()
     print_schemes()
@@ -41,7 +41,7 @@ def debug_routine_after_compilation(qyp_set):
 
 
 def print_qyp_set_summary(qyp_set):
-    print("INFO: Module summary:")
+    print("... Module summary:")
     for qyp_name, qyp in qyp_set.qyp_name_map.items():
         print(f"- qyp {repr(qyp_name)} @ path({repr(qyp.file_path)})")
         for src_file in qyp.iter_src_paths():
@@ -70,7 +70,7 @@ def print_types():
 def print_schemes():
     h_a = types.VarType('a')
     h_b = types.VarType('b')
-    scm = scheme.Scheme([h_a, h_b], types.StructType([('x', h_a), ('y', h_b)]))
+    scm = typer.Scheme([h_a, h_b], types.StructType([('x', h_a), ('y', h_b)]))
     instantiate_sub, instantiated_type = scm.instantiate([types.IntType.get(32, True), types.IntType.get(64, True)])
     print("... Scheme print-test:")
     print('\tScheme:            ' + str(scm))

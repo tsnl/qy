@@ -315,7 +315,6 @@ class UnionType(BaseAlgebraicType):
 def get_id_str_suffix(it, id_suffix_w=4):
     trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
     return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
-    
 
 
 word_size_in_bits = int(1+math.log2(sys.maxsize))

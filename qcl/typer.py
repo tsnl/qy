@@ -9,7 +9,6 @@ from . import config
 from . import pair
 from . import feedback as fb
 from . import types
-from . import scheme
 from . import ast1
 from . import ast2
 
@@ -41,19 +40,19 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name, 
-            scheme.Scheme([], types.VarType(f"bind1v_{stmt.name}"))
+            Scheme([], types.VarType(f"bind1v_{stmt.name}"))
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            scheme.Scheme([], types.VarType(f"bind1f_{stmt.name}"))
+            Scheme([], types.VarType(f"bind1f_{stmt.name}"))
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            scheme.Scheme([], types.VarType(f"bind1t_{stmt.name}"))
+            Scheme([], types.VarType(f"bind1t_{stmt.name}"))
         )
     
     if new_definition is not None:
@@ -128,7 +127,7 @@ def model_one_block(
 ) -> "Substitution":
     sub = Substitution.empty
     for stmt in stmt_list:
-        stmt_sub = model_one_stmt(ctx, stmt, dto_list)
+        stmt_sub = model_one_statement(ctx, stmt, dto_list)
         sub = stmt_sub.compose(sub)
         if is_top_level:
             ctx.apply_sub_in_place_to_sub_tree(sub)
@@ -148,7 +147,7 @@ def model_one_block_in_function(
     # defining each formal argument for this function:
     for arg_index, (arg_name, arg_type) in enumerate(arg_name_type_list):
         loc = fb.BuiltinLoc(f"arg({arg_index}):{arg_name}")
-        scm = scheme.Scheme([], arg_type)
+        scm = Scheme([], arg_type)
         fn_ctx.try_define(ValueDefinition(loc, arg_name, scm))
 
     # solving the block statements:
@@ -158,7 +157,7 @@ def model_one_block_in_function(
     return sub, fn_ctx.local_return_type
 
 
-def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOList") -> "Substitution":
+def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOList") -> "Substitution":
     if isinstance(stmt, ast1.Bind1vStatement):
         exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
         if ctx.kind == ContextKind.TopLevelOfSourceFile:
@@ -173,7 +172,7 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
             ).compose(last_sub)
         else:
             # try to create a local definition using the expression type.
-            definition = ValueDefinition(stmt.loc, stmt.name, scheme.Scheme([], exp_type))
+            definition = ValueDefinition(stmt.loc, stmt.name, Scheme([], exp_type))
             conflicting_def = ctx.try_define(definition)
             if conflicting_def is not None:
                 panic.because(
@@ -183,8 +182,8 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
                     f"later: {definition.loc}"
                 )
             else:
-                def_sub, def_type = definition.instantiate()
-                return def_sub, def_type
+                def_sub, def_type = definition.scheme.instantiate()
+                return def_sub
     elif isinstance(stmt, ast1.Bind1fStatement):
         arg_type_list = [
             types.VarType(f"arg{arg_index}:{arg_name}")
@@ -222,15 +221,25 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
             opt_loc=stmt.loc
         ).compose(last_sub)
     elif isinstance(stmt, ast1.ConstStatement):
-        sub = Substitution.empty
+        sub, enum_type = model_one_type_spec(ctx, stmt.const_type_spec, dto_list)
+        iota_ctx = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx)
+        iota_ctx.local_return_type = enum_type
         for const_bind_stmt in stmt.body:
             assert isinstance(const_bind_stmt, ast1.Bind1vStatement)
             definition = ctx.try_lookup(const_bind_stmt.name)
             assert definition is not None
             const_sub, const_type = definition.scheme.instantiate()
-            sub = const_sub.compose(sub)
-            const_type = sub.rewrite_type(const_type)
-            # TODO: check the constant's type
+            
+            # unifying with RHS; note 'iota_ctx' so 'iota' resolves correctly
+            rhs_sub, rhs_type = model_one_exp(iota_ctx, const_bind_stmt.initializer, dto_list)
+            rhs_u_sub = unify(rhs_type, const_type)
+
+            # unifying with enum type:
+            common_u_sub = unify(const_type, enum_type)
+
+            # updating accumulator 'sub'
+            sub = common_u_sub.compose(rhs_u_sub).compose(rhs_sub).compose(const_sub).compose(sub)
+
         return sub
     elif isinstance(stmt, ast1.ReturnStatement):
         if ctx.return_type is None:
@@ -243,10 +252,10 @@ def model_one_stmt(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOLis
         return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type), opt_loc=stmt.loc).compose(ret_exp_sub)
     elif isinstance(stmt, ast1.IteStatement):
         condition_sub, condition_type = model_one_exp(ctx, stmt.cond, dto_list)
-        dto_list.add(IteCondTypeCheckDTO(stmt.loc, condition_type))
+        cond_dto_sub = dto_list.add_dto(IteCondTypeCheckDTO(stmt.loc, condition_type))
         then_sub = model_one_block(ctx, stmt.then_block, dto_list)
         else_sub = model_one_block(ctx, stmt.else_block, dto_list) if stmt.else_block else Substitution.empty
-        return then_sub.compose(else_sub).compose(condition_sub)
+        return then_sub.compose(else_sub).compose(cond_dto_sub).compose(condition_sub)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
@@ -295,14 +304,14 @@ def help_model_one_exp(
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
         operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
-        dto_list.add(UnaryOpDTO(exp.loc, exp.operator, res_type, operand_type))
-        return operand_sub, res_type
+        operation_dto_sub = dto_list.add_dto(UnaryOpDTO(exp.loc, exp.operator, res_type, operand_type))
+        return operand_sub.compose(operation_dto_sub), res_type
     elif isinstance(exp, ast1.BinaryOpExpression):
         res_type = types.VarType(f"binary_op_{exp.operator.name.lower()}_res")
         lt_operand_sub, lt_operand_type = model_one_exp(ctx, exp.lt_operand, dto_list)
         rt_operand_sub, rt_operand_type = model_one_exp(ctx, exp.rt_operand, dto_list)
-        sub = rt_operand_sub.compose(lt_operand_sub)
-        dto_list.add(BinaryOpDTO(exp.loc, exp.operator, res_type, lt_operand_type, rt_operand_type))
+        operation_dto_sub = dto_list.add_dto(BinaryOpDTO(exp.loc, exp.operator, res_type, lt_operand_type, rt_operand_type))
+        sub = operation_dto_sub.compose(rt_operand_sub).compose(lt_operand_sub)
         return sub, res_type
     elif isinstance(exp, ast1.ProcCallExpression):
         # collecting actual procedure type information:
@@ -328,10 +337,13 @@ def help_model_one_exp(
             opt_loc=exp.loc
         ).compose(last_sub)
         return sub, proxy_ret_type
-    elif isinstance(exp, ast1.IotaExpression):
-        raise NotImplementedError("typing an IotaExpression")
     elif isinstance(exp, ast1.DotIdExpression):
-        raise NotImplementedError("typing a DotIdExpression")
+        container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
+        proxy_ret_type = types.VarType(f"dot_{exp.key}")
+        add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_ret_type, exp.key))
+        return container_sub.compose(add_dto_sub), proxy_ret_type
+    elif isinstance(exp, ast1.IotaExpression):
+        return Substitution.empty, ctx.return_type
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
@@ -408,12 +420,21 @@ def help_model_one_type_spec(
 # source file typing: part III: deferred resolution (solving)
 #
 
+# DTOList = Deferred Type Order List
+# (cf BaseDTO below)
+
 class DTOList(object): 
     def __init__(self):
         self.internal_dto_list: t.List[BaseDTO] = []
 
-    def add(self, dto: "BaseDTO"):
-        self.internal_dto_list.append(dto)
+    def add_dto(self, dto: "BaseDTO") -> "Substitution":
+        # before adding to the list, we first try applying immediately
+        finished, sub = dto.increment_solution()
+        if finished:
+            return sub
+        else:
+            self.internal_dto_list.append(dto)
+            return Substitution.empty
 
     def update(self, sub, opt_replacement_internal_dto_list=None):
         if opt_replacement_internal_dto_list is not None:
@@ -436,7 +457,7 @@ class DTOList(object):
             if len(new_dto_list) == len(old_dto_list):
                 panic.because(
                     panic.ExitCode.TyperDtoSolverStalledError,
-                    f"Solution stalled with {len(new_dto_list)} constraints remaining:\n" +
+                    f"TYPER: DTOList solution stalled with {len(new_dto_list)} constraints remaining:\n" +
                     '\n'.join(map(str, new_dto_list))
                 )
 
@@ -458,11 +479,14 @@ class DTOList(object):
         return all_finished, new_dto_list, sub
 
 
+# DTO = Deferred Type Order
+#
+
 class BaseDTO(object, metaclass=abc.ABCMeta):
-    def __init__(self, loc: fb.ILoc, arg_type_list):
+    def __init__(self, loc: fb.ILoc, arg_type_list: t.List[types.BaseType]):
         super().__init__()
-        self.loc = loc
-        self.arg_type_list = arg_type_list
+        self.loc: fb.ILoc = loc
+        self.arg_type_list: t.List[types.BaseType] = arg_type_list
 
     @abc.abstractmethod
     def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
@@ -677,6 +701,44 @@ class BinaryOpDTO(BaseDTO):
         return f"{self.binary_op}({self.lt_operand_type}, {self.rt_operand_type})"
 
 
+class DotIdDTO(BaseDTO):
+    def __init__(self, loc: fb.ILoc, container_type: types.BaseType, proxy_ret_type: types.BaseType, key_name: str):
+        super().__init__(loc, [container_type, proxy_ret_type])
+        self.key_name = key_name
+
+    @property
+    def container_type(self) -> types.BaseType:
+        return self.arg_type_list[0]
+    
+    @property
+    def proxy_ret_type(self) -> types.BaseType:
+        return self.arg_type_list[1]
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        if self.container_type.is_var:
+            return False, Substitution.empty
+        if not self.container_type.is_composite:
+            panic.because(
+                panic.ExitCode.TyperDtoSolverFailedError,
+                f"Cannot lookup `.{self.key_name}` in non-composite container type: {self.container_type}"
+            )
+        else:
+            assert isinstance(self.container_type, types.BaseCompositeType)
+            for field_name, field_type in self.container_type.fields:
+                if field_name == self.key_name:
+                    break
+            else:
+                panic.because(
+                    panic.ExitCode.TyperDtoSolverFailedError,
+                    f"Undefined field `{self.key_name}` in composite container type: {self.container_type}"
+                )
+            sub = unify(self.proxy_ret_type, field_type, self.loc)
+            return True, sub
+
+    def __str__(self):
+        return f"DOT({self.container_type}, {self.key_name}, {self.proxy_ret_type})"
+
+
 #
 # Unification
 #
@@ -766,6 +828,7 @@ class ContextKind(enum.Enum):
     TopLevelOfSourceFile = enum.auto()
     FunctionArgs = enum.auto()
     FunctionBlock = enum.auto()
+    ConstImmediatelyInvokedFunctionBlock = enum.auto()
     
 
 class Context(object):
@@ -858,7 +921,7 @@ Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
 #
 
 class BaseDefinition(object, metaclass=abc.ABCMeta):
-    def __init__(self, loc: fb.ILoc, name: str, scm: scheme.Scheme) -> None:
+    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme") -> None:
         super().__init__()
         self.loc = loc
         self.name = name
@@ -997,7 +1060,7 @@ class Substitution(object):
         assert t.is_atomic or t.is_var
         return t
 
-    def rewrite_scheme(self, s: scheme.Scheme) -> scheme.Scheme:
+    def rewrite_scheme(self, s: "Scheme") -> "Scheme":
         if s.vars:
             # NOTE: any bound vars mapped in this substitution must be removed from the substitution, since these 
             # variables must be free in the body of the scheme to be substituted out by instantiation.
@@ -1007,11 +1070,13 @@ class Substitution(object):
         else:
             new_sub = self
 
-        return scheme.Scheme(s.vars, new_sub.rewrite_type(s.body))
+        return Scheme(s.vars, new_sub.rewrite_type(s.body))
 
     @staticmethod
     def can_overwrite_t1_with_t2(t1: types.BaseType, t2: types.BaseType):
-        assert t1 != t2
+        # if t1 == t2, then rewriting one with the other loses no information.
+        if t1 == t2:
+            return True
         
         # if t1 is a variable, we prefer t2 as a replacement (be it a var or not)
         if t1.is_var:
@@ -1031,5 +1096,46 @@ class Substitution(object):
 Substitution.empty = Substitution({}, _suppress_construct_empty_error=True)
 
 
+#
+# Schemes:
+#
+
+class Scheme(object):
+    def __init__(self, vars: t.List[types.VarType], body: types.BaseType) -> None:
+        assert all((isinstance(it, types.VarType) for it in vars))
+        super().__init__()
+        self.vars = vars
+        self.body = body
+
+    def instantiate(
+        self, 
+        opt_actual_args_list: t.Optional[t.List[types.BaseType]]=None
+    ) -> t.Tuple["Substitution", types.BaseType]:
+        if not self.vars:
+            assert not opt_actual_args_list
+            return Substitution.empty, self.body
+        
+        if opt_actual_args_list is None:
+            actual_arg_types = list((types.VarType(f"new({var})") for var in self.vars))
+        else:
+            actual_arg_types = opt_actual_args_list
+            assert len(actual_arg_types) == len(self.vars)
+
+        sub = Substitution.get(dict(zip(
+            self.vars,
+            actual_arg_types
+        )))
+        res = sub.rewrite_type(self.body)
+        return sub, res
+
+    def __str__(self) -> str:
+        return f"({','.join(map(str, self.vars))})=>{self.body}"
+
+
+#
+# Exceptions:
+#
+
 class InfiniteSizeTypeException(BaseException):
     pass
+

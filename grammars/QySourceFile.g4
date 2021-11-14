@@ -65,7 +65,7 @@ type1vStatement
     : ((is_pub='pub')|'val') name=VID ':' ts=typeSpec
     ;
 constStatement
-    : 'const' b=block
+    : 'const' type_spec=typeSpec b=block
     ;
 iteStatement
     : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=block))?

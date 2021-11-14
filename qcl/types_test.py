@@ -1,5 +1,4 @@
 from . import types
-from . import scheme
 import unittest
 
 
