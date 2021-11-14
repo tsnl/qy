@@ -329,7 +329,9 @@ def help_model_one_exp(
         ).compose(last_sub)
         return sub, proxy_ret_type
     elif isinstance(exp, ast1.IotaExpression):
-        raise NotImplementedError("IotaExpression")
+        raise NotImplementedError("typing an IotaExpression")
+    elif isinstance(exp, ast1.DotIdExpression):
+        raise NotImplementedError("typing a DotIdExpression")
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
@@ -817,19 +819,15 @@ class Context(object):
         else:
             return None
 
-    def print(self):
-        self.print_impl(0)
-        # print()
-
-    def print_impl(self, indent_count: int):
+    def print(self, indent_count: int = 0):
         indent = '  ' * indent_count
         lines = [f"+ {self.kind.name}"]
         for sym_name, sym_definition in self.symbol_table.items():
             if isinstance(sym_definition, ValueDefinition):
-                def_sub, def_type = sym_definition.scheme.instantiate()
+                _, def_type = sym_definition.scheme.instantiate()
                 line = f"  - {sym_name}: {def_type} [public={sym_definition.is_public}]"
             elif isinstance(sym_definition, TypeDefinition):
-                def_sub, def_type = sym_definition.scheme.instantiate()
+                _, def_type = sym_definition.scheme.instantiate()
                 line = f"  - {sym_name} = {def_type} [public={sym_definition.is_public}]"
             else:
                 raise NotImplementedError("Printing unknown definition")
@@ -839,7 +837,7 @@ class Context(object):
             print(indent, line, sep='')
     
         for child_context in self.children:
-            child_context.print_impl(1+indent_count)
+            child_context.print(1+indent_count)
 
     def apply_sub_in_place_to_sub_tree(self, sub: "Substitution"):
         # applying to 'self'

@@ -14,7 +14,7 @@ pub vec3f: (x: f32, y: f32, z: f32) => Vec3f;
 pub v3f_add: (Vec3f, Vec3f) => Vec3f;
 pub v3f_scale: (Vec3f, f32) => Vec3f;
 
-// enums p./rovided using 'const', which translates into preprocessor declarations
+// enums provided using 'const', which translates into preprocessor declarations
 const {
     let error_code_all_ok = 0;
     let error_code_bad_cli_args = iota;

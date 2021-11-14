@@ -15,6 +15,7 @@ from . import panic
 from . import feedback as fb
 from . import ast1
 from . import parser
+from . import config
 
 
 #
@@ -26,6 +27,20 @@ from . import parser
 class QypSet(object):
     @staticmethod
     def load(path_to_root_qyp_file: str) -> t.Optional["QypSet"]:
+        # checking input file path:
+        if not path_to_root_qyp_file.endswith(config.PROJECT_FILE_EXTENSION):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"expected project file path to end with '{config.PROJECT_FILE_EXTENSION}', got:",
+                path_to_root_qyp_file
+            )
+        if not os.path.isfile(path_to_root_qyp_file):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"project file path does not refer to a file:",
+                path_to_root_qyp_file
+            )
+
         # using a BFS to iteratively construct a second list parallel to an input list of paths
         # NOTE: paths must be absolute to properly detect cycles.
         qyp_path_queue: t.List[str] = [os.path.abspath(path_to_root_qyp_file)]
@@ -103,7 +118,7 @@ class Qyp(object):
 
         # basic error checking: still need owner to query and report for us
         provided_props_set = set(js_map.keys())
-        
+
         # checking all required keys are present, panic otherwise:
         missing_keys = []
         for supported_key in package_required_keys:
@@ -115,7 +130,7 @@ class Qyp(object):
                 panic.ExitCode.BadProjectFile,
                 f"project file missing {len(missing_keys)} top-level key-value pairs {missing_keys_str}"
             )
-        
+
         # checking no extra keys are present, panic otherwise:
         extra_keys = provided_props_set - package_supported_keys
         if extra_keys:
@@ -162,7 +177,7 @@ class Qyp(object):
         )
 
     def __init__(
-        self, 
+        self,
         qyp_file_path: str, dir_path: str,
         name: str, author: str, project_help: str,
         src_list: t.List[str],
@@ -199,6 +214,18 @@ package_supported_keys = package_required_keys | package_optional_keys
 class QySourceFile(object):
     @staticmethod
     def load(source_file_path: str) -> "QySourceFile":
+        if not source_file_path.endswith(config.SOURCE_FILE_EXTENSION):
+            panic.because(
+                panic.ExitCode.BadProjectFile, 
+                f"expected source file path to end with '{config.SOURCE_FILE_EXTENSION}', got:", 
+                source_file_path
+            )
+        if not os.path.isfile(source_file_path):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"source file path does not refer to a file:",
+                source_file_path
+            )
         stmt_list = parser.parse_one_file(source_file_path)
         return QySourceFile(source_file_path, stmt_list)
 

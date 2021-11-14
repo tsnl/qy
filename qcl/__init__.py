@@ -4,13 +4,18 @@ from . import config
 from . import panic
 from . import feedback as fb
 from . import ast2
-from . import types
 from . import typer
+from . import cpp_emitter
+from . import base_emitter
+from . import types
 from . import scheme
 
 
-def transpile_one_package_set(path_to_root_qyp_file: str):
-    qyp_set = ast2.QypSet.load(path_to_root_qyp_file)
+def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter):
+    assert isinstance(path_to_input_root_qyp_file, str)
+    assert isinstance(emitter, base_emitter.BaseEmitter)
+
+    qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file)
     
     # typing:
     dto_list = typer.DTOList()
@@ -20,7 +25,11 @@ def transpile_one_package_set(path_to_root_qyp_file: str):
         typer.model_one_source_file(source_file, dto_list)
     dto_list.solve()
 
-    debug_routine_after_compilation(qyp_set)
+    # emitting:
+    emitter.emit_qyp_set(qyp_set)
+
+    # debug routine:
+    # debug_routine_after_compilation(qyp_set)
 
 
 def debug_routine_after_compilation(qyp_set):
@@ -125,4 +134,4 @@ def print_contexts(qyp_set):
     print("... Contexts output")
     for _, _, source_file in qyp_set.iter_source_files():
         if source_file.x_typer_ctx is not None:
-            source_file.x_typer_ctx.print()
+            source_file.x_typer_ctx.print(indent_count=1)
