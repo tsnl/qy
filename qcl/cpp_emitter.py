@@ -39,7 +39,8 @@ class Emitter(base_emitter.BaseEmitter):
 PLACEHOLDER_RE = re.compile(r'\$([^\$]+)\$')
 
 
-CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
+# CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
+CodeFragment = t.Union[str, t.List[str]]
 
 
 class CppFile(object):
