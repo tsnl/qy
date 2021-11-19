@@ -133,5 +133,5 @@ def verbose_unify(t, u, annotation=""):
 def print_contexts(qyp_set):
     print("... Contexts output")
     for _, _, source_file in qyp_set.iter_source_files():
-        if source_file.x_typer_ctx is not None:
-            source_file.x_typer_ctx.print(indent_count=1)
+        if source_file.wb_typer_ctx is not None:
+            source_file.wb_typer_ctx.print(indent_count=1)

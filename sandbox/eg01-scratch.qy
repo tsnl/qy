@@ -9,8 +9,8 @@ def hello (x) {
     return x;
 };
 
-pub wrong_phi: (bool,i32,i32)=>i32;
-def wrong_phi (b, x, y) {
+pub wrongPhi: (bool,i32,i32)=>i32;
+def wrongPhi (b, x, y) {
     if b {
         return x;
     } else {
@@ -19,7 +19,7 @@ def wrong_phi (b, x, y) {
 };
 
 let w = hello(13);
-let j = wrong_phi(true, 15, 32);
+let j = wrongPhi(true, 15, 32);
 
 def fibonacci (x) {
     if x == 0 {

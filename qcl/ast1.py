@@ -97,7 +97,11 @@ class BaseExpression(BaseFileNode):
 
 
 class BaseStatement(BaseFileNode):
-    pass
+    def __init__(self, loc: fb.ILoc):
+        super().__init__(loc)
+
+        # writeback properties:
+        self.wb_ctx = None
 
 
 #
@@ -106,32 +110,40 @@ class BaseStatement(BaseFileNode):
 #
 #
 
-class Bind1vStatement(BaseStatement):
-    def __init__(self, loc: fb.ILoc, name: str, initializer: BaseExpression):
+class BaseIdQualifierStatement(BaseStatement):
+    def __init__(self, loc: fb.ILoc, name: str):
         super().__init__(loc)
         self.name = name
+    
+    def lookup_def_obj(self):
+        assert self.wb_ctx is not None
+        res = self.wb_ctx.try_lookup(self.name)
+        assert res is not None
+        return res
+
+
+class Bind1vStatement(BaseIdQualifierStatement):
+    def __init__(self, loc: fb.ILoc, name: str, initializer: BaseExpression):
+        super().__init__(loc, name)
         self.initializer = initializer
 
 
-class Bind1fStatement(BaseStatement):
+class Bind1fStatement(BaseIdQualifierStatement):
     def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.List[BaseStatement]):
-        super().__init__(loc)
-        self.name = name
+        super().__init__(loc, name)
         self.args = args
         self.body = body
 
 
-class Bind1tStatement(BaseStatement):
+class Bind1tStatement(BaseIdQualifierStatement):
     def __init__(self, loc: fb.ILoc, name: str, initializer: BaseTypeSpec):
-        super().__init__(loc)
-        self.name = name
+        super().__init__(loc, name)
         self.initializer = initializer
 
 
-class Type1vStatement(BaseStatement):
+class Type1vStatement(BaseIdQualifierStatement):
     def __init__(self, loc: fb.ILoc, name: str, ts: BaseTypeSpec, is_export_line: bool):
-        super().__init__(loc)
-        self.name = name
+        super().__init__(loc, name)
         self.ts = ts
         self.is_export_line = is_export_line
 
@@ -210,7 +222,7 @@ class StringExpression(BaseExpression):
         # print("StringExpression:", self.pieces, repr(self.value))
 
 
-class IotaExpression(BaseExpression):
+class BuiltinConPrevExpression(BaseExpression):
     pass
 
 

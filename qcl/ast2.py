@@ -234,5 +234,5 @@ class QySourceFile(object):
         self.file_path = source_file_path
         self.stmt_list = stmt_list
 
-        # properties computed over the course of evaluation:
-        self.x_typer_ctx = None
+        # writeback properties: properties computed over the course of evaluation and 'written back' for later:
+        self.wb_typer_ctx = None

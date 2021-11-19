@@ -291,8 +291,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         value = ''.join(piece_value_list)
         return ast1.StringExpression(self.loc(ctx), piece_text_list, value)
 
-    def visitIotaPrimaryExpression(self, ctx: antlr.QySourceFileParser.IotaPrimaryExpressionContext):
-        return ast1.IotaExpression(self.loc(ctx))
+    def visitPrevConstPrimaryExpression(self, ctx: antlr.QySourceFileParser.PrevConstPrimaryExpressionContext):
+        return ast1.BuiltinConPrevExpression(self.loc(ctx))
 
     def visitVidPrimaryExpression(self, ctx: antlr.QySourceFileParser.VidPrimaryExpressionContext):
         return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)

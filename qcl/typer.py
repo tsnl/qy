@@ -27,7 +27,7 @@ def seed_one_source_file(sf: ast2.QySourceFile):
     for top_level_stmt in sf.stmt_list:
         seed_one_top_level_stmt(new_ctx, top_level_stmt)
 
-    sf.x_typer_ctx = new_ctx
+    sf.wb_typer_ctx = new_ctx
 
 
 def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
@@ -109,11 +109,11 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 #
 
 def model_one_source_file(sf: ast2.QySourceFile, dto_list: "DTOList"):
-    sf_top_level_context = sf.x_typer_ctx
+    sf_top_level_context = sf.wb_typer_ctx
     assert isinstance(sf_top_level_context, Context)
     
     sol_sub = model_one_block(sf_top_level_context, sf.stmt_list, dto_list, is_top_level=True)
-    # sf.x_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
+    # sf.wb_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
     # print(f"Applying `sol_sub`: {sol_sub}")
     
     # TODO: solve deferred constraints in a separate pass
@@ -158,6 +158,8 @@ def model_one_block_in_function(
 
 
 def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "DTOList") -> "Substitution":
+    stmt.wb_ctx = ctx
+
     if isinstance(stmt, ast1.Bind1vStatement):
         exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
         if ctx.kind == ContextKind.TopLevelOfSourceFile:
@@ -177,7 +179,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             if conflicting_def is not None:
                 panic.because(
                     panic.ExitCode.TyperModelerRedefinedIdError,
-                    f"Local value identifier {stmt.name} bound twice:\n"
+                    f"Local value identifier '{stmt.name}' bound twice:\n"
                     f"first: {conflicting_def.loc}\n"
                     f"later: {definition.loc}"
                 )
@@ -279,7 +281,7 @@ def help_model_one_exp(
         if found_definition is None:
             panic.because(
                 panic.ExitCode.TyperModelerUndefinedIdError,
-                f"Value identifier {exp.name} used, but not defined or declared",
+                f"Value identifier '{exp.name}' used, but not defined or declared",
                 opt_loc=exp.loc
             )
         sub, id_type = found_definition.scheme.instantiate()
@@ -342,7 +344,7 @@ def help_model_one_exp(
         proxy_ret_type = types.VarType(f"dot_{exp.key}")
         add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_ret_type, exp.key))
         return container_sub.compose(add_dto_sub), proxy_ret_type
-    elif isinstance(exp, ast1.IotaExpression):
+    elif isinstance(exp, ast1.BuiltinConPrevExpression):
         return Substitution.empty, ctx.return_type
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
