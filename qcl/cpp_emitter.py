@@ -148,7 +148,8 @@ class Emitter(base_emitter.BaseEmitter):
 # adapted from https://www.codeproject.com/script/Articles/ViewDownloads.aspx?aid=571645
 #
 
-CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
+# CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
+CodeFragment = t.Union[str, t.List[str]]
 
 
 class CppFileType(enum.Enum):

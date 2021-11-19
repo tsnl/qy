@@ -24,3 +24,6 @@ output-1
 .ninja_deps
 .ninja_log
 build.ninja
+
+# Qy build:
+qc-build
