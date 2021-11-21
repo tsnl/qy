@@ -267,6 +267,7 @@ def model_one_exp(
     exp: ast1.BaseExpression, 
     dto_list: "DTOList"
 ) -> t.Tuple["Substitution", types.BaseType]:
+    exp.wb_ctx = ctx
     exp_sub, exp_type = help_model_one_exp(ctx, exp, dto_list)
     return exp_sub, exp_sub.rewrite_type(exp_type)
 
@@ -355,6 +356,7 @@ def model_one_type_spec(
     ts: "ast1.BaseTypeSpec", 
     dto_list: "DTOList"
 ) -> t.Tuple["Substitution", types.BaseType]:
+    ts.wb_ctx = ctx
     ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
     return ts_sub, ts_sub.rewrite_type(ts_type)
 

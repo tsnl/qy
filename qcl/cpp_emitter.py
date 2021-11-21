@@ -153,12 +153,25 @@ class Emitter(base_emitter.BaseEmitter):
             print(f"WARNING: Don't know how to translate type to C++: {qy_type}")
             return f"<NotImplemented:{qy_type}>"
 
-    def translate_expression(self, exp: ast1.BaseExpression):
+    def translate_expression(self, exp: ast1.BaseExpression) -> str:
+        ret_str, ret_type = self.translate_expression_with_type(exp)
+        assert isinstance(ret_str, str)
+        # assert isinstance(ret_type, types.BaseType)
+        assert isinstance(ret_type, types.BaseType) or ret_type is None
+        return ret_str
+
+    def translate_expression_with_type(self, exp: ast1.BaseExpression) -> t.Tuple[str, types.BaseConcreteType]:
         if isinstance(exp, ast1.IdRefExpression):
-            return exp.name
+            def_obj = exp.lookup_def_obj()
+            assert isinstance(def_obj, typer.BaseDefinition)
+            s, def_type = def_obj.scheme.instantiate()
+            assert s is typer.Substitution.empty
+            return exp.name, def_type
+
         elif isinstance(exp, ast1.IntExpression):
             if exp.width_in_bits == 1:
-                return ['false', 'true'][exp.value]
+                assert exp.is_unsigned
+                return ['false', 'true'][exp.value], types.IntType.get(1, is_signed=False)
             else:
                 fragments = []
                 
@@ -181,7 +194,8 @@ class Emitter(base_emitter.BaseEmitter):
                 elif exp.width_in_bits == 8:
                     fragments.insert(0, '(uint8_t)' if exp.is_unsigned else '(int8_t)')
             
-            return ''.join(fragments)
+            return ''.join(fragments), types.IntType.get(exp.width_in_bits, is_signed=not exp.is_unsigned)
+
         elif isinstance(exp, ast1.FloatExpression):
             fragments = []
             fragments.append(str(exp.value))
@@ -192,9 +206,11 @@ class Emitter(base_emitter.BaseEmitter):
                 pass
             else:
                 raise NotImplementedError("Unknown float exp width in bits")
-            return ''.join(fragments)
+            return ''.join(fragments), types.FloatType.get(exp.width_in_bits)
+
         elif isinstance(exp, ast1.StringExpression):
-            return json.dumps(exp.value)
+            return json.dumps(exp.value), types.StringType.singleton
+
         elif isinstance(exp, ast1.UnaryOpExpression):
             operator_str = {
                 ast1.UnaryOperator.DeRef: "*",
@@ -202,7 +218,31 @@ class Emitter(base_emitter.BaseEmitter):
                 ast1.UnaryOperator.Minus: "-",
                 ast1.UnaryOperator.Plus: "+"
             }[exp.operator]
-            return f"({operator_str}{self.translate_expression(exp.operand)})"
+            operand_type, operand_str = self.translate_expression_with_type(exp.operand)
+
+            # dispatch based on `operand_type` to select the right operator and return type:
+            # for now, Qy's builtin unary operators are a subset of C++'s builtin unary operators.            
+            if exp.operator == ast1.UnaryOperator.DeRef:
+                operand_ptr_type = operand_type
+                assert isinstance(operand_ptr_type, types.PointerType)
+                ret_type = operand_ptr_type.pointee_type
+                assert isinstance(ret_type, types.BaseConcreteType)
+            elif exp.operator == ast1.UnaryOperator.LogicalNot:
+                operand_type = operand_type
+                assert operand_type is types.IntType.get(1, is_signed=False)
+                ret_type = operand_type
+            elif exp.operator in (ast1.UnaryOperator.Minus, ast1.UnaryOperator.Plus):
+                if isinstance(operand_type, types.IntType):
+                    ret_type = types.IntType.get(operand_type.width_in_bits, is_signed=True)
+                elif isinstance(operand_type, types.FloatType):
+                    ret_type = operand_type
+                else:
+                    raise NotImplementedError(f"Unknown argument types in unary operator emitter")
+            else:
+                raise NotImplementedError("Unknown operator")
+            
+            return f"({operator_str} {operand_str})", ret_type
+
         elif isinstance(exp, ast1.BinaryOpExpression):
             # FIXME: hacky; does not work for fmod, though type-checks
             operator_str = {
@@ -221,25 +261,45 @@ class Emitter(base_emitter.BaseEmitter):
                 ast1.BinaryOperator.LSh: "<<",
                 ast1.BinaryOperator.RSh: ">>"
             }[exp.operator]
-            return (
-                "(" +
-                self.translate_expression(exp.lt_operand) +
-                operator_str +
-                self.translate_expression(exp.rt_operand) +
-                ")"
-            )
+            lt_operand_str, lt_operand_type = self.translate_expression_with_type(exp.lt_operand)
+            rt_operand_str, rt_operand_type = self.translate_expression_with_type(exp.rt_operand)
+            if exp.operator in typer.BinaryOpDTO.arithmetic_binary_operator_set:
+                if isinstance(lt_operand_type, types.IntType):
+                    assert isinstance(rt_operand_type, types.IntType)
+                    assert lt_operand_type.is_signed == rt_operand_type.is_signed
+                    width_in_bits = max(lt_operand_type.width_in_bits, rt_operand_type.width_in_bits)
+                    ret_type = types.IntType.get(width_in_bits, is_signed=lt_operand_type.is_signed)
+                elif isinstance(lt_operand_type, types.FloatType):
+                    assert isinstance(rt_operand_type, types.FloatType)
+                    width_in_bits = max(lt_operand_type.width_in_bits, rt_operand_type.width_in_bits)
+                    ret_type = types.FloatType.get(width_in_bits)
+                else:
+                    raise NotImplementedError("Unknown operand types to binary arithmetic operator")
+            elif exp.operator in typer.BinaryOpDTO.comparison_binary_operator_set:
+                ret_type = types.IntType.get(1, is_signed=False)
+            elif exp.operator in typer.BinaryOpDTO.logical_binary_operator_set:
+                ret_type = types.IntType.get(1, is_signed=False)
+            else:
+                raise NotImplementedError(f"Unknown operator when typing in binary operator emitter: {exp.operator}")
+            return "(" + lt_operand_str + operator_str + rt_operand_str + ")", ret_type
+
         elif isinstance(exp, ast1.ProcCallExpression):
-            return (
-                self.translate_expression(exp.proc)
-            ) + '(' + ', '.join((
-                self.translate_expression(arg_exp)
-                for arg_exp in exp.arg_exps
-            )) + ')'
-            
-                
+            proc_str, proc_type = self.translate_expression_with_type(exp.proc)
+            assert isinstance(proc_type, types.ProcedureType)
+            ret_type = proc_type.ret_type
+            ret_str = (
+                proc_str + 
+                '(' + 
+                ', '.join((
+                    self.translate_expression(arg_exp)
+                    for arg_exp in exp.arg_exps
+                )) + 
+                ')'
+            )
+            return ret_str, ret_type
         else:
             print(f"WARNING: Don't know how to translate expression to C++: {exp}")
-            return f"<NotImplemented:{exp.desc}>"
+            return f"<NotImplemented:{exp.desc}>", None
 
 
 #
@@ -319,12 +379,13 @@ class CppFile(BasePrinter):
     def print(self, code_fragment: CodeFragment = ""):
         if isinstance(code_fragment, str):
             lines = code_fragment.split('\n')
-        else:
-            assert isinstance(code_fragment, list)
+        elif isinstance(code_fragment, list):
             if __debug__:
                 for line in code_fragment:
                     assert '\n' not in line
             lines = code_fragment
+        else:
+            raise ValueError(f"Invalid CodeFragment: {code_fragment}")
         
         for line in lines:
             for _ in range(self.indent_count):

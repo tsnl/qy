@@ -225,7 +225,7 @@ class PointerType(BaseConcreteType):
         super().__init__([('pointee', pointee_type)])
 
     @property
-    def pointee_type(self):
+    def pointee_type(self) -> "BaseType":
         return self.elements[0]
 
     def __str__(self) -> str:

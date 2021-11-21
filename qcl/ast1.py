@@ -6,6 +6,8 @@ import abc
 import typing as t
 import enum
 
+from qcl import common
+
 from . import feedback as fb
 
 #
@@ -74,7 +76,7 @@ class LinearTypeOp(enum.Enum):
 
 #
 #
-# Base classes:
+# Base classes and mixins:
 #
 #
 
@@ -82,6 +84,7 @@ class BaseFileNode(object, metaclass=abc.ABCMeta):
     def __init__(self, loc: fb.ILoc):
         super().__init__()
         self.loc = loc
+        self.wb_ctx = None
 
     @property
     def desc(self):
@@ -100,8 +103,19 @@ class BaseStatement(BaseFileNode):
     def __init__(self, loc: fb.ILoc):
         super().__init__(loc)
 
-        # writeback properties:
-        self.wb_ctx = None
+
+class MIdQualifierNode(common.Mixin):
+    def __init__(self, name: str, *args, **kwargs) -> None:
+        assert isinstance(self, BaseFileNode)
+        super().__init__(*args, **kwargs)
+        self.name = name
+
+    def lookup_def_obj(self):
+        assert self.wb_ctx is not None
+        res = self.wb_ctx.try_lookup(self.name)
+        assert res is not None
+        return res
+
 
 
 #
@@ -110,16 +124,9 @@ class BaseStatement(BaseFileNode):
 #
 #
 
-class BaseIdQualifierStatement(BaseStatement):
+class BaseIdQualifierStatement(MIdQualifierNode, BaseStatement):
     def __init__(self, loc: fb.ILoc, name: str):
-        super().__init__(loc)
-        self.name = name
-    
-    def lookup_def_obj(self):
-        assert self.wb_ctx is not None
-        res = self.wb_ctx.try_lookup(self.name)
-        assert res is not None
-        return res
+        super().__init__(name, loc)
 
 
 class Bind1vStatement(BaseIdQualifierStatement):
@@ -226,10 +233,9 @@ class BuiltinConPrevExpression(BaseExpression):
     pass
 
 
-class IdRefExpression(BaseExpression):
+class IdRefExpression(MIdQualifierNode, BaseExpression):
     def __init__(self, loc: fb.ILoc, name: str):
-        super().__init__(loc)
-        self.name = name
+        super().__init__(name, loc)
 
 
 class ProcCallExpression(BaseExpression):
@@ -274,10 +280,9 @@ class BinaryOpExpression(BaseExpression):
 #
 #
 
-class IdRefTypeSpec(BaseTypeSpec):
+class IdRefTypeSpec(MIdQualifierNode, BaseTypeSpec):
     def __init__(self, loc: fb.ILoc, name: str):
-        super().__init__(loc)
-        self.name = name
+        super().__init__(name, loc)
 
 
 class BuiltinPrimitiveTypeSpec(BaseTypeSpec):
