@@ -213,7 +213,7 @@ class BaseCompositeType(BaseConcreteType):
             yield from field_type.iter_free_vars()
 
     def __hash__(self) -> int:
-        return hash((self.__class__, *self.field_types))
+        return hash((self.kind().value, *self.field_types))
 
     def __eq__(self, o: object) -> bool:
         return self.kind == o.kind and self.fields == o.fields

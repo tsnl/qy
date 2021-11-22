@@ -21,7 +21,7 @@ def main():
     args_obj = arg_parser.parse_args()
     root_qyp_path = args_obj.root_qyp_path
     output_dir_path = args_obj.output_dir_path
-    emitter = qcl.cpp_emitter_v1.Emitter(output_dir_path)
+    emitter = qcl.cpp_emitter_v2.Emitter(output_dir_path)
     root_qyp = qcl.transpile_one_package_set(root_qyp_path, emitter)
     return root_qyp
 

@@ -11,6 +11,8 @@
 #   - this allows us to write to all 4 streams in parallel.
 #   * translate-type must recursively build caches for ADTs
 
+raise NotImplementedError("Abandoned with incomplete functionality; do not import me!")
+
 import abc
 import os
 import os.path
@@ -141,6 +143,13 @@ class Emitter(base_emitter.BaseEmitter):
                 if def_type.is_atomic:
                     p.print(f"typedef {self.translate_type(def_type)} {def_obj.name};")
                 elif def_type.is_composite:
+                    # associating def_type with this name in a deferred order; can be sorted and emitted later.
+                    # NOTE: this breaks with local type definitions; need scoped construct instead; consider adding ID?
+                    # NOTE: this MUST run before the 'types' pass
+                    self.deferred_type_name_map[def_type] = stmt.name
+                    p.print(f"// added deferred order for type {stmt.name} = {def_type}")
+
+                    # emitting a forward declaration
                     if def_type.kind() == types.TypeKind.Struct:
                         p.print(f"struct {stmt.name};")
                     elif def_type.kind() == types.TypeKind.Union:
@@ -154,26 +163,12 @@ class Emitter(base_emitter.BaseEmitter):
                 else:
                     raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
                 p.print()
-            elif p.type == CppFileType.TypesHeader:
-                # associating def_type with this name in a deferred order; can be sorted and emitted later.
-                # NOTE: this breaks with local type definitions; need scoped construct instead; consider adding ID?
-                if def_type.is_composite:
-                    self.deferred_type_name_map[def_type] = stmt.name
-                    p.print(f"// added deferred order for type {stmt.name} = {def_type}")
-                else:
-                    assert def_type.is_atomic
-                    # defined in 'declare'
-                p.print()
-            elif p.type == CppFileType.MainHeader:
-                pass
-            elif p.type == CppFileType.MainSource:
-                pass
         elif isinstance(stmt, ast1.Type1vStatement):
             if p.type == CppFileType.MainHeader:
                 def_obj = stmt.lookup_def_obj()
                 if def_obj.is_public:
                     _, def_type = def_obj.scheme.instantiate()
-                    p.print(f"// extern {stmt.name}")
+                    p.print(f"// pub {stmt.name}")
                     p.print(f"extern {self.translate_type(def_type)} {stmt.name};")
                     p.print()
         elif isinstance(stmt, ast1.ConstStatement):
@@ -240,6 +235,8 @@ class Emitter(base_emitter.BaseEmitter):
                         for arg_type in qy_type.arg_types
                     ))
                     return f"std::function<{self.translate_type(qy_type.ret_type)}({args_str})>"
+                else:
+                    raise NotImplementedError("Unknown compound type in 'translate_type'")
         else:
             # raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
             print(f"WARNING: Don't know how to translate type to C++: {qy_type}")

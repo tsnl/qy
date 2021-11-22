@@ -5,7 +5,8 @@ from . import panic
 from . import feedback as fb
 from . import ast2
 from . import typer
-from . import cpp_emitter_v1
+# from . import cpp_emitter_v1
+from . import cpp_emitter_v2
 from . import base_emitter
 from . import types
 
