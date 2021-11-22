@@ -197,7 +197,7 @@ class BaseCompositeType(BaseConcreteType):
         assert ((isinstance(field_name, str) and isinstance(field_type, BaseType) for field_name, field_type in fields))
 
         super().__init__()
-        self.fields = fields
+        self.fields: t.List[t.Tuple[str, BaseType]] = fields
         self.field_names, self.field_types = zip(*self.fields)
         self.opt_name = opt_name
 

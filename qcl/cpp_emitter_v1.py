@@ -1,9 +1,15 @@
-# FIXME: 'translate' functions should return the type as well as a string translation-- allows us to dispatch when 
-#        emitting.
 # TODO: emit 2 more headers: `.forward.hpp` and `.types.hpp`
 #   - `.forward.hpp` performs forward declarations/type aliasing
+#       * included by `.types.hpp` of any number of files
+#       * filled with 'typedef'
 #   - `.types.hpp` contains type definitions, including as C++ classes
-#   - this allows us to write to all 4 streams in parallel, inserting includes to glue this together.
+#       * included by `.hpp`
+#       * filled with 'class', 'struct', ...
+#   - `.hpp` contains function declarations, extern variable declarations
+#       * included by `.cpp`, other modules' `.hpp` files
+#   - `.cpp` contains function definitions, variable definitions
+#   - this allows us to write to all 4 streams in parallel.
+#   * translate-type must recursively build caches for ADTs
 
 import abc
 import os
@@ -28,6 +34,7 @@ class Emitter(base_emitter.BaseEmitter):
         super().__init__()
         self.rel_output_dir_path = rel_output_dir_path
         self.abs_output_dir_path = os.path.abspath(rel_output_dir_path)
+        self.deferred_type_name_map = {}
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         os.makedirs(self.abs_output_dir_path, exist_ok=True)
@@ -38,17 +45,25 @@ class Emitter(base_emitter.BaseEmitter):
 
     def emit_single_qyp(self, qyp_name: str, qyp: ast2.Qyp):
         output_file_stem = os.path.join(self.abs_output_dir_path, qyp_name)
-        cpp_file = CppFile(CppFileType.MainSource, f"{output_file_stem}.cpp")
-        hpp_file = CppFile(CppFileType.MainHeader, f"{output_file_stem}.hpp")
+        forward_file = CppFile(CppFileType.ForwardHeader, output_file_stem)
+        types_file = CppFile(CppFileType.TypesHeader, output_file_stem)
+        hpp_file = CppFile(CppFileType.MainHeader, output_file_stem)
+        cpp_file = CppFile(CppFileType.MainSource, output_file_stem)
+        
         print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
         
-        # emitting declarations
+        # first, building all types:
+
+        # emitting declarations, definitions, etc all at once using different files:
+        # NOTE: 'types' files are generated using a deferred system so we can sort definitions correctly
         for src_file_path, src_obj in qyp.src_map.items():
             assert isinstance(src_obj, ast2.QySourceFile)
             for stmt in src_obj.stmt_list:
+                self.emit_stmt(forward_file, stmt, is_top_level=True)
+                self.emit_stmt(types_file, stmt, is_top_level=True)
                 self.emit_stmt(hpp_file, stmt, is_top_level=True)
                 self.emit_stmt(cpp_file, stmt, is_top_level=True)
-
+        self.emit_deferred_types(types_file)
         # TODO: emitting type definitions
         #   - must order types, so can use DFS-like approach with a 'visited' set
 
@@ -56,6 +71,26 @@ class Emitter(base_emitter.BaseEmitter):
 
         cpp_file.close()
         hpp_file.close()
+        types_file.close()
+        forward_file.close()
+
+    def emit_deferred_types(self, types_file: "CppFile"):
+        assert types_file.type == CppFileType.TypesHeader
+
+        def immediately_emit_definition_for(qy_t, bound_name):
+            assert isinstance(qy_t, types.BaseCompositeType)
+            if isinstance(qy_t, types.StructType):
+                types_file.print(f"struct {bound_name}")
+                with Block(types_file, closing_brace="};") as b:
+                    # FIXME: distinguish between public and private struct fields?
+                    # FIXME: here, we assume 'field_type' is emitted before, whereas this may not always be the case.
+                    for field_name, field_type in qy_t.fields:
+                        types_file.print(f"{self.translate_type(field_type)} {field_name};")
+                    
+        # TODO: use a common 'visited' set and a post-order DFS visit to emit definitions for types.
+        # for now, doing the **incorrect** thing and just emitting in a random order
+        for qy_type, bind_name in self.deferred_type_name_map.items():
+            immediately_emit_definition_for(qy_type, bind_name)
 
     def emit_stmt(self, p: "BasePrinter", stmt: ast1.BaseStatement, is_top_level: bool):
         if isinstance(stmt, ast1.Bind1vStatement):
@@ -81,11 +116,10 @@ class Emitter(base_emitter.BaseEmitter):
                 assert not def_obj.scheme.vars
                 _, def_type = def_obj.scheme.instantiate()
                 assert isinstance(def_type, types.ProcedureType)
-                left_half_signature_fragments = []
-                arg_fragments = []
-                for arg_type, arg_name in zip(def_type.arg_types, stmt.args):
-                    arg_fragments.append(f"{self.translate_type(arg_type)} {arg_name}")
-                
+                arg_fragments = [
+                    f"{self.translate_type(arg_type)} {arg_name}"
+                    for arg_type, arg_name in zip(def_type.arg_types, stmt.args)
+                ]
                 p.print(f"// bind {stmt.name} = {{...}}")
                 if not def_obj.is_public:
                     p.print('static')
@@ -97,7 +131,43 @@ class Emitter(base_emitter.BaseEmitter):
                     self.emit_block(b, stmt.body)
                 p.print()
         elif isinstance(stmt, ast1.Bind1tStatement):
-            pass
+            def_obj = stmt.lookup_def_obj()
+            assert def_obj is not None
+            assert not def_obj.scheme.vars
+            _, def_type = def_obj.scheme.instantiate()
+            assert isinstance(def_type, types.BaseType)
+            p.print(f"// bind {stmt.name} = {{...}}")
+            if p.type == CppFileType.ForwardHeader:
+                if def_type.is_atomic:
+                    p.print(f"typedef {self.translate_type(def_type)} {def_obj.name};")
+                elif def_type.is_composite:
+                    if def_type.kind() == types.TypeKind.Struct:
+                        p.print(f"struct {stmt.name};")
+                    elif def_type.kind() == types.TypeKind.Union:
+                        p.print(f"union {stmt.name};")
+                    elif def_type.kind() == types.TypeKind.Procedure:
+                        assert isinstance(def_type, types.ProcedureType)
+                        cs_arg_str = ', '.join(map(self.translate_type, def_type.arg_types))
+                        p.print(f"typedef {def_type.ret_type}(*{stmt.name})({cs_arg_str})")
+                    else:
+                        raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {def_type}")
+                else:
+                    raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
+                p.print()
+            elif p.type == CppFileType.TypesHeader:
+                # associating def_type with this name in a deferred order; can be sorted and emitted later.
+                # NOTE: this breaks with local type definitions; need scoped construct instead; consider adding ID?
+                if def_type.is_composite:
+                    self.deferred_type_name_map[def_type] = stmt.name
+                    p.print(f"// added deferred order for type {stmt.name} = {def_type}")
+                else:
+                    assert def_type.is_atomic
+                    # defined in 'declare'
+                p.print()
+            elif p.type == CppFileType.MainHeader:
+                pass
+            elif p.type == CppFileType.MainSource:
+                pass
         elif isinstance(stmt, ast1.Type1vStatement):
             if p.type == CppFileType.MainHeader:
                 def_obj = stmt.lookup_def_obj()
@@ -148,6 +218,28 @@ class Emitter(base_emitter.BaseEmitter):
                 raise NotImplementedError(f"Unknown float width in bits: {qy_type.width_in_bits}")
         elif isinstance(qy_type, types.StringType):
             return "std::string";
+        elif isinstance(qy_type, types.BaseCompositeType):
+            opt_existing_name = self.deferred_type_name_map.get(qy_type)
+            if opt_existing_name is not None:
+                return opt_existing_name
+            else:
+                if isinstance(qy_type, (types.StructType, types.UnionType)):
+                    field_str_fragments = [
+                        f"{self.translate_type(field_type)} {field_name};" 
+                        for field_name, field_type in qy_type.fields
+                    ]
+                    fields_str = ' '.join(field_str_fragments)
+                    if isinstance(qy_type, types.StructType):
+                        return f"struct {{ {fields_str} }}"
+                    else:
+                        assert isinstance(qy_type, types.UnionType)
+                        return f"union {{ {fields_str} }}"
+                elif isinstance(qy_type, (types.ProcedureType)):
+                    args_str = ', '.join((
+                        self.translate_type(arg_type)
+                        for arg_type in qy_type.arg_types
+                    ))
+                    return f"std::function<{self.translate_type(qy_type.ret_type)}({args_str})>"
         else:
             # raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
             print(f"WARNING: Don't know how to translate type to C++: {qy_type}")
@@ -338,15 +430,24 @@ class BasePrinter(abc.ABC):
 
 
 class CppFile(BasePrinter):
+    file_type_suffix = {
+        CppFileType.TypesHeader: ".types.hpp",
+        CppFileType.ForwardHeader: ".forward.hpp",
+        CppFileType.MainHeader: ".hpp",
+        CppFileType.MainSource: ".cpp"
+    }
+
     def __init__(
         self, 
         file_type: CppFileType,
-        file_path: str,
+        file_stem: str,
         # indent_str: str='\t'
     ) -> None:
         super().__init__()
         self._type = file_type
-        self.path = file_path
+        self.stem = file_stem
+        self.stem_base = os.path.basename(self.stem)
+        self.path = f"{self.stem}{CppFile.file_type_suffix[self._type]}"
         self.os_file_handle = open(self.path, 'w', buffering=4*1024)
         self.indent_count = 0
         self.indent_str = '\t'
@@ -359,10 +460,20 @@ class CppFile(BasePrinter):
         if self.type == CppFileType.MainHeader:
             self.print("#pragma once")
             self.print()
+            self.print(f"#include \"{self.stem_base}{CppFile.file_type_suffix[CppFileType.TypesHeader]}\"")
+            self.print()
+        elif self.type == CppFileType.TypesHeader:
+            self.print("#pragma once")
+            self.print()
+            self.print(f"#include \"{self.stem_base}{CppFile.file_type_suffix[CppFileType.ForwardHeader]}\"")
+            self.print()
+        elif self.type == CppFileType.ForwardHeader:
+            self.print("#pragma once")
+            self.print()
             self.print_common_stdlib_header_includes()
             self.print()
         elif self.type == CppFileType.MainSource:
-            self.print(f"#include \"{os.path.basename(self.path)[:-len('.cpp')]}.hpp\"")
+            self.print(f"#include \"{self.stem_base}{CppFile.file_type_suffix[CppFileType.MainHeader]}\"")
             self.print()
             self.print_common_stdlib_header_includes()
             self.print()
@@ -398,6 +509,7 @@ class CppFile(BasePrinter):
     def print_common_stdlib_header_includes(self):
         self.print("#include <cstdint>")
         self.print("#include <string>")
+        self.print("#include <functional>")        
 
     def inc_indent(self):
         self.indent_count += 1
