@@ -34,3 +34,22 @@ def fibonacci (x) {
 let b1 = true;
 let b2 = false;
 let m = b1 or b2;
+
+//
+// Testing types output:
+//
+
+def Vec3f = struct {
+    x: f32,
+    y: f32,
+    z: f32
+};
+def Vec2f = struct {
+    x: f32,
+    y: f32
+};
+def Point = struct {
+    position: Vec3f,
+    normal: Vec3f,
+    uv: Vec2f
+};

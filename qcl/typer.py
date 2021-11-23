@@ -49,7 +49,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             Scheme([], types.VarType(f"bind1f_{stmt.name}"))
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
-        new_definition = ValueDefinition(
+        new_definition = TypeDefinition(
             stmt.loc,
             stmt.name,
             Scheme([], types.VarType(f"bind1t_{stmt.name}"))
@@ -951,7 +951,8 @@ class ValueDefinition(BaseDefinition):
         
 
 class TypeDefinition(BaseDefinition):
-    pass
+    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme") -> None:
+        super().__init__(loc, name, scm)
 
 
 #

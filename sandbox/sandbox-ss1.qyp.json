@@ -1,5 +1,5 @@
 {
-    "name": "sandbox",
+    "name": "sandbox_ss",
     "author": "TSNL",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
