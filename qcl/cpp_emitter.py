@@ -69,7 +69,9 @@ class Emitter(base_emitter.BaseEmitter):
             type_files_stem = f"{self.types_abs_output_dir_path}/{type_name}"
             type_decl_file = CppFile(CppFileType.TypeDeclHeader, type_files_stem)
             type_def_file = CppFile(CppFileType.TypeDefHeader, type_files_stem)
-            self.emit_one_per_type_header_pair(qy_type, type_decl_file, type_def_file)
+            self.emit_one_per_type_header_pair(qy_type, type_name, type_decl_file, type_def_file)
+            type_decl_file.close()
+            type_def_file.close()
 
     def collect_pub_named_types(self, stmt_list):
         for stmt in stmt_list:
@@ -87,18 +89,34 @@ class Emitter(base_emitter.BaseEmitter):
                     )
                 self.pub_type_to_header_name_map[def_type] = stmt.name
 
-    def emit_one_per_type_header_pair(self, qy_type, type_decl_file, type_def_file):
+    def emit_one_per_type_header_pair(self, qy_type, type_name, type_decl_file, type_def_file):
         # TODO: add common includes to type_decl_file
         # TODO: add include to type_decl_file in type_def_file
         
+        # emitting a forward declaration
         if qy_type.is_atomic:
-            # TODO: just emit the declaration alias; this will serve as the definition too.
-            pass
+            type_decl_file.print(f"typedef {self.translate_type(qy_type)} {type_name};")
+            type_decl_file.print()
+        elif qy_type.is_composite:
+            if qy_type.kind() == types.TypeKind.Struct:
+                type_decl_file.print(f"struct {type_name};")
+            elif qy_type.kind() == types.TypeKind.Union:
+                type_decl_file.print(f"union {type_name};")
+            elif qy_type.kind() == types.TypeKind.Procedure:
+                assert isinstance(qy_type, types.ProcedureType)
+                cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
+                type_decl_file.print(f"typedef {qy_type.ret_type}(*{type_name})({cs_arg_str})")
+            else:
+                raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {qy_type}")
         else:
-            assert qy_type.is_composite
-            # TODO: emit definitions
-            # TODO: insert 'include' to declaration (if indirect reference) or definition (if direct reference) header 
-            #       files-- can also check for cycles here.
+            raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
+        
+        # linking definition to declaration:
+        type_def_file.include_paths.append((False, type_decl_file.file_name))
+
+        # TODO: emit definitions
+        # TODO: insert 'include' to declaration (if indirect reference) or definition (if direct reference) header 
+        #       files-- can also check for cycles here.
 
     #
     # part 2: emitting module body
@@ -166,29 +184,6 @@ class Emitter(base_emitter.BaseEmitter):
             _, def_type = def_obj.scheme.instantiate()
             assert isinstance(def_type, types.BaseType)
             c.print(f"// bind {stmt.name} = {{...}}")
-            if def_type.is_atomic:
-                h.print(f"typedef {self.translate_type(def_type)} {def_obj.name};")
-                h.print()
-            elif def_type.is_composite:
-                # associating def_type with this name in a deferred order; can be sorted and emitted later.
-                # NOTE: this breaks with local type definitions; need scoped construct instead; consider adding ID?
-                # NOTE: this MUST run before the 'types' pass
-                self.pub_type_to_header_name_map[def_type] = stmt.name
-                h.print(f"// added deferred order for type {stmt.name} = {def_type}")
-
-                # emitting a forward declaration
-                if def_type.kind() == types.TypeKind.Struct:
-                    h.print(f"struct {stmt.name};")
-                elif def_type.kind() == types.TypeKind.Union:
-                    h.print(f"union {stmt.name};")
-                elif def_type.kind() == types.TypeKind.Procedure:
-                    assert isinstance(def_type, types.ProcedureType)
-                    cs_arg_str = ', '.join(map(self.translate_type, def_type.arg_types))
-                    h.print(f"typedef {def_type.ret_type}(*{stmt.name})({cs_arg_str})")
-                else:
-                    raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {def_type}")
-            else:
-                raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
             c.print()
         elif isinstance(stmt, ast1.Type1vStatement):
             def_obj = stmt.lookup_def_obj()
@@ -476,21 +471,33 @@ class CppFile(object):
         self.indent_count = 0
         self.indent_str = '\t'
         self.include_paths: t.List[bool, str] = []
-        self.body_lines: t.List[str] = []
-
+        self.document_sections = {
+            "prefix": [],
+            "body": []
+        }
+        
         #
         # Post-constructor, but constructor-time:
         #
 
         # emitting preamble:
         if self.type == CppFileType.MainHeader:
-            self.print("#pragma once")
-            self.print()
-            self.print_common_stdlib_header_includes()
-            self.print()
+            self.print("#pragma once", target='prefix')
+            self.print(target='prefix')
+            self.add_common_stdlib_header_includes()
         elif self.type == CppFileType.MainSource:
-            self.print(f"#include \"{self.stem_base}{CppFile.file_type_suffix[CppFileType.MainHeader]}\"")
-            self.print()
+            self.include_paths.append((False, self.stem_base + CppFile.file_type_suffix[CppFileType.MainHeader]))
+        elif self.type == CppFileType.TypeDeclHeader:
+            self.print("#pragma once", target='prefix')
+            self.print(target='prefix')
+            self.add_common_stdlib_header_includes()
+        elif self.type == CppFileType.TypeDefHeader:
+            self.print("#pragma once", target='prefix')
+            self.print(target='prefix')
+
+    @property
+    def file_name(self):
+        return os.path.basename(self.path)
 
     @property
     def type(self):
@@ -503,21 +510,28 @@ class CppFile(object):
         # writing all data in a deferred way:
         #
 
+        # prefix:
+        prefix_lines = self.document_sections['prefix']
+        for prefix_line in prefix_lines:
+            print(prefix_line, file=self.os_file_handle)
+
         # includes:
         for is_abs, include_path in self.include_paths:
             if is_abs:
                 print(f"#include <{include_path}>", file=self.os_file_handle)
             else:
                 print(f"#include \"{include_path}\"", file=self.os_file_handle)
-    
+        print(file=self.os_file_handle)
+
         # body lines:
-        for body_line in self.body_lines:
+        body_lines = self.document_sections['body']
+        for body_line in body_lines:
             print(body_line, file=self.os_file_handle)
 
         self.os_file_handle.close()
         self.os_file_handle = None
 
-    def print(self, code_fragment: CodeFragment = ""):
+    def print(self, code_fragment: CodeFragment = "", target="body"):
         if isinstance(code_fragment, str):
             lines = code_fragment.split('\n')
         elif isinstance(code_fragment, list):
@@ -528,15 +542,16 @@ class CppFile(object):
         else:
             raise ValueError(f"Invalid CodeFragment: {code_fragment}")
         
+        target_lines_list = self.document_sections[target]
         for line in lines:
-            self.body_lines.append(f"{self.indent_str*self.indent_count}{line}")
+            target_lines_list.append(f"{self.indent_str*self.indent_count}{line}")
             
         # print(file=self.os_file_handle)
     
-    def print_common_stdlib_header_includes(self):
-        self.print("#include <cstdint>")
-        self.print("#include <string>")
-        self.print("#include <functional>")        
+    def add_common_stdlib_header_includes(self):
+        self.include_paths.append((True, "cstdint"))
+        self.include_paths.append((True, "string"))
+        self.include_paths.append((True, "functional"))
 
     def inc_indent(self):
         self.indent_count += 1
