@@ -19,6 +19,7 @@ from . import config
 from . import types
 from . import typer
 from . import base_emitter
+from . import panic
 
 #
 # Interface:
@@ -41,6 +42,8 @@ class Emitter(base_emitter.BaseEmitter):
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         os.makedirs(self.root_abs_output_dir_path, exist_ok=True)
+        os.makedirs(self.types_abs_output_dir_path, exist_ok=True)
+
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             self.emit_per_type_headers(qyp_name, qyp)
 
@@ -49,10 +52,13 @@ class Emitter(base_emitter.BaseEmitter):
         # for qyp_name, src_file_path, source_file in qyp_set.iter_source_files():
         #     self.emit_single_file(qyp_set, qyp_name, src_file_path, source_file)
 
+    #
+    # part 1: emitting type headers.
+    #
+
     def emit_per_type_headers(self, qyp_name: str, qyp: ast2.Qyp):
         for src_file_path, src_obj in qyp.src_map.items():
-            for stmt in src_obj.stmt_list:
-                self.collect_pub_named_types(stmt)
+            self.collect_pub_named_types(src_obj.stmt_list)
 
         # TODO: emit type definitions in a file
         #   - emit declaration and definition headers
@@ -60,19 +66,43 @@ class Emitter(base_emitter.BaseEmitter):
         #       - some types have only a declaration and not a definition-- atomic aliases
         #   - include types' headers based on whether they are required via direct or indirect reference
         for qy_type, type_name in self.pub_type_to_header_name_map.items():
-            print(f"- emitting type {type_name} = {qy_type}: {self.types_abs_output_dir_path}/{type_name}{CppFile.file_type_suffix[CppFileType.TypeDefHeader]}")
-            print(f"- emitting type {type_name} = {qy_type}: {self.types_abs_output_dir_path}/{type_name}{CppFile.file_type_suffix[CppFileType.TypeDeclHeader]}")
+            type_files_stem = f"{self.types_abs_output_dir_path}/{type_name}"
+            type_decl_file = CppFile(CppFileType.TypeDeclHeader, type_files_stem)
+            type_def_file = CppFile(CppFileType.TypeDefHeader, type_files_stem)
+            self.emit_one_per_type_header_pair(qy_type, type_decl_file, type_def_file)
 
-    def collect_pub_named_types(self, stmt):
-        if isinstance(stmt, ast1.Bind1tStatement):
-            def_obj = stmt.lookup_def_obj()
-            assert isinstance(def_obj, typer.TypeDefinition)
-            assert not def_obj.scheme.vars
-            
-            # NOTE: type definitions are always public by default
-            def_type = def_obj.scheme.instantiate()
-            assert def_type not in self.pub_type_to_header_name_map
-            self.pub_type_to_header_name_map[def_type] = stmt.name
+    def collect_pub_named_types(self, stmt_list):
+        for stmt in stmt_list:
+            if isinstance(stmt, ast1.Bind1tStatement):
+                def_obj = stmt.lookup_def_obj()
+                assert isinstance(def_obj, typer.TypeDefinition)
+                assert not def_obj.scheme.vars
+                
+                # NOTE: type definitions are always public by default
+                _, def_type = def_obj.scheme.instantiate()
+                if def_type in self.pub_type_to_header_name_map:
+                    panic.because(
+                        panic.ExitCode.ScopingError,
+                        f"Public type symbol {stmt.name} re-defined across different packages."
+                    )
+                self.pub_type_to_header_name_map[def_type] = stmt.name
+
+    def emit_one_per_type_header_pair(self, qy_type, type_decl_file, type_def_file):
+        # TODO: add common includes to type_decl_file
+        # TODO: add include to type_decl_file in type_def_file
+        
+        if qy_type.is_atomic:
+            # TODO: just emit the declaration alias; this will serve as the definition too.
+            pass
+        else:
+            assert qy_type.is_composite
+            # TODO: emit definitions
+            # TODO: insert 'include' to declaration (if indirect reference) or definition (if direct reference) header 
+            #       files-- can also check for cycles here.
+
+    #
+    # part 2: emitting module body
+    #
 
     def emit_module_body(self, qyp_name: str, qyp: ast2.Qyp):
         output_file_stem = os.path.join(self.root_abs_output_dir_path, qyp_name)
@@ -193,6 +223,9 @@ class Emitter(base_emitter.BaseEmitter):
             self.emit_module_body_stmt(c, h, stmt, is_top_level=False)
 
     def translate_type(self, qy_type: types.BaseType) -> str:
+        opt_named_pub_type = self.pub_type_to_header_name_map.get(qy_type, None)
+        if opt_named_pub_type is not None:
+            return opt_named_pub_type
         if isinstance(qy_type, types.VoidType):
             return "void"
         elif isinstance(qy_type, types.IntType):
@@ -386,6 +419,19 @@ class Emitter(base_emitter.BaseEmitter):
                 ')'
             )
             return ret_str, ret_type
+        
+        elif isinstance(exp, ast1.DotIdExpression):
+            container_str, container_type = self.translate_expression_with_type(exp.container)
+            ret_str = f"{container_str}.{exp.key}"
+            ret_type = None
+            assert isinstance(container_type, types.BaseAlgebraicType)
+            for field_name, field_type in container_type.fields:
+                if field_name == exp.key:
+                    ret_type = field_type
+                    break
+            assert ret_type is not None
+            return ret_str, ret_type
+
         else:
             print(f"WARNING: Don't know how to translate expression to C++: {exp}")
             return f"<NotImplemented:{exp.desc}>", None

@@ -39,6 +39,7 @@ let m = b1 or b2;
 // Testing types output:
 //
 
+/*
 def Vec3f = struct {
     x: f32,
     y: f32,
@@ -53,3 +54,4 @@ def Point = struct {
     normal: Vec3f,
     uv: Vec2f
 };
+*/

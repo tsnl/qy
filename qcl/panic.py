@@ -27,6 +27,8 @@ class ExitCode(enum.Enum):
     TyperModelerRedefinedIdError = enum.auto()
     TyperDtoSolverStalledError = enum.auto()
     TyperDtoSolverFailedError = enum.auto()
+    ScopingError = enum.auto()
+    EmitterError = enum.auto()
 
 
 def because(
