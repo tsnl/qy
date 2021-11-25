@@ -36,21 +36,22 @@ class Emitter(base_emitter.BaseEmitter):
         super().__init__()
         self.root_rel_output_dir_path = rel_output_dir_path
         self.root_abs_output_dir_path = os.path.abspath(rel_output_dir_path)
-        self.types_rel_output_dir_path = os.path.join(self.root_rel_output_dir_path, "types")
-        self.types_abs_output_dir_path = os.path.abspath(self.types_rel_output_dir_path)
+        self.types_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "types")
+        self.modules_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "modules")
         self.pub_type_to_header_name_map = {}
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         os.makedirs(self.root_abs_output_dir_path, exist_ok=True)
         os.makedirs(self.types_abs_output_dir_path, exist_ok=True)
+        os.makedirs(self.modules_abs_output_dir_path, exist_ok=True)
 
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             self.emit_per_type_headers(qyp_name, qyp)
 
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             self.emit_module_body(qyp_name, qyp)
-        # for qyp_name, src_file_path, source_file in qyp_set.iter_source_files():
-        #     self.emit_single_file(qyp_set, qyp_name, src_file_path, source_file)
+        
+        self.emit_cmake_lists(qyp_set)
 
     #
     # part 1: emitting type headers.
@@ -90,9 +91,6 @@ class Emitter(base_emitter.BaseEmitter):
                 self.pub_type_to_header_name_map[def_type] = stmt.name
 
     def emit_one_per_type_header_pair(self, qy_type, type_name, type_decl_file, type_def_file):
-        # TODO: add common includes to type_decl_file
-        # TODO: add include to type_decl_file in type_def_file
-        
         # emitting a forward declaration
         if qy_type.is_atomic:
             type_decl_file.print(f"typedef {self.translate_type(qy_type)} {type_name};")
@@ -115,15 +113,61 @@ class Emitter(base_emitter.BaseEmitter):
         type_def_file.include_paths.append((False, type_decl_file.file_name))
 
         # TODO: emit definitions
+        if qy_type.is_composite:
+            if qy_type.kind() in (types.TypeKind.Struct, types.TypeKind.Union):
+                if qy_type.kind() == types.TypeKind.Struct:
+                    type_def_file.print(f"struct {type_name}")
+                else:
+                    assert qy_type.kind() == types.TypeKind.Union
+                    type_def_file.print(f"union {type_name}")
+                with Block(type_def_file, closing_brace="}", close_with_semicolon=True):
+                    for field_name, field_type in qy_type.fields:
+                        # printing the field type:
+                        type_def_file.print(f"{self.translate_type(field_type)} {field_name};")
+                        # adding an 'include' to all used types:
+                        self.insert_type_ref_includes(type_def_file, field_type)
+            elif qy_type.kind() == types.TypeKind.Procedure:
+                return_type = qy_type.ret_type
+                args_str = ', '.join((
+                    f"{self.translate_type(arg_type)}"
+                    for arg_type in qy_type.arg_types()
+                ))
+                type_def_file.print(f"using {type_name} = std::function<{return_type}({args_str})>;")
+
         # TODO: insert 'include' to declaration (if indirect reference) or definition (if direct reference) header 
         #       files-- can also check for cycles here.
+
+    def insert_type_ref_includes(self, print_file: "CppFile", qy_type: types.BaseType, direct_ref: bool = True):
+        # NOTE: every compound just includes dependencies required to write the type.
+        
+        # first, checking if this type has a name: just include it directly.
+        opt_existing_name = self.pub_type_to_header_name_map.get(qy_type, None)
+        if opt_existing_name:
+            if direct_ref:
+                extension = CppFile.file_type_suffix[CppFileType.TypeDefHeader]
+            else:
+                extension = CppFile.file_type_suffix[CppFileType.TypeDeclHeader]
+            print_file.include_paths.append((False, f"{opt_existing_name}{extension}"))
+
+        # otherwise, this is an anonymous type.
+        # we must include all types used to write this type.
+        # WARNING: this output depends heavily on 'translate_type'-- it could be merged.
+        if qy_type.is_atomic:
+            # do nothing-- all atomic types are built-in.
+            pass
+        elif qy_type.is_composite:
+            if isinstance(qy_type, types.PointerType):
+                self.insert_type_ref_includes(print_file, qy_type.pointee_type, direct_ref=False)
+            else:
+                for field_type in qy_type.field_types:
+                    self.insert_type_ref_includes(print_file, field_type, direct_ref=direct_ref)
 
     #
     # part 2: emitting module body
     #
 
     def emit_module_body(self, qyp_name: str, qyp: ast2.Qyp):
-        output_file_stem = os.path.join(self.root_abs_output_dir_path, qyp_name)
+        output_file_stem = os.path.join(self.modules_abs_output_dir_path, qyp_name)
         hpp_file = CppFile(CppFileType.MainHeader, output_file_stem)
         cpp_file = CppFile(CppFileType.MainSource, output_file_stem)
         
@@ -150,9 +194,10 @@ class Emitter(base_emitter.BaseEmitter):
                 bind_cpp_fragments.append('static')
             bind_cpp_fragments.append(self.translate_type(def_type))
             bind_cpp_fragments.append(def_obj.name)
+            bind_cpp_fragments.append("=")
             c.print(f"// bind {stmt.name} = {stmt.initializer.desc}")
             c.print(' '.join(bind_cpp_fragments))
-            with Block(c, closing_brace="};") as b:
+            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True) as b:
                 self.emit_expression(c, stmt.initializer)
             c.print()
         elif isinstance(stmt, ast1.Bind1fStatement):
@@ -162,28 +207,39 @@ class Emitter(base_emitter.BaseEmitter):
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
             assert isinstance(def_type, types.ProcedureType)
-            arg_fragments = [
-                f"{self.translate_type(arg_type)} {arg_name}"
-                for arg_type, arg_name in zip(def_type.arg_types, stmt.args)
-            ]
             c.print(f"// bind {stmt.name} = {{...}}")
-            if not def_obj.is_public:
+            if not def_obj.is_public and stmt.name != 'main':
                 c.print('static')
             c.print(self.translate_type(def_type.ret_type))
-            c.print(def_obj.name)
-            with Block(c, opening_brace='(', closing_brace=')') as b:
-                c.print(',\n'.join(arg_fragments))
+            if not stmt.args:
+                c.print(f"{def_obj.name}()")
+            else:
+                c.print(def_obj.name)
+                with Block(c, opening_brace='(', closing_brace=')') as b:
+                    c.print(',\n'.join((
+                        f"{self.translate_type(arg_type)} {arg_name}"
+                        for arg_type, arg_name in zip(def_type.arg_types, stmt.args)
+                    )))
             with Block(c) as b:
                 self.emit_block(c, h, stmt.body)
             c.print()
         elif isinstance(stmt, ast1.Bind1tStatement):
             assert is_top_level
+            c.print(f"// bind {stmt.name} = {{...}}")
+
             def_obj = stmt.lookup_def_obj()
             assert def_obj is not None
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
-            assert isinstance(def_type, types.BaseType)
-            c.print(f"// bind {stmt.name} = {{...}}")
+            if def_type in self.pub_type_to_header_name_map:
+                # public type => it has its own header pair => include this in the header
+                type_def_extension = CppFile.file_type_suffix[CppFileType.TypeDefHeader]
+                h.include_paths.append((False, f"types/{stmt.name}{type_def_extension}"))
+            else:
+                # private type => define in 'c' file
+                assert isinstance(def_type, types.BaseType)
+                c.print(f"using {stmt.name} = {self.translate_type(def_type)}")
+            
             c.print()
         elif isinstance(stmt, ast1.Type1vStatement):
             def_obj = stmt.lookup_def_obj()
@@ -191,8 +247,16 @@ class Emitter(base_emitter.BaseEmitter):
                 _, def_type = def_obj.scheme.instantiate()
                 h.print(f"// pub {stmt.name}")
                 if isinstance(def_type, types.ProcedureType):
-                    args_list = ', '.join(map(self.translate_type, def_type.arg_types))
-                    h.print(f"extern {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
+                    # FIXME: only apply this technique to `Bind1f` statements.
+                    # unfortunately, C++ cannot link 'std::function' type definitions.
+                    # fallback to this C-style declaration, even though it will be incompatible with 'lambda'
+                    # bindings.
+                    # This results in a tricky 'dual-type' representation of function handles.
+                    if is_top_level:
+                        args_list = ', '.join(map(self.translate_type, def_type.arg_types))
+                        h.print(f"extern {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
+                    else:
+                        raise NotImplementedError("Cannot type a function in a non-global context")
                 else:
                     h.print(f"extern {self.translate_type(def_type)} {stmt.name};")
                 h.print()
@@ -218,6 +282,12 @@ class Emitter(base_emitter.BaseEmitter):
             self.emit_module_body_stmt(c, h, stmt, is_top_level=False)
 
     def translate_type(self, qy_type: types.BaseType) -> str:
+        """
+        Emits the C++ translation of a given Qy type.
+        NOTE: only usable in the context of defining a _single_ variable.
+            - cf pointer type
+        """
+
         opt_named_pub_type = self.pub_type_to_header_name_map.get(qy_type, None)
         if opt_named_pub_type is not None:
             return opt_named_pub_type
@@ -263,6 +333,8 @@ class Emitter(base_emitter.BaseEmitter):
                         for arg_type in qy_type.arg_types
                     ))
                     return f"std::function<{self.translate_type(qy_type.ret_type)}({args_str})>"
+                elif isinstance(qy_type, (types.PointerType)):
+                    return f"{self.translate_type(qy_type.pointee_type)}*"
                 else:
                     raise NotImplementedError("Unknown compound type in 'translate_type'")
         else:
@@ -431,6 +503,37 @@ class Emitter(base_emitter.BaseEmitter):
             print(f"WARNING: Don't know how to translate expression to C++: {exp}")
             return f"<NotImplemented:{exp.desc}>", None
 
+    #
+    # part 3: generating CMakeLists.txt files
+    #
+
+    def emit_cmake_lists(self, qyp_set: ast2.QypSet):
+        cml_file_path = f"{self.root_abs_output_dir_path}/CMakeLists.txt"
+        with open(cml_file_path, 'w') as cml_file:
+            def cml_print(*args, **kwargs):
+                assert 'file' not in kwargs
+                print(*args, **kwargs, file=cml_file)
+            
+            cml_print(f"cmake_minimum_required(VERSION 3.0.0)")
+            cml_print(f"project({qyp_set.root_qyp.js_name})")
+            cml_print()
+            cml_print(f"include_directories({self.root_abs_output_dir_path})")
+            cml_print()
+            cml_print(f"set(CMAKE_CXX_STANDARD 17)")
+            cml_print()
+            cml_print(f"set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
+            
+            for qyp_name, qyp in qyp_set.qyp_name_map.items():
+                if qyp is qyp_set.root_qyp:
+                    cml_print(f"add_executable({qyp_name}")
+                else:
+                    cml_print(f"add_library({qyp_name}")
+                
+                cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainHeader]}")
+                cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainSource]}")
+                
+                cml_print(")")
+
 
 #
 # C++ generator:
@@ -516,12 +619,16 @@ class CppFile(object):
             print(prefix_line, file=self.os_file_handle)
 
         # includes:
-        for is_abs, include_path in self.include_paths:
-            if is_abs:
+        abs_include_paths = [path for is_abs, path in self.include_paths if is_abs]
+        rel_include_paths = [path for is_abs, path in self.include_paths if not is_abs]
+        if abs_include_paths:
+            for include_path in abs_include_paths:
                 print(f"#include <{include_path}>", file=self.os_file_handle)
-            else:
+            print(file=self.os_file_handle)
+        if rel_include_paths:
+            for include_path in rel_include_paths:
                 print(f"#include \"{include_path}\"", file=self.os_file_handle)
-        print(file=self.os_file_handle)
+            print(file=self.os_file_handle)
 
         # body lines:
         body_lines = self.document_sections['body']
@@ -567,7 +674,8 @@ class Block(object):
         prefix: str = "", 
         suffix: str = "", 
         opening_brace: str = "{",
-        closing_brace: str = "}"
+        closing_brace: str = "}",
+        close_with_semicolon: bool = False
 ) -> None:
         super().__init__()
         self.cpp_file: "CppFile" = cpp_file
@@ -575,6 +683,7 @@ class Block(object):
         self.suffix: str = suffix
         self.opening_brace = opening_brace
         self.closing_brace = closing_brace
+        self.close_with_semicolon = close_with_semicolon
 
     def type(self):
         return self.printer.type
@@ -588,7 +697,10 @@ class Block(object):
 
     def __exit__(self, *_):
         self.cpp_file.dec_indent()
-        self.cpp_file.print(self.closing_brace)
+        if self.close_with_semicolon:
+            self.cpp_file.print(f"{self.closing_brace};")
+        else:
+            self.cpp_file.print(self.closing_brace)
         if self.suffix:
             self.cpp_file.print(self.suffix)
 

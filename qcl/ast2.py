@@ -87,13 +87,14 @@ class QypSet(object):
             qyp_path_index += 1
 
         if all_loaded_ok:
-            return QypSet(qyp_name_map)
+            return QypSet(qyp_queue[0], qyp_name_map)
         else:
             return None
 
-    def __init__(self, qyp_name_map: t.OrderedDict[str, "Qyp"]) -> None:
+    def __init__(self, root_qyp: "Qyp", qyp_name_map: t.OrderedDict[str, "Qyp"]) -> None:
         super().__init__()
         self.qyp_name_map = qyp_name_map
+        self.root_qyp = root_qyp
 
     def iter_source_files(self) -> t.Iterable[t.Tuple[str, str, "QySourceFile"]]:
         for qyp_name, qyp in self.qyp_name_map.items():

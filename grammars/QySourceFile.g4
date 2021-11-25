@@ -170,8 +170,12 @@ adtTypeSpec
     : through=primaryTypeSpec
     | kw=('struct'|'union') '{' args=csFormalArgSpecList '}'
     ;
-signatureTypeSpec
+ptrTypeSpec
     : through=adtTypeSpec
+    | '&' pointee=ptrTypeSpec
+    ;
+signatureTypeSpec
+    : through=ptrTypeSpec
     | '(' args=csFormalArgSpecList ')' '=>' ret=signatureTypeSpec
     ;
 formalArgSpec

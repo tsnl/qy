@@ -303,6 +303,12 @@ class AdtTypeSpec(BaseTypeSpec):
         }
 
 
+class PtrTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, pointee_type_spec: BaseTypeSpec):
+        super().__init__(loc)
+        self.pointee_type_spec = pointee_type_spec
+
+
 class ProcSignatureTypeSpec(BaseTypeSpec):
     def __init__(self, loc: fb.ILoc, args: t.List[t.Tuple[OptStr, BaseTypeSpec]], ret_ts: BaseTypeSpec):
         super().__init__(loc)

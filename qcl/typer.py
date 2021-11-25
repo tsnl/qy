@@ -416,6 +416,9 @@ def help_model_one_type_spec(
             return sub, types.UnionType(fields)
         else:
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
+    elif isinstance(ts, ast1.PtrTypeSpec):
+        pointee_sub, pointee_type = model_one_type_spec(ctx, ts.pointee_type_spec, dto_list)
+        return pointee_sub, types.PointerType.new(pointee_type)
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
 

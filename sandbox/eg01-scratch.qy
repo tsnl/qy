@@ -55,3 +55,7 @@ def Point = struct {
     uv: Vec2f
 };
 */
+
+def main() {
+    return 42;
+};

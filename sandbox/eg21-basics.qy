@@ -29,7 +29,7 @@ const u32 {
 
 // struct definitions: (enum, union are similar)
 def Point = struct {
-    pos: Vec3f
+    pos: &Vec3f
 };
 def Vec3f = struct {
     x: f32,

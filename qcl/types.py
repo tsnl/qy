@@ -189,7 +189,7 @@ class FloatType(AtomicConcreteType):
 
 class BaseCompositeType(BaseConcreteType):
     """
-    subclasses must preserve the same '__init__.py' signature.
+    IMPORTANT: subclasses must preserve the same '__init__' signature.
     """
 
     def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None) -> None:
@@ -198,7 +198,14 @@ class BaseCompositeType(BaseConcreteType):
 
         super().__init__()
         self.fields: t.List[t.Tuple[str, BaseType]] = fields
-        self.field_names, self.field_types = zip(*self.fields)
+        if len(self.fields) == 1:
+            singleton_field_name, singleton_field_type = self.fields[0]
+            self.field_names = [singleton_field_name]
+            self.field_types = [singleton_field_type]
+        else:
+            self.field_names, self.field_types = zip(*self.fields)
+        assert all((isinstance(t, BaseType) for t in self.field_types))
+        assert all((isinstance(n, str) for n in self.field_names))
         self.opt_name = opt_name
 
     def copy_with_elements(self, new_elements: t.List[BaseType]) -> "BaseCompositeType":
@@ -220,20 +227,17 @@ class BaseCompositeType(BaseConcreteType):
 
 
 
-class PointerType(BaseConcreteType):
-    def __init__(self, pointee_type: BaseConcreteType) -> None:
-        super().__init__([('pointee', pointee_type)])
-
+class PointerType(BaseCompositeType):
     @property
     def pointee_type(self) -> "BaseType":
-        return self.elements[0]
+        return self.field_types[0]
 
     def __str__(self) -> str:
         return f"&{self.pointee_type}"
 
     @staticmethod
     def new(pointee_type: BaseConcreteType):
-        return PointerType([pointee_type])
+        return PointerType([('pointee', pointee_type)])
 
     @classmethod
     def kind(cls):
