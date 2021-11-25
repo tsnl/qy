@@ -13,6 +13,8 @@ import re
 import typing as t
 import enum
 import json
+
+from qcl import feedback
 from . import ast1
 from . import ast2
 from . import config
@@ -39,6 +41,9 @@ class Emitter(base_emitter.BaseEmitter):
         self.types_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "types")
         self.modules_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "modules")
         self.pub_type_to_header_name_map = {}
+        
+        # v-- used by 'check_global_definition'
+        self.global_symbol_loc_map = {}
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         os.makedirs(self.root_abs_output_dir_path, exist_ok=True)
@@ -162,6 +167,22 @@ class Emitter(base_emitter.BaseEmitter):
                 for field_type in qy_type.field_types:
                     self.insert_type_ref_includes(print_file, field_type, direct_ref=direct_ref)
 
+    def check_global_definition(self, name: str, loc: feedback.ILoc, is_public: bool):
+        opt_existing_loc = self.global_symbol_loc_map.get(name, None)
+        if opt_existing_loc is not None:
+            headline = (
+                f"Public global symbol `{name}` found in two or more `Qyp`s. Cannot resolve ambiguity."
+                if is_public else
+                f"Private global symbol `{name}` reused across different modules. Cannot generate C++ code."
+            )
+            panic.because(
+                panic.ExitCode.EmitterError,
+                f"{headline}\n"
+                f"\tfirst: {opt_existing_loc}\n"
+                f"\tlater: {loc}"
+            )
+        self.global_symbol_loc_map[name] = loc
+
     #
     # part 2: emitting module body
     #
@@ -184,29 +205,39 @@ class Emitter(base_emitter.BaseEmitter):
     def emit_module_body_stmt(self, c: "CppFile", h: "CppFile", stmt: ast1.BaseStatement, is_top_level: bool):
         assert c.type == CppFileType.MainSource
         assert h.type == CppFileType.MainHeader
+        
         if isinstance(stmt, ast1.Bind1vStatement):
             def_obj = stmt.lookup_def_obj()
+            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+        
             assert isinstance(def_obj, typer.BaseDefinition)
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
+        
             bind_cpp_fragments = []
             if not def_obj.is_public:
                 bind_cpp_fragments.append('static')
             bind_cpp_fragments.append(self.translate_type(def_type))
             bind_cpp_fragments.append(def_obj.name)
             bind_cpp_fragments.append("=")
+        
             c.print(f"// bind {stmt.name} = {stmt.initializer.desc}")
             c.print(' '.join(bind_cpp_fragments))
             with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True) as b:
                 self.emit_expression(c, stmt.initializer)
             c.print()
+        
         elif isinstance(stmt, ast1.Bind1fStatement):
             assert is_top_level
+
             def_obj = stmt.lookup_def_obj()
+            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+        
             assert isinstance(def_obj, typer.BaseDefinition)
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
             assert isinstance(def_type, types.ProcedureType)
+            
             c.print(f"// bind {stmt.name} = {{...}}")
             if not def_obj.is_public and stmt.name != 'main':
                 c.print('static')
@@ -223,11 +254,15 @@ class Emitter(base_emitter.BaseEmitter):
             with Block(c) as b:
                 self.emit_block(c, h, stmt.body)
             c.print()
+        
         elif isinstance(stmt, ast1.Bind1tStatement):
             assert is_top_level
+            
             c.print(f"// bind {stmt.name} = {{...}}")
 
             def_obj = stmt.lookup_def_obj()
+            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+        
             assert def_obj is not None
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
@@ -260,10 +295,13 @@ class Emitter(base_emitter.BaseEmitter):
                 else:
                     h.print(f"extern {self.translate_type(def_type)} {stmt.name};")
                 h.print()
+
         elif isinstance(stmt, ast1.ConstStatement):
             pass
+
         elif isinstance(stmt, ast1.ReturnStatement):
             c.print(f"return {self.translate_expression(stmt.returned_exp)};")
+
         elif isinstance(stmt, ast1.IteStatement):
             c.print(f"if ({self.translate_expression(stmt.cond)})")
             with Block(c):
@@ -271,6 +309,7 @@ class Emitter(base_emitter.BaseEmitter):
             c.print("else")
             with Block(c):
                 self.emit_block(c, h, stmt.else_block)
+
         else:
             raise NotImplementedError(f"emit_declarations_for_stmt: {stmt}")
 
@@ -522,7 +561,8 @@ class Emitter(base_emitter.BaseEmitter):
             cml_print(f"set(CMAKE_CXX_STANDARD 17)")
             cml_print()
             cml_print(f"set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
-            
+            cml_print()
+
             for qyp_name, qyp in qyp_set.qyp_name_map.items():
                 if qyp is qyp_set.root_qyp:
                     cml_print(f"add_executable({qyp_name}")
