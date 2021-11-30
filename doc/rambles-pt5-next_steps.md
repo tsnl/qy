@@ -21,6 +21,7 @@
                 -   static ones via class-based method-call syntax.
                 -   constructors and destructors implicitly (treated like 'builtin magic' for now)
             -   should NOT be able to define classes, derive from C++ classes, etc.
+            -   NOTE: since types will support method injection now, why not 
         -   TODO: add builtin support for **reflection**
             -   investigate C++'s run-time type info system (since we need to interop with C++ anyway)
             -   can fill in C++ RTTI using libclang, but means we link with C++ with source-only.
@@ -57,3 +58,13 @@
             -   supporting more platforms/backends, simplifying the build process and allowing for interpreters
                 -   e.g. lowered backends like LLVM IR and C
                 -   e.g. optimizations for specific standard library features like Python execution
+
+-   FIXME:
+    -   (x) linking contexts between files in a package does not work, even with 'seeding' pass; needs to be done in a different order.
+    -   ConstructorExp does not type correctly in conjunction with function invocation
+    -   look for any more 'NotImplemented' stubs or areas that can be cleaned up
+        -   e.g. detecting duplicated file paths in project files
+    -   implement 'namespaces'
+        -   maybe packages should be 'mapped' into their own namespace?
+    -   implement C++ interop
+        -   treat C++ code as another form of Qy source code

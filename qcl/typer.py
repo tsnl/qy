@@ -17,12 +17,10 @@ from . import ast2
 # source file typing: part 1: seeding
 #
 
-def seed_one_source_file(sf: ast2.QySourceFile):
+def seed_one_source_file(sf: ast2.QySourceFile, new_ctx):
     """
     defines global symbols in a context using free variables, then sets it on `x_typer_ctx`
     """
-
-    new_ctx = Context(ContextKind.TopLevelOfSourceFile, Context.builtin_root)
 
     for top_level_stmt in sf.stmt_list:
         seed_one_top_level_stmt(new_ctx, top_level_stmt)
@@ -108,30 +106,35 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 # source file typing: part II: modelling
 #
 
-def model_one_source_file(sf: ast2.QySourceFile, dto_list: "DTOList"):
+def model_one_source_file(
+    sf: ast2.QySourceFile, dto_list: "DTOList", 
+    sub: t.Optional["Substitution"]
+) -> "Substitution":
     sf_top_level_context = sf.wb_typer_ctx
     assert isinstance(sf_top_level_context, Context)
-    
-    sol_sub = model_one_block(sf_top_level_context, sf.stmt_list, dto_list, is_top_level=True)
-    # sf.wb_typer_ctx.apply_sub_in_place_to_sub_tree(sol_sub)
-    # print(f"Applying `sol_sub`: {sol_sub}")
-    
-    # TODO: solve deferred constraints in a separate pass
+    return model_one_block(sf_top_level_context, sf.stmt_list, dto_list, init_sub=sub, is_top_level=True)
 
 
 def model_one_block(
     ctx: "Context", 
     stmt_list: t.List[ast1.BaseStatement], 
     dto_list: "DTOList", 
+    init_sub: t.Optional["Substitution"] = None,
     is_top_level=False
 ) -> "Substitution":
-    sub = Substitution.empty
+    if init_sub is None:
+        init_sub = Substitution.empty
+
+    assert isinstance(init_sub, Substitution)
+    sub = init_sub
+    
     for stmt in stmt_list:
         stmt_sub = model_one_statement(ctx, stmt, dto_list)
         sub = stmt_sub.compose(sub)
         if is_top_level:
-            ctx.apply_sub_in_place_to_sub_tree(sub)
+            Context.apply_sub_everywhere(sub)
             dto_list.update(sub)
+    
     return sub
 
 
@@ -162,7 +165,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
 
     if isinstance(stmt, ast1.Bind1vStatement):
         exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
-        if ctx.kind == ContextKind.TopLevelOfSourceFile:
+        if ctx.kind == ContextKind.TopLevelOfQypSet:
             # definition is already seeded-- just retrieve and unify.
             definition = ctx.symbol_table[stmt.name]
             def_sub, def_type = definition.scheme.instantiate()
@@ -257,7 +260,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         cond_dto_sub = dto_list.add_dto(IteCondTypeCheckDTO(stmt.loc, condition_type))
         then_sub = model_one_block(ctx, stmt.then_block, dto_list)
         else_sub = model_one_block(ctx, stmt.else_block, dto_list) if stmt.else_block else Substitution.empty
-        return then_sub.compose(else_sub).compose(cond_dto_sub).compose(condition_sub)
+        return else_sub.compose(then_sub).compose(cond_dto_sub).compose(condition_sub)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
@@ -269,6 +272,7 @@ def model_one_exp(
 ) -> t.Tuple["Substitution", types.BaseType]:
     exp.wb_ctx = ctx
     exp_sub, exp_type = help_model_one_exp(ctx, exp, dto_list)
+    exp.wb_type = exp_type
     return exp_sub, exp_sub.rewrite_type(exp_type)
 
 
@@ -358,6 +362,7 @@ def model_one_type_spec(
 ) -> t.Tuple["Substitution", types.BaseType]:
     ts.wb_ctx = ctx
     ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
+    ts.wb_type = ts_type
     return ts_sub, ts_sub.rewrite_type(ts_type)
 
 
@@ -461,7 +466,7 @@ class DTOList(object):
             finished, new_dto_list, sub = DTOList.solve_one_iteration(old_dto_list)
             
             # ensuring solving hasn't stalled:
-            if len(new_dto_list) == len(old_dto_list):
+            if not finished and len(new_dto_list) == len(old_dto_list):
                 panic.because(
                     panic.ExitCode.TyperDtoSolverStalledError,
                     f"TYPER: DTOList solution stalled with {len(new_dto_list)} constraints remaining:\n" +
@@ -469,11 +474,14 @@ class DTOList(object):
                 )
 
             # applying the substitution:
-            Context.builtin_root.apply_sub_in_place_to_sub_tree(sub)
+            Context.apply_sub_everywhere(sub)
             self.update(sub, new_dto_list)
 
     @staticmethod
     def solve_one_iteration(dto_list: t.List["BaseDTO"]) -> t.Tuple[bool, t.List["BaseDTO"], "Substitution"]:
+        if len(dto_list) == 0:
+            return True, dto_list, Substitution.empty
+        
         new_dto_list = []
         sub = Substitution.empty
         all_finished = True
@@ -500,8 +508,11 @@ class BaseDTO(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def __str__(self):
+    def prefix_str(self):
         pass
+
+    def __str__(self) -> str:
+        return f"{self.prefix_str()} @ {self.loc}"
 
     def __repr__(self):
         return str(self)
@@ -531,7 +542,7 @@ class IteCondTypeCheckDTO(BaseDTO):
         else:
             return True, Substitution.empty
 
-    def __str__(self):
+    def prefix_str(self):
         return f"IfThenElse(cond={self.condition_type})"
 
 
@@ -579,7 +590,7 @@ class UnaryOpDTO(BaseDTO):
         else:
             raise NotImplementedError(f"Solving one iter for UnaryOpDTO for unary op: {self.unary_op.name}")
 
-    def __str__(self):
+    def prefix_str(self):
         return f"{self.unary_op}({self.operand_type})"
 
 
@@ -704,7 +715,7 @@ class BinaryOpDTO(BaseDTO):
         else:
             raise NotImplementedError(f"Solving one iter for BinaryOpDTO for binary op: {self.binary_op.name}")
         
-    def __str__(self):
+    def prefix_str(self):
         return f"{self.binary_op}({self.lt_operand_type}, {self.rt_operand_type})"
 
 
@@ -742,7 +753,7 @@ class DotIdDTO(BaseDTO):
             sub = unify(self.proxy_ret_type, field_type, self.loc)
             return True, sub
 
-    def __str__(self):
+    def prefix_str(self):
         return f"DOT({self.container_type}, {self.key_name}, {self.proxy_ret_type})"
 
 
@@ -767,7 +778,18 @@ def unify(
     
     # var -> anything else (including var)
     if t1.is_var or t2.is_var:
-        if t1.is_var:
+        if t1.is_var and t2.is_var:
+            # must ensure eliminations are consistent; 
+            #   - always replace with newer type (t1.id > t2.id => var=t1, replacement=t2)
+            #   - always replace with older type (t1.id < t2.id => var=t2, replacement=t1)
+            # for correctness: solver should be invariant to this: good way to hunt for bugs.
+            if t1.id > t2.id:
+                var_type = t1
+                replacement_type = t2
+            else:
+                var_type = t2
+                replacement_type = t1
+        elif t1.is_var:
             var_type = t1
             replacement_type = t2
         else:
@@ -832,7 +854,7 @@ def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None,
 
 class ContextKind(enum.Enum):
     BuiltinRoot = enum.auto()
-    TopLevelOfSourceFile = enum.auto()
+    TopLevelOfQypSet = enum.auto()
     FunctionArgs = enum.auto()
     FunctionBlock = enum.auto()
     ConstImmediatelyInvokedFunctionBlock = enum.auto()
@@ -918,6 +940,10 @@ class Context(object):
         # applying to 'self.children'
         for child_ctx in self.children:
             child_ctx.apply_sub_in_place_to_sub_tree(sub)
+
+    @staticmethod
+    def apply_sub_everywhere(s):
+        Context.builtin_root.apply_sub_in_place_to_sub_tree(s)
 
 
 Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
@@ -1089,7 +1115,7 @@ class Substitution(object):
         # if t1 is a variable, we prefer t2 as a replacement (be it a var or not)
         if t1.is_var:
             return True
-
+        
         # if t1 is composite, check if t2 has preferable fields.
         if t1.is_composite and t2.is_composite:
             if t1.kind == t2.kind and len(t1.fields) == len(t2.fields):
@@ -1136,7 +1162,7 @@ class Scheme(object):
         res = sub.rewrite_type(self.body)
         return sub, res
 
-    def __str__(self) -> str:
+    def prefix_str(self) -> str:
         return f"({','.join(map(str, self.vars))})=>{self.body}"
 
 

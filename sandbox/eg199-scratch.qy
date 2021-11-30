@@ -49,6 +49,23 @@ def Point = struct {
 };
 */
 
+
+/* FIXME: this example should produce a unification error
+pub main: () => i32;
 def main() {
-    return fibonacci(5);
+    let v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
+    return v.x;
+};
+*/
+
+def Vec2f = struct {
+    x: f32,
+    y: f32
+};
+
+def main() {
+    // let v = Vec3f (1.0f, 2.0f, 3.0f);
+    // let w = v3f_add(v, v);
+    let w = Vec2f(0, 0);
+    return fibonacci(i32(w.x));
 };

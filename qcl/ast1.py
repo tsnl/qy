@@ -92,11 +92,15 @@ class BaseFileNode(object, metaclass=abc.ABCMeta):
 
 
 class BaseTypeSpec(BaseFileNode):
-    pass
+    def __init__(self, loc: fb.ILoc):
+        super().__init__(loc)
+        self.wb_type = None
 
 
 class BaseExpression(BaseFileNode):
-    pass
+    def __init__(self, loc: fb.ILoc):
+        super().__init__(loc)
+        self.wb_type = None
 
 
 class BaseStatement(BaseFileNode):

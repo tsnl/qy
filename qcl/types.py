@@ -26,6 +26,13 @@ class TypeKind(enum.Enum):
 
 
 class BaseType(object, metaclass=abc.ABCMeta):
+    id_counter = 0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.id = BaseType.id_counter
+        BaseType.id_counter += 1
+    
     @abc.abstractmethod
     def __str__(self) -> str:
         return self.text
@@ -317,8 +324,11 @@ class UnionType(BaseAlgebraicType):
 
 
 def get_id_str_suffix(it, id_suffix_w=4):
-    trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
-    return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
+    # trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
+    # return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
+    trimmed_number = hex(it.id)[2:]
+    return trimmed_number
+    
 
 
 word_size_in_bits = int(1+math.log2(sys.maxsize))

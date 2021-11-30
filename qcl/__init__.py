@@ -18,10 +18,12 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     
     # typing:
     dto_list = typer.DTOList()
+    new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
+    sub = typer.Substitution.empty
     for _, _, source_file in qyp_set.iter_source_files():
-        typer.seed_one_source_file(source_file)
+        typer.seed_one_source_file(source_file, new_ctx)
     for _, _, source_file in qyp_set.iter_source_files():
-        typer.model_one_source_file(source_file, dto_list)
+        sub = typer.model_one_source_file(source_file, dto_list, sub)
     dto_list.solve()
 
     # emitting:
@@ -34,9 +36,9 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
 def debug_routine_after_compilation(qyp_set):
     print("INFO: Post-compilation Debug Dump")
     print_qyp_set_summary(qyp_set)
-    print_types()
-    print_schemes()
-    print_unification_subs()
+    # print_types_test()
+    # print_schemes_test()
+    # print_unification_subs_test()
     print_contexts(qyp_set)
 
 
@@ -48,7 +50,7 @@ def print_qyp_set_summary(qyp_set):
             print(f"  - Qy source file @ path({repr(src_file)})")
 
 
-def print_types():
+def print_types_test():
     vec2 = types.StructType([('x', types.FloatType(32)), ('y', types.FloatType(32))])
     vec3 = types.StructType([('x', types.FloatType(32)), ('y', types.FloatType(32)), ('z', types.FloatType(32))])
     print("... Types print-test:")
@@ -67,7 +69,7 @@ def print_types():
     ])))
 
 
-def print_schemes():
+def print_schemes_test():
     h_a = types.VarType('a')
     h_b = types.VarType('b')
     scm = typer.Scheme([h_a, h_b], types.StructType([('x', h_a), ('y', h_b)]))
@@ -78,7 +80,7 @@ def print_schemes():
     print('\tInstantiated type: ' + str(instantiated_type))
 
 
-def print_unification_subs():
+def print_unification_subs_test():
     print("... Unifier print-test:")
 
     # unifying an atomic type to a single variable (simple)

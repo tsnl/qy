@@ -208,7 +208,8 @@ class Emitter(base_emitter.BaseEmitter):
         
         if isinstance(stmt, ast1.Bind1vStatement):
             def_obj = stmt.lookup_def_obj()
-            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+            if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
+                self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
         
             assert isinstance(def_obj, typer.BaseDefinition)
             assert not def_obj.scheme.vars
@@ -231,7 +232,8 @@ class Emitter(base_emitter.BaseEmitter):
             assert is_top_level
 
             def_obj = stmt.lookup_def_obj()
-            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+            if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
+                self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
         
             assert isinstance(def_obj, typer.BaseDefinition)
             assert not def_obj.scheme.vars
@@ -261,7 +263,8 @@ class Emitter(base_emitter.BaseEmitter):
             c.print(f"// bind {stmt.name} = {{...}}")
 
             def_obj = stmt.lookup_def_obj()
-            self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
+            if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
+                self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
         
             assert def_obj is not None
             assert not def_obj.scheme.vars
@@ -326,6 +329,12 @@ class Emitter(base_emitter.BaseEmitter):
         NOTE: only usable in the context of defining a _single_ variable.
             - cf pointer type
         """
+
+        if qy_type.is_var:
+            panic.because(
+                panic.ExitCode.EmitterError,
+                f"Typer failed: residual type variables found in emitter: {qy_type}"
+            )
 
         opt_named_pub_type = self.pub_type_to_header_name_map.get(qy_type, None)
         if opt_named_pub_type is not None:
@@ -538,6 +547,19 @@ class Emitter(base_emitter.BaseEmitter):
             assert ret_type is not None
             return ret_str, ret_type
 
+        elif isinstance(exp, ast1.ConstructorExpression):
+            if exp.wb_type.is_atomic and len(exp.initializer_list) == 1:
+                # 'cast' expressions
+                target_type_str = self.translate_type(exp.wb_type)
+                arg_str = self.translate_expression(exp.initializer_list[0])
+                return f"static_cast<{target_type_str}>({arg_str})", exp.wb_type
+            else:
+                # constructor invocation
+                constructor_ts = self.translate_type(exp.wb_type)
+                initializer_exps = [self.translate_expression(exp) for exp in exp.initializer_list]
+                constructor_str = f"{constructor_ts}{{{','.join(initializer_exps)}}}"
+                return constructor_str, exp.made_ts.wb_type
+        
         else:
             print(f"WARNING: Don't know how to translate expression to C++: {exp}")
             return f"<NotImplemented:{exp.desc}>", None

@@ -11,6 +11,30 @@
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
             "args": ["sandbox/sandbox.qyp.json"]
+        },
+        {
+            "name": "qc sandbox/sandbox-ss1.qyp.json",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["sandbox/sandbox-ss1.qyp.json"]
+        },
+        {
+            "name": "qc sandbox/sandbox-ss2.qyp.json",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["sandbox/sandbox-ss2.qyp.json"]
+        },
+        {
+            "name": "qc sandbox/sandbox-ss3.qyp.json",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["sandbox/sandbox-ss3.qyp.json"]
         }
     ]
 }
