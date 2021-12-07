@@ -1,116 +1,57 @@
-# `qy-v3`
+# Qy 3.1 (future)
 
-A vastly simplified take on Qy.
-1.  No templates, no compile-time evaluation: instead, dynamically typed and interpreted
-2.  No explicit type system, language is trivially manifestly typed.
-    - unlike Julia, which relies on JIT template expansion, or Crystal, which implicitly unifies, we do something else.
-    - every function is a constructor of its own data-type.
-    - we can perform control-flow analysis to infer and type-check the whole system without any annotations.
-    - until this is feasible, can use a placeholder system that is not very efficient, but 'good enough' for testing and
-      excellent for debugging
-    - **unification errors** are typing errors, but we can add ways for the unifier to 'auto fix' (built-in only)
-3.  Initially, assume functions are not first-class.
-    - this helps us optimize one of the most important operations we execute
-4.  Symbols denoted by back-quoted strings (?)
-5.  Syntax need not be indentation sensitive
-    - keyword-based languages typically have a terminator keyword (e.g. `end` in basic, `fi` in bash)
-    - control-flow gives us certain keywords we expect to terminate blocks-- use these
-        - only oddball: 'if': not an expression, just subdivides into more blocks
-        - block terminators: `continue`, `break`, `return`, etc
+> This is a spec for a language that may or may not manifest as its own, separate successor to Qy, or whose features may be integrated into Qy if possible.
 
 
-```
-; Semicolons begin line comments, and are not used as delimiters.
-; Only top-level statements are 'def', 'use', and 'chk'
+Source file transformations are a painful necessity. They are required to...
+-   Insert pre-computed/configured results into source code (like compile-time evaluation).
+-   Get information at compile-time to generate key data-structures or definitions.
 
-; NOTE: each file is a module, and is processed as one translation unit.
-;       this lets the user define stuff out of order. ^_^
 
-;
-; 'USE' statement:
-;
+Existing solutions include...
+-   Dynamic programming languages
+-   Templates, constexpr in C/C++
+-   Racket/PLT Scheme's extensible reader/lexer/parser system: use a shebang-like line to specify a module that
+    transforms the rest of the file into a Racket module.
+    -   This would allow users to integrate various input files as Racket modules. XML? JSON? Datalog? 
+        All transformed into statements that instantiate the ASTs of these files. 
 
-; 'use' is like import in Python, but from any file path.
-use basic from "random-qy3-file-path.qy3"
 
-;
-; 'DEF' & 'VAL' statements:
-;
+Why not...
+-   make source code transformation passes a part of the code base?
+-   allow the user to emit arbitrary languages
 
-; used to define functions, which are polymorphically typed by default.
-; NOTE: top-level functions are also generic type definitions.
-;       you can use a function name to identify the data-type it returns.
 
-def point_v1 (xyz, r, c) =
-    return {
-        pos: xyz,
-        r: r, 
-        c: c
-    }
+**Qy 3.1 is a macro-focussed language that produces independent `.so` modules.**
+Macros and modules form the core of Qy. 
 
-def point_v2 (xyz, rc) = 
-    return {
-        pos: xyz,
-        rc: rc
-    }
+-   The user only writes and composes macros and base language statements, much like in LISP.
 
-def use_point_v1 = false
+    Unlike LISP, the base language is much closer to an out-of-order LLVM IR than a high-level interpreted language.
 
-; discriminated unions expressed via named return branches
-; **discriminated unions are always boxed.**
-def point (x, y, z, r, c) =
-    if use_point_v1 then
-        return.Point1 point_v1()
-    else
-        return.Point2 point_v2()
+-   Each base language instruction inserts, modifies, or deletes a low-level output object file. (`.so|.dll`)
+    -   A source file without any macros directly specifies how to build a single position-independent object file 
+    -   These shared objects can be easily statically linked if required.
 
-; note 'is' operator is compile-time OR run-time (unions only)
-def process_pts (pt_list) =
-    for pt in pt_list do
-        if pt is point.Point1 then
-            # do point 1 specific stuff
-        elif pt is point.Point2 then
-            # do point 2 specific stuff
-        else
-            # 'panic' is checked for at compile-time-- 
-            # if the compiler can prove a program may panic, it is taken as a compile-time error.
-            panic "Unknown 'point' type"
+-   Macros are expanded recursively into base language instructions.
 
-        continue
+Like Racket, we can specify modules to act as readers and parsers in custom languages.
+-   **This combination of arbitrary parsers and a low-level backend in a single compiler is what makes Qy valuable.**
 
-; TODO: what about references? vectors?
-; maybe can offer these as built-ins, with user-managed 'handles' and the option to index
-; challenge is getting good handles-- maybe scheme locatives are what we need?
-; alternatively, can offer 'vector' as a built-in, and let the user slice it as required (no references, just indices)
+In the tradition of Qy, manual memory management would be preferred over garbage collection. Embrace static regional allocation.
+-   Mandating a little planning can trivialize memory management while improving performance significantly,
+    even over RAII.
+-   We can allow the user to evaluate any code at compile-time efficiently using generational compilation.
+    -   Each output shared object is the descendant of zero or more ancestors that will trigger a specific trap if a value is computed from
+        invalid inputs.
+        -   Global variables are usually specified by pointers to the heap. Setting a `nullptr` would trigger a trap. Setting a trap handler
+            would allow us to intercept any such errors and report them as compile-time errors.
+    -   Alternatively, a VM could be used to evaluate these results. This would produce superior debug output.
+-   The idea is that the user runs arbitrarily sophisticated code to pre-calculate the size of different regions.
+    Regions are scoped, constant-size slabs of memory that are associated with stack frames.
 
-; TODO: what about interfaces, dynamic dispatch?
-;   - can just use a procedural approach?
-;   - pattern matching allows us to dynamic dispatch?
-;     - so optional type annotations auto-pattern-match
-;     - so overloads are a thing
-;     - can use a Nim-style de-sugaring for `.method`
-
-;
-; EXAMPLES OF ERRORS
-;
-
-; unification error: 
-; all function return branches must return a value with the same datatype or use named return 
-; branches to box
-
-; WRONG
-def optional (is_some, v) =
-    if is_some then
-        return {`Some`, v}
-    else
-        return {`None`, void}
-
-; RIGHT
-def optional (is_some, v) =
-    if is_some then
-        return.Some v
-    else
-        return.None void
-```
-
+Finally, Qy can also be used to generate other kinds of output.
+-   Compile-time execution can be used to write output files.
+-   Emitted modules are basically linkable executables. 
+    Certain modules can be generated such that they contain an entry point that, by accepting flags, prints output in various formats.
 
