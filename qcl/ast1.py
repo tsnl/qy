@@ -5,6 +5,7 @@
 import abc
 import typing as t
 import enum
+from collections import defaultdict
 
 from qcl import common
 
@@ -91,16 +92,30 @@ class BaseFileNode(object, metaclass=abc.ABCMeta):
         return self.__class__.__name__
 
 
-class BaseTypeSpec(BaseFileNode):
-    def __init__(self, loc: fb.ILoc):
-        super().__init__(loc)
+class WbTypeMixin(common.Mixin):
+    all = []
+    
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.wb_type = None
 
+        WbTypeMixin.all.append(self)
 
-class BaseExpression(BaseFileNode):
+    @staticmethod
+    def apply_sub_everywhere(sub):
+        for ast_node in WbTypeMixin.all:
+            if ast_node.wb_type is not None:
+                ast_node.wb_type = sub.rewrite_type(ast_node.wb_type)
+
+
+class BaseTypeSpec(WbTypeMixin, BaseFileNode):
     def __init__(self, loc: fb.ILoc):
         super().__init__(loc)
-        self.wb_type = None
+
+
+class BaseExpression(WbTypeMixin, BaseFileNode):
+    def __init__(self, loc: fb.ILoc):
+        super().__init__(loc)
 
 
 class BaseStatement(BaseFileNode):

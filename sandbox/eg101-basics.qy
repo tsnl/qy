@@ -28,10 +28,10 @@ const u32 {
 };
 
 // struct definitions: (enum, union are similar)
-def Point = struct {
+let Point = struct {
     pos: Vec3f
 };
-def Vec3f = struct {
+let Vec3f = struct {
     x: f32,
     y: f32,
     z: f32
@@ -39,16 +39,16 @@ def Vec3f = struct {
 
 // function definitions:
 // NOTE: type inference fills in holes.
-def vec3f (x, y, z) = 
+let vec3f (x, y, z) = 
     Vec3f(x, y, z);
 
-def v3f_add (v1, v2) {
+let v3f_add (v1, v2) {
     let vx = v1.x + v2.x;
     let vy = v1.y + v2.y;
     let vz = v1.z + v2.z;
     return vec3f(vx, vy, vz);
 };
-def v3f_scale (v, s) {
+let v3f_scale (v, s) {
     let sx = v.x * s;
     let sy = v.y * s;
     let sz = v.z * s;

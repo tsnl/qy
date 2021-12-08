@@ -55,11 +55,11 @@ bind1vStatement
     : 'let' name=VID '=' initializer=expression
     ;
 bind1fStatement
-    : 'def' name=VID '(' args=csVIdList ')' '=' body_exp=expression
-    | 'def' name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
+    : 'let' name=VID '(' args=csVIdList ')' '=' body_exp=expression
+    | 'let' name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
     ;
 bind1tStatement
-    : 'def' name=TID '=' initializer=typeSpec
+    : 'let' name=TID '=' initializer=typeSpec
     ;
 type1vStatement
     : ((is_pub='pub')|'val') name=VID ':' ts=typeSpec

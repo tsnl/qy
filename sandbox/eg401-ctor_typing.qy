@@ -1,13 +1,15 @@
-// NOTE: error does not occur if this def occurs after 'vec2f', 'v3f_add' are defined.
-def main() {
-    let v = vec2f(2.0f, 3.0f);
+// NOTE: error does not occur if this let occurs after 'vec2f', 'v3f_add' are defined first.
+// NOTE: error does not occur unless a block is used.
+
+let main() {
+    let v = Vec2f(2.0f, 3.0f);
     // return i32(v.x);
     return 0;
 };
 
-def Vec2f = struct {x: f32, y: f32};
+let Vec2f = struct {x: f32, y: f32};
 
-pub vec2f: (f32, f32) => Vec2f;
-def vec2f (a, b) = Vec2f(a, b);
+// pub vec2f: (f32, f32) => Vec2f;
+// let vec2f (a, b) = Vec2f(a, b);
 
 // let x = vec2f(0.0f, 0.0f);

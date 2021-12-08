@@ -103,7 +103,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 
 
 #
-# source file typing: part II: modelling
+# source file typing: part 2: modelling
 #
 
 def model_one_source_file(
@@ -134,6 +134,7 @@ def model_one_block(
         if is_top_level:
             Context.apply_sub_everywhere(sub)
             dto_list.update(sub)
+            ast1.WbTypeMixin.apply_sub_everywhere(sub)
     
     return sub
 
@@ -343,7 +344,7 @@ def help_model_one_exp(
             last_sub.rewrite_type(actual_proc_type),
             opt_loc=exp.loc
         ).compose(last_sub)
-        return sub, proxy_ret_type
+        return sub, sub.rewrite_type(proxy_ret_type)
     elif isinstance(exp, ast1.DotIdExpression):
         container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
         proxy_ret_type = types.VarType(f"dot_{exp.key}")
@@ -429,7 +430,7 @@ def help_model_one_type_spec(
 
 
 #
-# source file typing: part III: deferred resolution (solving)
+# source file typing: part 3: deferred resolution (solving)
 #
 
 # DTOList = Deferred Type Order List
@@ -476,6 +477,7 @@ class DTOList(object):
             # applying the substitution:
             Context.apply_sub_everywhere(sub)
             self.update(sub, new_dto_list)
+            ast1.WbTypeMixin.apply_sub_everywhere(sub)
 
     @staticmethod
     def solve_one_iteration(dto_list: t.List["BaseDTO"]) -> t.Tuple[bool, t.List["BaseDTO"], "Substitution"]:

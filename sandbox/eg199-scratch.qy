@@ -1,10 +1,10 @@
 pub hello: (i32)=>i32;
-def hello (x) {
+let hello (x) {
     return x;
 };
 
 pub wrongPhi: (bool,i32,i32)=>i32;
-def wrongPhi (b, x, y) {
+let wrongPhi (b, x, y) {
     if b {
         return x;
     } else {
@@ -14,7 +14,7 @@ def wrongPhi (b, x, y) {
 
 let j = wrongPhi(true, 15, 32);
 
-def fibonacci (x) {
+let fibonacci (x) {
     if x == 0 {
         return 0;
     } else if x == 1 {
@@ -33,16 +33,16 @@ let m = b1 or b2;
 //
 
 /*
-def Vec3f = struct {
+let Vec3f = struct {
     x: f32,
     y: f32,
     z: f32
 };
-def Vec2f = struct {
+let Vec2f = struct {
     x: f32,
     y: f32
 };
-def Point = struct {
+let Point = struct {
     position: Vec3f,
     normal: Vec3f,
     uv: Vec2f
@@ -52,18 +52,18 @@ def Point = struct {
 
 /* FIXME: this example should produce a unification error
 pub main: () => i32;
-def main() {
+let main() {
     let v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
     return v.x;
 };
 */
 
-def Vec2f = struct {
+let Vec2f = struct {
     x: f32,
     y: f32
 };
 
-def main() {
+let main() {
     // let v = Vec3f (1.0f, 2.0f, 3.0f);
     // let w = v3f_add(v, v);
     let w = Vec2f(0, 0);
