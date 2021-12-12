@@ -306,7 +306,7 @@ def help_model_one_exp(
             initializer_arg_sub, initializer_arg_type = model_one_exp(ctx, initializer_arg_exp, dto_list)
             args_sub = initializer_arg_sub.compose(args_sub)
             initializer_type_list.append(initializer_arg_type)
-        # TODO: check the arguments against the made type, maybe using a deferred query.
+        # TODO: check the arguments against the made type, maybe using a deferred query or unification?
         sub = args_sub.compose(made_ts_sub)
         return sub, made_type
     elif isinstance(exp, ast1.UnaryOpExpression):

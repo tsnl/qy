@@ -82,7 +82,7 @@ primaryExpression
     | litInteger                    #litIntPrimaryExpression
     | litFloat                      #litFloatPrimaryExpression
     | litString                     #litStringPrimaryExpression
-    | '__prev_const__'               #prevConstPrimaryExpression
+    | '$.prevConst'                 #prevConstPrimaryExpression
     | id_tok=VID                    #vidPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */

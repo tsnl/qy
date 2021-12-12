@@ -79,12 +79,6 @@ class QyErrorListener(antlr.ANTLR4ErrorListener):
 
 
 class AstConstructorVisitor(antlr.QySourceFileVisitor):
-    # TODO: add methods to check that input is correct
-    #   - only certain statements allowed in top-level, function bodies, etc.
-    #       - 'return', 'ite' not allowed except inside a function
-    #       - 'const', 'bind1f' only globally allowed
-    #   - `iota` expression only allowed inside a 'const' initializer
-
     def __init__(self, source_file_path: str):
         super().__init__()
         self.source_file_path = source_file_path

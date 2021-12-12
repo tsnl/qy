@@ -1,6 +1,6 @@
 {
     "name": "sandbox",
-    "author": "TSNL",
+    "author": "https://github.com/tsnl",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
         "./eg101-basics.qy",
@@ -8,7 +8,8 @@
         "./eg102-literals.qy"
     ],
     "deps": [
-        "./import-test-qyp-1/import-test-qyp-1.qyp.json",
-        "./import-test-qyp-2/import-test-qyp-2.qyp.json"
+        "./import-test-qyp-1/import-test-qyp-1.qyp.jsonc",
+        "./import-test-qyp-2/import-test-qyp-2.qyp.jsonc",
+        "./extern-c-1/extern-c-1.qyx.jsonc"
     ]
 }

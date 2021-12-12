@@ -1,15 +1,5 @@
-# FIXME: this module is currently being rewritten.
-#   - each 'translate' function now invokes 'visit' as well, which scans for types and defines them in files
-#   - each ADT gets emitted to a separate file so that type dependencies are 'linked' by the preprocessor
-#       - type dependencies are encoded by 'include's
-#       - later, this will also enable implementing interfaces and methods very easily.
-#       - NOTE: only public types get pushed into their own header; private types are defined in the main source.
-#   - 
-
-import abc
 import os
 import os.path
-import re
 import typing as t
 import enum
 import json
@@ -17,7 +7,6 @@ import json
 from qcl import feedback
 from . import ast1
 from . import ast2
-from . import config
 from . import types
 from . import typer
 from . import base_emitter
@@ -66,7 +55,7 @@ class Emitter(base_emitter.BaseEmitter):
         for src_file_path, src_obj in qyp.src_map.items():
             self.collect_pub_named_types(src_obj.stmt_list)
 
-        # TODO: emit type definitions in a file
+        # emit type definitions in a file unique to this type
         #   - emit declaration and definition headers
         #       - can use `typedef <anonymous-type> TId` syntax to handle a wide variety of type definitions
         #       - some types have only a declaration and not a definition-- atomic aliases
@@ -117,7 +106,7 @@ class Emitter(base_emitter.BaseEmitter):
         # linking definition to declaration:
         type_def_file.include_paths.append((False, type_decl_file.file_name))
 
-        # TODO: emit definitions
+        # emitting definitions:
         if qy_type.is_composite:
             if qy_type.kind() in (types.TypeKind.Struct, types.TypeKind.Union):
                 if qy_type.kind() == types.TypeKind.Struct:
@@ -130,19 +119,16 @@ class Emitter(base_emitter.BaseEmitter):
                         # printing the field type:
                         type_def_file.print(f"{self.translate_type(field_type)} {field_name};")
                         # adding an 'include' to all used types:
-                        self.insert_type_ref_includes(type_def_file, field_type)
+                        self.insert_type_ref_includes(type_def_file, field_type, direct_ref=True)
             elif qy_type.kind() == types.TypeKind.Procedure:
                 return_type = qy_type.ret_type
                 args_str = ', '.join((
                     f"{self.translate_type(arg_type)}"
                     for arg_type in qy_type.arg_types()
                 ))
-                type_def_file.print(f"using {type_name} = std::function<{return_type}({args_str})>;")
+                type_def_file.print(f"using {type_name} = {return_type}(*)({args_str});")
 
-        # TODO: insert 'include' to declaration (if indirect reference) or definition (if direct reference) header 
-        #       files-- can also check for cycles here.
-
-    def insert_type_ref_includes(self, print_file: "CppFile", qy_type: types.BaseType, direct_ref: bool = True):
+    def insert_type_ref_includes(self, print_file: "CppFile", qy_type: types.BaseType, direct_ref: bool):
         # NOTE: every compound just includes dependencies required to write the type.
         
         # first, checking if this type has a name: just include it directly.
@@ -285,11 +271,6 @@ class Emitter(base_emitter.BaseEmitter):
                 _, def_type = def_obj.scheme.instantiate()
                 h.print(f"// pub {stmt.name}")
                 if isinstance(def_type, types.ProcedureType):
-                    # FIXME: only apply this technique to `Bind1f` statements.
-                    # unfortunately, C++ cannot link 'std::function' type definitions.
-                    # fallback to this C-style declaration, even though it will be incompatible with 'lambda'
-                    # bindings.
-                    # This results in a tricky 'dual-type' representation of function handles.
                     if is_top_level:
                         args_list = ', '.join(map(self.translate_type, def_type.arg_types))
                         h.print(f"extern {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
@@ -380,7 +361,7 @@ class Emitter(base_emitter.BaseEmitter):
                         self.translate_type(arg_type)
                         for arg_type in qy_type.arg_types
                     ))
-                    return f"std::function<{self.translate_type(qy_type.ret_type)}({args_str})>"
+                    return f"{self.translate_type(qy_type.ret_type)}(*)({args_str})"
                 elif isinstance(qy_type, (types.PointerType)):
                     return f"{self.translate_type(qy_type.pointee_type)}*"
                 else:
@@ -589,7 +570,7 @@ class Emitter(base_emitter.BaseEmitter):
                 if qyp is qyp_set.root_qyp:
                     cml_print(f"add_executable({qyp_name}")
                 else:
-                    cml_print(f"add_library({qyp_name}")
+                    cml_print(f"add_library({qyp_name} SHARED")
                 
                 cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainHeader]}")
                 cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainSource]}")
@@ -720,8 +701,7 @@ class CppFile(object):
     def add_common_stdlib_header_includes(self):
         self.include_paths.append((True, "cstdint"))
         self.include_paths.append((True, "string"))
-        self.include_paths.append((True, "functional"))
-
+        
     def inc_indent(self):
         self.indent_count += 1
     

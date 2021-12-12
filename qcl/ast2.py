@@ -17,6 +17,7 @@ from . import ast1
 from . import parser
 from . import config
 
+import jstyleson
 
 #
 #
@@ -28,10 +29,10 @@ class QypSet(object):
     @staticmethod
     def load(path_to_root_qyp_file: str) -> t.Optional["QypSet"]:
         # checking input file path:
-        if not path_to_root_qyp_file.endswith(config.PROJECT_FILE_EXTENSION):
+        if not path_to_root_qyp_file.endswith(config.QYP_FILE_EXTENSION):
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"expected project file path to end with '{config.PROJECT_FILE_EXTENSION}', got:",
+                f"expected project file path to end with '{config.QYP_FILE_EXTENSION}', got:",
                 path_to_root_qyp_file
             )
         if not os.path.isfile(path_to_root_qyp_file):
@@ -44,14 +45,38 @@ class QypSet(object):
         # using a BFS to iteratively construct a second list parallel to an input list of paths
         # NOTE: paths must be absolute to properly detect cycles.
         qyp_path_queue: t.List[str] = [os.path.abspath(path_to_root_qyp_file)]
+        qyp_path_queue_parent_list = [None]
         qyp_path_index: int = 0
         qyp_queue: t.List[Qyp] = []
         qyp_name_map: t.OrderedDict[str, "Qyp"] = OrderedDict()
         all_loaded_ok = True
         while qyp_path_index < len(qyp_path_queue):
             # acquiring the next path to load, loading a Qyp
+            opt_parent_path = qyp_path_queue_parent_list[qyp_path_index]
             qyp_path_to_load = qyp_path_queue[qyp_path_index]
-            loaded_qyp = Qyp.load(qyp_path_to_load)
+            loader_map = {
+                config.QYP_FILE_EXTENSION: Qyp.load,
+                config.QYX_FILE_EXTENSION: Qyx.load
+            }
+            for loader_ext, loader_fun in loader_map.items():
+                if qyp_path_to_load.endswith(loader_ext):
+                    loaded_qyp = loader_fun(qyp_path_to_load)
+                    break
+            else:
+                more = ""
+                for wrong_ext in config.WRONG_QYP_LIKE_EXTENSIONS:
+                    if qyp_path_to_load.endswith(wrong_ext):
+                        more += f"... received wrong/incomplete extension '{wrong_ext}'.\n"
+                        break
+                expected_exts = loader_map.keys()
+                expected_exts_desc = ', '.join((f"'{expected_ext}'" for expected_ext in expected_exts))
+                more += f"... expected extensions: {expected_exts_desc}\n"
+                more += f"... see file:"
+                panic.because(
+                    panic.ExitCode.BadProjectFile,
+                    f"Dependency '{qyp_path_to_load}' does not have a valid extension.\n{more}",
+                    opt_file_path=opt_parent_path
+                )
             qyp_queue.append(loaded_qyp)
 
             # complaining if the loaded qyp has the same name as another we've already loaded:
@@ -81,6 +106,7 @@ class QypSet(object):
                     # relative path
                     target_path = os.path.abspath(os.path.join(loaded_qyp.dir_path, dep_path))
                     if target_path not in qyp_path_queue:
+                        qyp_path_queue_parent_list.append(qyp_path_to_load)
                         qyp_path_queue.append(target_path)
 
             # incrementing the index into the path queue:
@@ -108,13 +134,13 @@ class Qyp(object):
     def load(path_to_root_qyp_file: str) -> "Qyp":
         try:
             with open(path_to_root_qyp_file, "r") as project_file:
-                js_map = json.load(project_file)
-        except json.decoder.JSONDecodeError as exc:
+                js_map = jstyleson.load(project_file)
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"failed to parse project file: {exc.msg} in:",
+                f"failed to parse project file: {exc} in:",
                 path_to_root_qyp_file,
-                fb.FileSpan(fb.FilePos(exc.lineno - 1, exc.colno - 1))
+                # fb.FileSpan(fb.FilePos(exc.lineno - 1, exc.colno - 1))
             )
 
         # basic error checking: still need owner to query and report for us
@@ -129,7 +155,7 @@ class Qyp(object):
             missing_keys_str = ', '.join(map(repr, missing_keys))
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"project file missing {len(missing_keys)} top-level key-value pairs {missing_keys_str}"
+                f"project file missing {len(missing_keys)} top-level key-value pair(s) {missing_keys_str}"
             )
 
         # checking no extra keys are present, panic otherwise:
@@ -138,7 +164,7 @@ class Qyp(object):
             extra_keys_str = ', '.join(map(repr, extra_keys))
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"project file has {len(missing_keys)} extra keys: {extra_keys_str}"
+                f"project file has {len(extra_keys)} extra key(s): {extra_keys_str}"
             )
 
         # args look OK!
@@ -201,6 +227,14 @@ class Qyp(object):
 
     def iter_src_paths(self):
         yield from self.js_src_list
+
+
+class Qyx(Qyp):
+    """
+    A 'Qyx' is a 'Qyp' that contains code from another language.
+    It is also known as an extension package.
+    """
+    pass
 
 
 package_required_keys = {

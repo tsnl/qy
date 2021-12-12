@@ -17,14 +17,14 @@ pub v3f_scale: (Vec3f, f32) => Vec3f;
 // enums provided using 'const', which translates into preprocessor declarations
 const i32 {
     let errorCode_allOK = 0;
-    let errorCode_badCliArgs = 1 + __prev_const__;
-    let errorCode_badFilePath = 1 + __prev_const__;
-    let errorCode_detectedRuntimeError = 1 + __prev_const__;
+    let errorCode_badCliArgs = 1 + $.prevConst;
+    let errorCode_badFilePath = 1 + $.prevConst;
+    let errorCode_detectedRuntimeError = 1 + $.prevConst;
 };
 const u32 {
     let windowFlag_fullScreen = 0x1u;
-    let windowFlag_fixedSize = 2u * __prev_const__;
-    let windowFlag_hwAccelerated = 2u * __prev_const__;
+    let windowFlag_fixedSize = 2u * $.prevConst;
+    let windowFlag_hwAccelerated = 2u * $.prevConst;
 };
 
 // struct definitions: (enum, union are similar)
@@ -39,8 +39,7 @@ let Vec3f = struct {
 
 // function definitions:
 // NOTE: type inference fills in holes.
-let vec3f (x, y, z) = 
-    Vec3f(x, y, z);
+let vec3f (x, y, z) = Vec3f(x, y, z);
 
 let v3f_add (v1, v2) {
     let vx = v1.x + v2.x;

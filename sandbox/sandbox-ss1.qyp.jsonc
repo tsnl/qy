@@ -1,6 +1,6 @@
 {
     "name": "sandbox_ss1",
-    "author": "TSNL",
+    "author": "https://github.com/tsnl",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
         "./eg199-scratch.qy"

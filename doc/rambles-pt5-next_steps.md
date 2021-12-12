@@ -10,21 +10,35 @@
     -  Before forking, take the time to audit, write tests, and refactor. 
         -   TODO: clean up any stubs in the existing code-base
             -   e.g. (at time of writing) emitting Constructor expressions (because we need to emit constructors)
-        -   TODO: add namespaces
+        -   DONE: change compilation to generate a shared object per-module, rely on run-time linking.
+        -   ~~TODO: add namespaces~~
             -   should be able to use TIDs (including ones bound to types) as namespaces
                 -   e.g. invoking methods in classes imported from C++
             -   should group symbols into a namespace
-        -   TODO: allow the user to add C++ libraries
+        -   ~~TODO: expose an API to generate source code objects in Python~~
+            -   source code generation can be extremely valuable
+            -   Python is even better than CMake, and would let the user conveniently pre-compute and embed anything
+            -   can use this API to generate source code objects from C/C++/etc... (cf below)
+        -   ~~TODO: allow the user to add C++ libraries~~
             -   should be able to import C++ source code, most notably `cstdio`
             -   should be able to instantiate C++ constructs
             -   should NOT be able to invoke methods except...
                 -   static ones via class-based method-call syntax.
                 -   constructors and destructors implicitly (treated like 'builtin magic' for now)
             -   should NOT be able to define classes, derive from C++ classes, etc.
-            -   NOTE: since types will support method injection now, why not 
-        -   TODO: add builtin support for **reflection**
-            -   investigate C++'s run-time type info system (since we need to interop with C++ anyway)
-            -   can fill in C++ RTTI using libclang, but means we link with C++ with source-only.
+            -   NOTE: since types will support method injection now, why not copy C++ types?
+
+                In effect, compile C++ to C++.
+
+            -   see: https://github.com/llvm/llvm-project/tree/main/clang/bindings/python/
+        -   TODO: add builtin support for using C libraries
+            -   C++ code can always expose C interfaces.
+            -   eliminates need for namespaces
+        -   TODO (FUTURE): add builtin support for **reflection**
+            -   ~~investigate C++'s run-time type info system (since we need to interop with C++ anyway)~~
+            -   ~~can fill in C++ RTTI using libclang, but means we link with C++ with source-only.~~
+            -   use this + emitting CMake objects as 'module' to control loading from within our language
+            -   bump this into a future release
 
     -   Propose **qc-v2.1 the fork test**: does this branch...
         -   produce correct C++ output given valid input?

@@ -1,0 +1,31 @@
+{
+    "name": "extern-c-1",
+    "author": "https://github.com/tsnl",
+    "help": "A Qy extension package: allow the user to link to code in a different language.",
+    "external-language": "c",
+    "src": [
+        // can be any C sources: *.h, *.c, *.o, *.a, *.so, etc
+        // only .h files are parsed for interfaces; linker errors are the QYX author's problem.
+        ""
+    ],
+    "deps": [
+        // `.qyx` packages can only depend on other `.qyx` packages.
+    ],
+    "c-compiler-args": {
+        "*": {
+            "include-dirs": [
+
+            ],
+            "flags": [
+                "-Wall"
+            ]
+        },
+        
+        // each of the above objects can be extended on a per-platform basis.
+        // based on VCPKG triplets, but just two components since everything is 'dynamic' by default.
+        "macos-x64": {},
+        "windows-x32": {},
+        "windows-x64": {},
+        "emscripten-wasm32": {}
+    }
+}

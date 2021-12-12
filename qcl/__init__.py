@@ -8,6 +8,7 @@ from . import typer
 from . import cpp_emitter
 from . import base_emitter
 from . import types
+from . import main
 
 
 def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter):
@@ -16,6 +17,14 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
 
     qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file)
     
+    # basic checks
+
+    # TODO: perform basic checks on AST structure
+    #   - only certain statements allowed in top-level, function bodies, etc.
+    #       - 'return', 'ite' not allowed except inside a function
+    #       - 'const', 'bind1f' only globally allowed
+    #   - `iota` expression only allowed inside a 'const' initializer
+
     # typing:
     dto_list = typer.DTOList()
     new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
