@@ -40,10 +40,12 @@ class Emitter(base_emitter.BaseEmitter):
         os.makedirs(self.modules_abs_output_dir_path, exist_ok=True)
 
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
-            self.emit_per_type_headers(qyp_name, qyp)
+            if isinstance(qyp, ast2.NativeQyp):
+                self.emit_per_type_headers(qyp_name, qyp)
 
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
-            self.emit_module_body(qyp_name, qyp)
+            if isinstance(qyp, ast2.NativeQyp):
+                self.emit_module_body(qyp_name, qyp)
         
         self.emit_cmake_lists(qyp_set)
 
@@ -51,8 +53,8 @@ class Emitter(base_emitter.BaseEmitter):
     # part 1: emitting type headers.
     #
 
-    def emit_per_type_headers(self, qyp_name: str, qyp: ast2.Qyp):
-        for src_file_path, src_obj in qyp.src_map.items():
+    def emit_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp):
+        for src_file_path, src_obj in qyp.qy_src_map.items():
             self.collect_pub_named_types(src_obj.stmt_list)
 
         # emit type definitions in a file unique to this type
@@ -173,14 +175,14 @@ class Emitter(base_emitter.BaseEmitter):
     # part 2: emitting module body
     #
 
-    def emit_module_body(self, qyp_name: str, qyp: ast2.Qyp):
+    def emit_module_body(self, qyp_name: str, qyp: ast2.NativeQyp):
         output_file_stem = os.path.join(self.modules_abs_output_dir_path, qyp_name)
         hpp_file = CppFile(CppFileType.MainHeader, output_file_stem)
         cpp_file = CppFile(CppFileType.MainSource, output_file_stem)
         
         print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
         
-        for src_file_path, src_obj in qyp.src_map.items():
+        for src_file_path, src_obj in qyp.qy_src_map.items():
             assert isinstance(src_obj, ast2.QySourceFile)
             for stmt in src_obj.stmt_list:
                 self.emit_module_body_stmt(cpp_file, hpp_file, stmt, is_top_level=True)

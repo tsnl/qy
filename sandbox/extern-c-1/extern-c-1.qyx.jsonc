@@ -2,22 +2,28 @@
     "name": "extern-c-1",
     "author": "https://github.com/tsnl",
     "help": "A Qy extension package: allow the user to link to code in a different language.",
-    "external-language": "c",
-    "src": [
-        // can be any C sources: *.h, *.c, *.o, *.a, *.so, etc
-        // only .h files are parsed for interfaces; linker errors are the QYX author's problem.
-        ""
-    ],
-    "deps": [
-        // `.qyx` packages can only depend on other `.qyx` packages.
+    "binder": "c-v1",
+    "binder-includes": [
+        {
+            "path": "print-v1.h",
+            "provides": [
+                "File", "FileAccess", "FileType",
+                "printUtf8Char",
+                "openFile", "closeFile",
+                "readCharFromFile"
+            ]
+        }
     ],
     "c-compiler-args": {
         "*": {
             "include-dirs": [
-
+                "./"
             ],
             "flags": [
                 "-Wall"
+            ],
+            "sources": [
+                "./print-v1.c"
             ]
         },
         

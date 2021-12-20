@@ -4,5 +4,6 @@ WRONG_QYP_LIKE_EXTENSIONS = [
     ".json",
     ".jsonc"
 ]
-SOURCE_FILE_EXTENSION = ".qy"
+QY_SOURCE_FILE_EXTENSION = ".qy"
+C_HEADER_FILE_EXTENSION = ".h"
 DEBUG_MODE = True and __debug__

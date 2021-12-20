@@ -1,6 +1,3 @@
-// NOTE: error does not occur if this let occurs after 'vec2f', 'v3f_add' are defined first.
-// NOTE: error does not occur unless a block is used.
-
 let main() {
     let v = Vec2f(2.0f, 3.0f);
     // return i32(v.x);

@@ -29,6 +29,7 @@ class ExitCode(enum.Enum):
     TyperDtoSolverFailedError = enum.auto()
     ScopingError = enum.auto()
     EmitterError = enum.auto()
+    UnsupportedExternCFeature = enum.auto()
 
 
 def because(

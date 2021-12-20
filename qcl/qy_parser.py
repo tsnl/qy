@@ -288,7 +288,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitPrevConstPrimaryExpression(self, ctx: antlr.QySourceFileParser.PrevConstPrimaryExpressionContext):
         return ast1.BuiltinConPrevExpression(self.loc(ctx))
 
-    def visitVidPrimaryExpression(self, ctx: antlr.QySourceFileParser.VidPrimaryExpressionContext):
+    def visitIdPrimaryExpression(self, ctx: antlr.QySourceFileParser.IdPrimaryExpressionContext):
         return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)
 
     def visitParenPrimaryExpression(self, ctx: antlr.QySourceFileParser.ParenPrimaryExpressionContext):
@@ -526,7 +526,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         ts = self.visit(ctx.ts)
         return opt_name, ts
 
-    def visitCsVIdList(self, ctx: antlr.QySourceFileParser.CsVIdListContext) -> t.List[str]:
+    def visitCsIdList(self, ctx: antlr.QySourceFileParser.CsIdListContext) -> t.List[str]:
         return [id_tok.text for id_tok in ctx.ids]
 
     def visitCsFormalArgSpecList(self, ctx: antlr.QySourceFileParser.CsFormalArgSpecListContext) \

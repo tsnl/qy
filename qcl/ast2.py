@@ -4,17 +4,29 @@
 - tracking `QypSet`s, or Qy Package sets: groups of interdependent packages
 - tracking `Qyp`s, or Qy Packages
 - tracking `QySourceFile`s
+
+Qy packages have grown to encompass different inputs.
+BaseQyp is a base qy package: it includes...
+-   `Qyp`s: native Qy packages
+-   `Qyx`s: Qy extension packages
+    - `CQyx`s: Qy extensions using C source code and C-level object files
 """
 
+import abc
+import functools
+import itertools
+from os import stat
 import os.path
 import json
+from posixpath import isabs
 import typing as t
 from collections import OrderedDict
 
 from . import panic
 from . import feedback as fb
 from . import ast1
-from . import parser
+from . import qy_parser
+from . import c_parser
 from . import config
 
 import jstyleson
@@ -32,7 +44,7 @@ class QypSet(object):
         if not path_to_root_qyp_file.endswith(config.QYP_FILE_EXTENSION):
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"expected project file path to end with '{config.QYP_FILE_EXTENSION}', got:",
+                f"expected root project file path to end with '{config.QYP_FILE_EXTENSION}', but got:",
                 path_to_root_qyp_file
             )
         if not os.path.isfile(path_to_root_qyp_file):
@@ -47,16 +59,16 @@ class QypSet(object):
         qyp_path_queue: t.List[str] = [os.path.abspath(path_to_root_qyp_file)]
         qyp_path_queue_parent_list = [None]
         qyp_path_index: int = 0
-        qyp_queue: t.List[Qyp] = []
-        qyp_name_map: t.OrderedDict[str, "Qyp"] = OrderedDict()
+        qyp_queue: t.List[NativeQyp] = []
+        qyp_name_map: t.OrderedDict[str, "NativeQyp"] = OrderedDict()
         all_loaded_ok = True
         while qyp_path_index < len(qyp_path_queue):
             # acquiring the next path to load, loading a Qyp
             opt_parent_path = qyp_path_queue_parent_list[qyp_path_index]
             qyp_path_to_load = qyp_path_queue[qyp_path_index]
             loader_map = {
-                config.QYP_FILE_EXTENSION: Qyp.load,
-                config.QYX_FILE_EXTENSION: Qyx.load
+                config.QYP_FILE_EXTENSION: NativeQyp.load,
+                config.QYX_FILE_EXTENSION: CQyx_v1.load
             }
             for loader_ext, loader_fun in loader_map.items():
                 if qyp_path_to_load.endswith(loader_ext):
@@ -88,7 +100,7 @@ class QypSet(object):
                 qyp_name_map[loaded_qyp.js_name] = loaded_qyp
 
             # adding all dependency paths:
-            for dep_index, dep_path in enumerate(loaded_qyp.js_dep_list):
+            for dep_index, dep_path in enumerate(loaded_qyp.js_dep_path_list):
                 if dep_path.startswith("https://"):
                     panic.because(
                         panic.ExitCode.BadProjectFile,
@@ -117,49 +129,81 @@ class QypSet(object):
         else:
             return None
 
-    def __init__(self, root_qyp: "Qyp", qyp_name_map: t.OrderedDict[str, "Qyp"]) -> None:
+    def __init__(self, root_qyp: "NativeQyp", qyp_name_map: t.OrderedDict[str, "NativeQyp"]) -> None:
         super().__init__()
         self.qyp_name_map = qyp_name_map
         self.root_qyp = root_qyp
 
-    def iter_source_files(self) -> t.Iterable[t.Tuple[str, str, "QySourceFile"]]:
+    def iter_native_src_paths(self) -> t.Iterable[t.Tuple[str, str, "QySourceFile"]]:
         for qyp_name, qyp in self.qyp_name_map.items():
-            assert isinstance(qyp, Qyp)
-            for src_file_path, qy_source_file in qyp.src_map.items():
-                yield qyp_name, src_file_path, qy_source_file
+            if isinstance(qyp, NativeQyp):
+                for src_file_path, qy_source_file in qyp.qy_src_map.items():
+                    yield qyp_name, src_file_path, qy_source_file
 
 
-class Qyp(object):
+class BaseQyp(object, metaclass=abc.ABCMeta):
+    def __init__(
+        self,
+        qyp_file_path: str, dir_path: str,
+        name: str, author: str, project_help: str,
+        any_src_path_list: t.List[str],
+        dep_path_list: t.List[str]
+    ) -> None:
+        """
+        WARNING: Do not instantiate this class directly.
+        Instead, invoke `Qyp.load`
+        """
+        super().__init__()
+        self.file_path = qyp_file_path
+        self.dir_path = dir_path
+        self.js_name = name
+        self.js_author = author
+        self.js_help = project_help
+        self.src_path_list = any_src_path_list
+        self.js_dep_path_list = dep_path_list
+
     @staticmethod
-    def load(path_to_root_qyp_file: str) -> "Qyp":
+    def panic_because_bad_keys(path_to_root_qyp_file, missing_keys):
+        missing_keys_str = ', '.join(map(repr, missing_keys))
+        panic.because(
+            panic.ExitCode.BadProjectFile,
+            f"Qyp/Qyx project file missing {len(missing_keys)} top-level key-value pair(s) {missing_keys_str}",
+            opt_file_path=path_to_root_qyp_file
+        )
+    
+    @staticmethod
+    def panic_because_bad_project_file(path_to_file, exc):
+        panic.because(
+            panic.ExitCode.BadProjectFile,
+            f"failed to parse project file: {exc} in:",
+            path_to_file,
+            fb.FileSpan(fb.FilePos(exc.lineno-1, exc.colno-1)) if isinstance(exc, json.JSONDecodeError) else None
+        )
+
+    @abc.abstractmethod
+    def iter_native_src_paths(self):
+        pass
+    
+
+class NativeQyp(BaseQyp):
+    @staticmethod
+    def load(path_to_root_qyp_file: str) -> "NativeQyp":
         try:
             with open(path_to_root_qyp_file, "r") as project_file:
                 js_map = jstyleson.load(project_file)
         except (FileNotFoundError, json.JSONDecodeError) as exc:
-            panic.because(
-                panic.ExitCode.BadProjectFile,
-                f"failed to parse project file: {exc} in:",
-                path_to_root_qyp_file,
-                # fb.FileSpan(fb.FilePos(exc.lineno - 1, exc.colno - 1))
-            )
+            NativeQyp.panic_because_bad_project_file(path_to_root_qyp_file, exc)
 
         # basic error checking: still need owner to query and report for us
         provided_props_set = set(js_map.keys())
 
         # checking all required keys are present, panic otherwise:
-        missing_keys = []
-        for supported_key in package_required_keys:
-            if supported_key not in provided_props_set:
-                missing_keys.append(supported_key)
+        missing_keys = qyp_required_keys - provided_props_set
         if missing_keys:
-            missing_keys_str = ', '.join(map(repr, missing_keys))
-            panic.because(
-                panic.ExitCode.BadProjectFile,
-                f"project file missing {len(missing_keys)} top-level key-value pair(s) {missing_keys_str}"
-            )
+            NativeQyp.panic_because_bad_keys(path_to_root_qyp_file, missing_keys)
 
         # checking no extra keys are present, panic otherwise:
-        extra_keys = provided_props_set - package_supported_keys
+        extra_keys = provided_props_set - qyp_supported_keys
         if extra_keys:
             extra_keys_str = ', '.join(map(repr, extra_keys))
             panic.because(
@@ -192,7 +236,7 @@ class Qyp(object):
             src_map[abs_src_file_path] = QySourceFile.load(abs_src_file_path)
 
         # create a Qy project (Qyp)
-        return Qyp(
+        return NativeQyp(
             path_to_root_qyp_file,
             qyp_dir_path,
             js_map["name"],
@@ -207,67 +251,328 @@ class Qyp(object):
         self,
         qyp_file_path: str, dir_path: str,
         name: str, author: str, project_help: str,
-        src_list: t.List[str],
-        dep_list: t.List[str],
-        src_map: t.Dict[str, "QySourceFile"]
+        qy_src_path_list: t.List[str],
+        dep_path_list: t.List[str],
+        qy_src_map: t.Dict[str, "QySourceFile"]
     ) -> None:
         """
         WARNING: Do not instantiate this class directly.
         Instead, invoke `Qyp.load`
         """
-        super().__init__()
-        self.file_path = qyp_file_path
-        self.dir_path = dir_path
-        self.js_name = name
-        self.js_author = author
-        self.js_help = project_help
-        self.js_src_list = src_list
-        self.js_dep_list = dep_list
-        self.src_map = src_map
+        super().__init__(qyp_file_path, dir_path, name, author, project_help, qy_src_path_list, dep_path_list)
+        self.qy_src_map = qy_src_map
 
-    def iter_src_paths(self):
-        yield from self.js_src_list
+    def iter_native_src_paths(self):
+        return iter(self.src_path_list)
 
 
-class Qyx(Qyp):
+class BaseQyx(BaseQyp, metaclass=abc.ABCMeta):
     """
     A 'Qyx' is a 'Qyp' that contains code from another language.
     It is also known as an extension package.
     """
-    pass
 
+    @classmethod
+    def load(cls, path_to_root_qyx_file: str) -> "BaseQyx":
+        try:
+            with open(path_to_root_qyx_file, "r") as project_file:
+                js_map = jstyleson.load(project_file)
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            NativeQyp.panic_because_bad_project_file(path_to_root_qyx_file, exc)
 
-package_required_keys = {
-    "name", "author", "help", "src"
-}
-package_optional_keys = {
-    "deps"
-}
-package_supported_keys = package_required_keys | package_optional_keys
+        # basic error checking: still need owner to query and report for us
+        provided_props_set = set(js_map.keys())
 
-
-class QySourceFile(object):
-    @staticmethod
-    def load(source_file_path: str) -> "QySourceFile":
-        if not source_file_path.endswith(config.SOURCE_FILE_EXTENSION):
-            panic.because(
-                panic.ExitCode.BadProjectFile, 
-                f"expected source file path to end with '{config.SOURCE_FILE_EXTENSION}', got:", 
-                source_file_path
-            )
-        if not os.path.isfile(source_file_path):
+        # checking all required keys are present, panic otherwise:
+        missing_keys = []
+        for supported_key in qyx_required_keys:
+            if supported_key not in provided_props_set:
+                missing_keys.append(supported_key)
+        if missing_keys:
+            missing_keys_str = ', '.join(map(repr, missing_keys))
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"source file path does not refer to a file:",
-                source_file_path
+                f"Qyx project file missing {len(missing_keys)} top-level key-value pair(s) {missing_keys_str}",
+                opt_file_path=path_to_root_qyx_file
             )
-        stmt_list = parser.parse_one_file(source_file_path)
-        return QySourceFile(source_file_path, stmt_list)
 
-    def __init__(self, source_file_path: str, stmt_list: t.List[ast1.BaseStatement]):
+        # checking for more required keys and extra keys depends on the extension language, and is handled later.
+        qyx_dir_path = os.path.dirname(path_to_root_qyx_file)
+        
+        # args look OK!
+
+        # dispatching to language-specific loaders:
+        lang = js_map["binder"].upper()
+        if lang == 'C-V1':
+            return cls.load_ext(js_map, path_to_root_qyx_file, qyx_dir_path, lang)
+        else:
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Unknown language in Qyx: {repr(lang)}"
+            )
+        raise NotImplementedError(f"Loading Qyx {path_to_root_qyx_file}")
+        
+    @classmethod
+    @abc.abstractmethod
+    def load_ext(cls, js_map, path_to_root_qyx_file, qyx_dir_path, language):
+        raise NotImplementedError("BaseQyx.load_ext: This method should be overridden before invocation.")
+
+    def iter_native_src_paths(self):
+        return iter(())
+        
+    def __init__(
+        self,
+        qyp_file_path: str, dir_path: str,
+        name: str, author: str, project_help: str,
+        src_list: t.List[str],
+        dep_path_list: t.List[str]
+    ) -> None:
+        """
+        WARNING: Do not instantiate this class directly.
+        Instead, invoke `<Lang>Qyx.load`
+        """
+        super().__init__(qyp_file_path, dir_path, name, author, project_help, src_list, dep_path_list)
+
+
+
+class CQyx_v1(BaseQyx):
+    required_keys = {
+        "binder-includes",
+        "c-compiler-args"
+    }
+
+    def __init__(
+        self, 
+        qyp_file_path: str, 
+        dir_path: str, 
+        name: str, 
+        author: str, 
+        project_help: str, 
+        src_path_list: t.List[str], 
+        dep_path_list: t.List[str],
+        c_source_files: t.List["CSourceFile"]
+    ) -> None:
+        super().__init__(qyp_file_path, dir_path, name, author, project_help, src_path_list, dep_path_list)
+        self.c_source_files = c_source_files
+
+    @classmethod
+    def load_ext(cls, js_map, path_to_root_qyx_file, qyx_dir_path, binder_name):
+        assert binder_name == 'C-V1'
+
+        missing_keys = CQyx_v1.required_keys - set(js_map.keys())
+        if missing_keys:
+            CQyx_v1.panic_because_bad_keys(path_to_root_qyx_file, missing_keys)
+
+        binder_includes_args_obj = js_map["binder-includes"]
+        CQyx_v1.check_binder_args_obj("binder-includes", binder_includes_args_obj, {"path", "provides"})
+        
+        c_source_files = []
+        src_path_list = []
+        for index, include_obj in enumerate(binder_includes_args_obj):
+            include_path = include_obj["path"]
+            CQyx_v1.check_obj_is_str_else_panic(f"binder-includes[{index}].path", include_path, path_to_root_qyx_file)
+            provided_symbol_list = include_obj["provides"]
+            CQyx_v1.check_obj_is_all_str_list_else_panic(f"binder-includes[{index}].path", provided_symbol_list, path_to_root_qyx_file)
+            abs_include_path = include_path if os.path.isabs(include_path) else os.path.join(qyx_dir_path, include_path)
+            other_abs_file_paths = []   # TODO: all '.c', '.a' files here.
+            
+            c_source_files.append(CSourceFile.load(abs_include_path, provided_symbol_list))
+            
+            src_path_list.append(abs_include_path)
+            src_path_list += other_abs_file_paths
+
+        # checking that all symbols claimed to be provided in the JSON were found:
+        all_provided_symbols = functools.reduce(
+            lambda a, b: a | b, 
+            (set(csf.this_file_provided_symbol_list) for csf in c_source_files)
+        )
+        missing_symbols = set(provided_symbol_list) - all_provided_symbols
+        if missing_symbols:
+            panic.because(
+                panic.ExitCode.CompilationFailed,
+                f"CQyx: could not find all provided symbols in project file when scanning headers. Missing symbols:\n" +
+                '- ' + '\n- '.join(sorted(missing_symbols)),
+                opt_file_path=path_to_root_qyx_file
+            )
+            
+        c_compiler_args_obj = js_map["c-compiler-args"]
+        platform_name_set = {
+            "macos-x64",
+            "windows-x32",
+            "windows-x64",
+            "emscripten-wasm32",
+            "linux-x32",
+            "linux-x64",
+            "linux-arm32",
+            "linux-arm64"
+        }
+        CQyx_v1.check_args_obj("c-compiler-args", c_compiler_args_obj, {"*"}, platform_name_set)
+        common_args = c_compiler_args_obj["*"]
+        
+        # TODO: handle platforms
+        for platform_name in platform_name_set:
+            if platform_name in c_compiler_args_obj:
+                print(f"WARNING: NotImplemented: platform-specific args: {repr(platform_name)}")
+
+        # TODO: check each C-compiler-args object
+
+        # returning:
+        return CQyx_v1(
+            path_to_root_qyx_file,
+            qyx_dir_path,
+            js_map["name"],
+            js_map["author"],
+            js_map["help"],
+            src_path_list,
+            js_map.get("deps", []),
+            c_source_files
+        )
+
+    @staticmethod
+    def check_binder_args_obj(top_level_key, arg_obj, required_per_obj_keys):
+        if not isinstance(arg_obj, list):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Qyx: in object mapped to '{top_level_key}': expected mapped value to be a list of objects, got:\n"
+                f"{repr(arg_obj)}"
+            )
+        
+        for index, include_obj in enumerate(arg_obj):
+            CQyx_v1.check_args_obj(f"{top_level_key}[{index}]", include_obj, required_per_obj_keys, set())
+
+    @staticmethod
+    def check_args_obj(top_level_key, args_obj, required_keys, optional_keys):
+        provided_keys = set(args_obj.keys())
+        missing_keys = required_keys - provided_keys
+        extra_keys = provided_keys - required_keys - optional_keys
+        
+        if missing_keys:
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Qyx: in object mapped to '{top_level_key}': missing {len(missing_keys)} keys:\n"
+                f"missing keys: " + ', '.join(map(repr, missing_keys))
+            )
+        if extra_keys:
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Qyx: in object mapped to 'binder-args': {len(extra_keys)} unused keys:\n"
+                f"unused keys: " + ', '.join(map(repr, extra_keys))
+            )    
+        
+    @staticmethod
+    def check_obj_is_str_else_panic(usage: str, obj: object, path_to_file: str):
+        if not isinstance(obj, str):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Invalid args to '{usage}': expected a single string literal",
+                opt_file_path=path_to_file
+            )
+
+    @staticmethod
+    def check_obj_is_all_str_list_else_panic(usage: str, obj: object, path_to_file: str):
+        if not isinstance(obj, list) or not all((isinstance(it, str) for it in obj)):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"Invalid args to '{usage}': expected a list of string literals",
+                opt_file_path=path_to_file
+            )
+
+
+class CQyx_v1_CompilerArgs(object):
+    @staticmethod
+    def from_json_obj(platform_name, json_obj):
+        pass
+
+    def __init__(
+        self, 
+        platform_name: str,
+        include_dirs: t.List[str],
+        flags: t.List["str"],
+        sources: t.List[str]
+    ) -> None:
+        """
+        WARNING: do not invoke this constructor directly: instead, use `from_json_obj`
+        """
+        super().__init__()
+
+
+base_qyp_required_keys = {
+    "name", "author", "help"
+}
+base_qyp_optional_keys = {
+    "deps"
+}
+
+qyp_required_keys = base_qyp_required_keys | {"src"}
+qyp_optional_keys = base_qyp_optional_keys
+
+qyp_supported_keys = qyp_required_keys | qyp_optional_keys
+
+qyx_required_keys = base_qyp_required_keys | {"binder"}
+qyx_optional_keys = base_qyp_optional_keys
+
+
+#
+#
+# Source files
+#
+#
+
+class BaseSourceFile(object, metaclass=abc.ABCMeta):
+    def __init__(self, source_file_path: str, stmt_list: t.List[ast1.BaseStatement]) -> None:
+        assert all((isinstance(it, ast1.BaseStatement) for it in stmt_list))
+        
         super().__init__()
         self.file_path = source_file_path
         self.stmt_list = stmt_list
 
         # writeback properties: properties computed over the course of evaluation and 'written back' for later:
         self.wb_typer_ctx = None
+
+
+class QySourceFile(BaseSourceFile):
+    @staticmethod
+    def load(source_file_path: str) -> "QySourceFile":
+        if not source_file_path.endswith(config.QY_SOURCE_FILE_EXTENSION):
+            panic.because(
+                panic.ExitCode.BadProjectFile, 
+                f"expected source file path to end with '{config.QY_SOURCE_FILE_EXTENSION}', got:", 
+                source_file_path
+            )
+        if not os.path.isfile(source_file_path):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                "source file path does not refer to a file:",
+                source_file_path
+            )
+        stmt_list = qy_parser.parse_one_file(source_file_path)
+        return QySourceFile(source_file_path, stmt_list)
+
+
+class CSourceFile(BaseSourceFile):
+    def __init__(
+        self, 
+        source_file_path: str, 
+        stmt_list: t.List[ast1.BaseStatement],
+        this_file_provided_symbol_list: t.List[str]
+    ) -> None:
+        super().__init__(source_file_path, stmt_list)
+        self.this_file_provided_symbol_list = this_file_provided_symbol_list
+
+    @staticmethod
+    def load(source_file_path: str, provided_symbol_list: t.List[str]) -> "CSourceFile":
+        if not source_file_path.endswith(config.C_HEADER_FILE_EXTENSION):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                f"expected C header file path to end with '{config.C_HEADER_FILE_EXTENSION}', got:",
+                source_file_path
+            )
+        if not os.path.isfile(source_file_path):
+            panic.because(
+                panic.ExitCode.BadProjectFile,
+                "source file path does not refer to an existing file:",
+                source_file_path
+            )
+        stmt_list, this_provided_symbol_list = c_parser.parse_one_file(source_file_path, provided_symbol_list)
+        assert isinstance(stmt_list, list)
+        return CSourceFile(source_file_path, stmt_list, this_provided_symbol_list)

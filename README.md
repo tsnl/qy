@@ -4,6 +4,8 @@ Qy is a systems programming language that compiles to C++.
 
 In particular, it will support consuming C++ APIs.
 
+In terms of features, it is like Go with manual memory management and C++-style templates.
+
 ## Setup
 
 - Install Python 3.9
@@ -22,3 +24,8 @@ In particular, it will support consuming C++ APIs.
 ## Usage
 
 Run `./qc` to print help, and go from there (WIP).
+
+## TODO
+
+Updated grammar with...
+- changing 'const' lists

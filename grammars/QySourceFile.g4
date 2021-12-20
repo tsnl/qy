@@ -4,8 +4,7 @@ options {
     language = 'Python3';
 }
 
-fragment L: [a-z] ;
-fragment U: [A-Z] ;
+fragment L: [a-zA-Z] ;
 fragment D: [0-9] ;
 fragment H: [0-9a-fA-F] ;
 fragment ANY_ESC: (
@@ -17,8 +16,7 @@ fragment ANY_ESC: (
 fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
-TID: (U (L|U|D|'_')*) ;
-VID: ((L|'_') (L|U|D|'_')*) ;
+ID: ((L|'_') (L|D|'_')*) ;
 LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
 LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
@@ -52,17 +50,17 @@ statement
     | ret=returnStatement
     ;
 bind1vStatement
-    : 'let' name=VID '=' initializer=expression
+    : 'let' name=ID '=' initializer=expression
     ;
 bind1fStatement
-    : 'let' name=VID '(' args=csVIdList ')' '=' body_exp=expression
-    | 'let' name=VID '(' args=csVIdList ')' '{' body_block=unwrappedBlock '}'
+    : 'let' name=ID '(' args=csIdList ')' '=' body_exp=expression
+    | 'let' name=ID '(' args=csIdList ')' '{' body_block=unwrappedBlock '}'
     ;
 bind1tStatement
-    : 'let' name=TID '=' initializer=typeSpec
+    : 'let' name=ID '=' initializer=typeSpec
     ;
 type1vStatement
-    : ((is_pub='pub')|'val') name=VID ':' ts=typeSpec
+    : ((is_pub='pub')|'val') name=ID ':' ts=typeSpec
     ;
 constStatement
     : 'const' type_spec=typeSpec b=block
@@ -83,15 +81,15 @@ primaryExpression
     | litFloat                      #litFloatPrimaryExpression
     | litString                     #litStringPrimaryExpression
     | '$.prevConst'                 #prevConstPrimaryExpression
-    | id_tok=VID                    #vidPrimaryExpression
+    | id_tok=ID                     #idPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
     ;
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression
     | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
-    | made_ts=typeSpec '(' args=csExpressionList ')'        #constructorExpression
-    | container=postfixExpression '.' key=VID               #dotIdExpression
+    | 'new' made_ts=typeSpec '(' args=csExpressionList ')'  #constructorExpression
+    | container=postfixExpression '.' key=ID                #dotIdExpression
     ;
 unaryExpression
     : through=postfixExpression             #throughUnaryExpression
@@ -151,7 +149,7 @@ typeSpec
     : through=signatureTypeSpec
     ;
 primaryTypeSpec
-    : id_tok=TID
+    : id_tok=ID
     | tok='f32'
     | tok='f64'
     | tok='i64'
@@ -180,13 +178,13 @@ signatureTypeSpec
     ;
 formalArgSpec
     : ts=typeSpec
-    | name_tok=VID ':' ts=typeSpec
+    | name_tok=ID ':' ts=typeSpec
     ;
 
 litBoolean: is_true='true' | 'false';
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
 litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING))+;
-csVIdList: (ids+=VID (',' ids+=VID)*)? ;
+csIdList: (ids+=ID (',' ids+=ID)*)? ;
 csFormalArgSpecList: (specs+=formalArgSpec (',' specs+=formalArgSpec)*)? ;
 csExpressionList: (exps+=expression (',' exps+=expression)*)? ;

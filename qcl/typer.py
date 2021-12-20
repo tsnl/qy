@@ -838,11 +838,15 @@ def unify(
 
 
 def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None, opt_loc=None):
+    tab_w = 4
     msg_chunks = [f"UNIFICATION_ERROR: Cannot unify {t} and {u}"]
     if opt_more is not None:
         assert isinstance(opt_more, str)
-        msg_chunks.append(textwrap.indent(opt_more, ' '*4))
+        msg_chunks.append(textwrap.indent(opt_more, ' '*tab_w))
     
+    if isinstance(t, types.StructType) and isinstance(u, types.ProcedureType):
+        msg_chunks.append(textwrap.indent("HINT: did you miss the keyword 'new' when constructing a type?", ' '*tab_w))
+
     panic.because(
         panic.ExitCode.TyperUnificationError,
         '\n'.join(msg_chunks),

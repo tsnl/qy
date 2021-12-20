@@ -39,7 +39,8 @@ let Vec3f = struct {
 
 // function definitions:
 // NOTE: type inference fills in holes.
-let vec3f (x, y, z) = Vec3f(x, y, z);
+let vec3f (x, y, z) = 
+    new Vec3f(x, y, z);
 
 let v3f_add (v1, v2) {
     let vx = v1.x + v2.x;

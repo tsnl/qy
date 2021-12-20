@@ -65,6 +65,6 @@ let Vec2f = struct {
 let main() {
     // let v = Vec3f (1.0f, 2.0f, 3.0f);
     // let w = v3f_add(v, v);
-    let w = Vec2f(13, 0);
-    return fibonacci(i32(w.x));
+    let w = new Vec2f(13, 0);
+    return fibonacci(new i32(w.x));
 };

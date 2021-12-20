@@ -25,13 +25,14 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     #       - 'const', 'bind1f' only globally allowed
     #   - `iota` expression only allowed inside a 'const' initializer
 
-    # typing:
+    # typing native source files:
+    # TODO: expand this to also handle 'Qyx'-es
     dto_list = typer.DTOList()
     new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
     sub = typer.Substitution.empty
-    for _, _, source_file in qyp_set.iter_source_files():
+    for _, _, source_file in qyp_set.iter_native_src_paths():
         typer.seed_one_source_file(source_file, new_ctx)
-    for _, _, source_file in qyp_set.iter_source_files():
+    for _, _, source_file in qyp_set.iter_native_src_paths():
         sub = typer.model_one_source_file(source_file, dto_list, sub)
     dto_list.solve()
 
@@ -55,7 +56,7 @@ def print_qyp_set_summary(qyp_set):
     print("... Module summary:")
     for qyp_name, qyp in qyp_set.qyp_name_map.items():
         print(f"- qyp {repr(qyp_name)} @ path({repr(qyp.file_path)})")
-        for src_file in qyp.iter_src_paths():
+        for src_file in qyp.iter_native_src_paths():
             print(f"  - Qy source file @ path({repr(src_file)})")
 
 
@@ -143,6 +144,6 @@ def verbose_unify(t, u, annotation=""):
 
 def print_contexts(qyp_set):
     print("... Contexts output")
-    for _, _, source_file in qyp_set.iter_source_files():
+    for _, _, source_file in qyp_set.iter_native_src_paths():
         if source_file.wb_typer_ctx is not None:
             source_file.wb_typer_ctx.print(indent_count=1)
