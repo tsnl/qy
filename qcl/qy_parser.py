@@ -504,7 +504,11 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         if ctx.through is not None:
             return self.visit(ctx.through)
         else:
-            return ast1.PtrTypeSpec(self.loc(ctx), self.visit(ctx.pointee))
+            is_mut = {
+                "^": False,
+                "&": True
+            }[ctx.ptrChar]
+            return ast1.PtrTypeSpec(self.loc(ctx), self.visit(ctx.pointee), is_mut)
 
     def visitSignatureTypeSpec(self, ctx: antlr.QySourceFileParser.SignatureTypeSpecContext):
         if ctx.through is not None:

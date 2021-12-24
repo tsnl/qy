@@ -170,7 +170,8 @@ adtTypeSpec
     ;
 ptrTypeSpec
     : through=adtTypeSpec
-    | '&' pointee=ptrTypeSpec
+    | ptrChar='^' pointee=ptrTypeSpec
+    | ptrChar='&' pointee=ptrTypeSpec
     ;
 signatureTypeSpec
     : through=ptrTypeSpec

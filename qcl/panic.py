@@ -25,11 +25,13 @@ class ExitCode(enum.Enum):
     TyperSeedingDoubleBindError = enum.auto()
     TyperModelerUndefinedIdError = enum.auto()
     TyperModelerRedefinedIdError = enum.auto()
+    TyperModelerInvalidIdError = enum.auto()
     TyperDtoSolverStalledError = enum.auto()
     TyperDtoSolverFailedError = enum.auto()
     ScopingError = enum.auto()
     EmitterError = enum.auto()
     UnsupportedExternCFeature = enum.auto()
+    ExternCompileFailed = enum.auto()
 
 
 def because(

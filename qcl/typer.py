@@ -290,6 +290,12 @@ def help_model_one_exp(
                 f"Value identifier '{exp.name}' used, but not defined or declared",
                 opt_loc=exp.loc
             )
+        if not isinstance(found_definition, ValueDefinition):
+            panic.because(
+                panic.ExitCode.TyperModelerInvalidIdError,
+                f"ID '{exp.name}' does not refer to a value, but was used as one.",
+                opt_loc=exp.loc
+            )
         sub, id_type = found_definition.scheme.instantiate()
         return sub, id_type
     elif isinstance(exp, ast1.IntExpression):
@@ -396,6 +402,12 @@ def help_model_one_type_spec(
                 f"Undefined ID used: {ts.name}",
                 opt_loc=ts.loc
             )
+        if not isinstance(found_definition, TypeDefinition):
+            panic.because(
+                panic.ExitCode.TyperModelerInvalidIdError,
+                f"ID '{ts.name}' does not refer to a type, but was used as one.",
+                opt_loc=ts.loc
+            )
         sub, def_type = found_definition.scheme.instantiate()
         return sub, def_type
     elif isinstance(ts, ast1.ProcSignatureTypeSpec):
@@ -424,7 +436,7 @@ def help_model_one_type_spec(
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
     elif isinstance(ts, ast1.PtrTypeSpec):
         pointee_sub, pointee_type = model_one_type_spec(ctx, ts.pointee_type_spec, dto_list)
-        return pointee_sub, types.PointerType.new(pointee_type)
+        return pointee_sub, types.PointerType.new(pointee_type, ts.is_mut)
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
 
@@ -844,8 +856,8 @@ def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None,
         assert isinstance(opt_more, str)
         msg_chunks.append(textwrap.indent(opt_more, ' '*tab_w))
     
-    if isinstance(t, types.StructType) and isinstance(u, types.ProcedureType):
-        msg_chunks.append(textwrap.indent("HINT: did you miss the keyword 'new' when constructing a type?", ' '*tab_w))
+    # if isinstance(t, types.StructType) and isinstance(u, types.ProcedureType):
+    #     msg_chunks.append(textwrap.indent("HINT: did you miss the keyword 'new' when constructing a type?", ' '*tab_w))
 
     panic.because(
         panic.ExitCode.TyperUnificationError,
@@ -1091,10 +1103,13 @@ class Substitution(object):
         
         # Composite types: map rewrite on each component
         if isinstance(t, types.BaseCompositeType):
-            return t.copy_with_elements([
+            rt = t.copy_with_elements([
                 (element_name, self._rewrite_type(element_type, rw_in_progress_pair_list))
                 for element_name, element_type in t.fields
             ])
+            if isinstance(t, types.PointerType):
+                rt.contents_is_mut = t.contents_is_mut
+            return rt
         
         # Otherwise, just return the type as is:
         assert t.is_atomic or t.is_var

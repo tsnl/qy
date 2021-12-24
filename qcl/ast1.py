@@ -309,6 +309,28 @@ class BuiltinPrimitiveTypeSpec(BaseTypeSpec):
         super().__init__(loc)
         self.identity = identity
 
+    @property
+    def is_unsigned_int(self) -> bool:
+        return self.identity in {
+            BuiltinPrimitiveTypeIdentity.UInt8,
+            BuiltinPrimitiveTypeIdentity.UInt16,
+            BuiltinPrimitiveTypeIdentity.UInt32,
+            BuiltinPrimitiveTypeIdentity.UInt64
+        }
+
+    @property
+    def int_width_in_bits(self) -> t.Optional[int]:
+        return {
+            BuiltinPrimitiveTypeIdentity.Int8: 8,
+            BuiltinPrimitiveTypeIdentity.Int16: 16,
+            BuiltinPrimitiveTypeIdentity.Int32: 32,
+            BuiltinPrimitiveTypeIdentity.Int64: 64,
+            BuiltinPrimitiveTypeIdentity.UInt8: 8,
+            BuiltinPrimitiveTypeIdentity.UInt16: 16,
+            BuiltinPrimitiveTypeIdentity.UInt32: 32,
+            BuiltinPrimitiveTypeIdentity.UInt64: 64
+        }.get(self.identity, None)
+
 
 class AdtTypeSpec(BaseTypeSpec):
     def __init__(self, loc: fb.ILoc, linear_op: LinearTypeOp, args: t.List[t.Tuple[OptStr, BaseTypeSpec]]):
@@ -323,9 +345,10 @@ class AdtTypeSpec(BaseTypeSpec):
 
 
 class PtrTypeSpec(BaseTypeSpec):
-    def __init__(self, loc: fb.ILoc, pointee_type_spec: BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, pointee_type_spec: BaseTypeSpec, is_mut: bool):
         super().__init__(loc)
         self.pointee_type_spec = pointee_type_spec
+        self.is_mut = is_mut
 
 
 class ProcSignatureTypeSpec(BaseTypeSpec):

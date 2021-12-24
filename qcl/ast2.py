@@ -368,6 +368,8 @@ class CQyx_v1(BaseQyx):
         
         c_source_files = []
         src_path_list = []
+
+        # loading headers:
         for index, include_obj in enumerate(binder_includes_args_obj):
             include_path = include_obj["path"]
             CQyx_v1.check_obj_is_str_else_panic(f"binder-includes[{index}].path", include_path, path_to_root_qyx_file)
@@ -376,7 +378,7 @@ class CQyx_v1(BaseQyx):
             abs_include_path = include_path if os.path.isabs(include_path) else os.path.join(qyx_dir_path, include_path)
             other_abs_file_paths = []   # TODO: all '.c', '.a' files here.
             
-            c_source_files.append(CSourceFile.load(abs_include_path, provided_symbol_list))
+            c_source_files.append(CSourceFile.load(abs_include_path, provided_symbol_list, True))
             
             src_path_list.append(abs_include_path)
             src_path_list += other_abs_file_paths
@@ -384,7 +386,7 @@ class CQyx_v1(BaseQyx):
         # checking that all symbols claimed to be provided in the JSON were found:
         all_provided_symbols = functools.reduce(
             lambda a, b: a | b, 
-            (set(csf.this_file_provided_symbol_list) for csf in c_source_files)
+            (set(csf.this_file_provided_symbol_set) for csf in c_source_files)
         )
         missing_symbols = set(provided_symbol_list) - all_provided_symbols
         if missing_symbols:
@@ -554,13 +556,15 @@ class CSourceFile(BaseSourceFile):
         self, 
         source_file_path: str, 
         stmt_list: t.List[ast1.BaseStatement],
-        this_file_provided_symbol_list: t.List[str]
+        this_file_provided_symbol_set: t.Set[str],
+        is_header
     ) -> None:
         super().__init__(source_file_path, stmt_list)
-        self.this_file_provided_symbol_list = this_file_provided_symbol_list
+        self.this_file_provided_symbol_set = this_file_provided_symbol_set
+        self.is_header = is_header
 
     @staticmethod
-    def load(source_file_path: str, provided_symbol_list: t.List[str]) -> "CSourceFile":
+    def load(source_file_path: str, provided_symbol_list: t.List[str], is_header) -> "CSourceFile":
         if not source_file_path.endswith(config.C_HEADER_FILE_EXTENSION):
             panic.because(
                 panic.ExitCode.BadProjectFile,
@@ -573,6 +577,6 @@ class CSourceFile(BaseSourceFile):
                 "source file path does not refer to an existing file:",
                 source_file_path
             )
-        stmt_list, this_provided_symbol_list = c_parser.parse_one_file(source_file_path, provided_symbol_list)
+        stmt_list, this_provided_symbol_set = c_parser.parse_one_file(source_file_path, set(provided_symbol_list), is_header)
         assert isinstance(stmt_list, list)
-        return CSourceFile(source_file_path, stmt_list, this_provided_symbol_list)
+        return CSourceFile(source_file_path, stmt_list, this_provided_symbol_set, is_header)

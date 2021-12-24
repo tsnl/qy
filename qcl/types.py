@@ -199,7 +199,7 @@ class BaseCompositeType(BaseConcreteType):
     IMPORTANT: subclasses must preserve the same '__init__' signature.
     """
 
-    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None) -> None:
+    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None, contents_is_mut=None) -> None:
         assert isinstance(fields, list)
         assert ((isinstance(field_name, str) and isinstance(field_type, BaseType) for field_name, field_type in fields))
 
@@ -214,6 +214,7 @@ class BaseCompositeType(BaseConcreteType):
         assert all((isinstance(t, BaseType) for t in self.field_types))
         assert all((isinstance(n, str) for n in self.field_names))
         self.opt_name = opt_name
+        self.contents_is_mut = contents_is_mut
 
     def copy_with_elements(self, new_elements: t.List[BaseType]) -> "BaseCompositeType":
         return self.__class__(new_elements)
@@ -240,11 +241,12 @@ class PointerType(BaseCompositeType):
         return self.field_types[0]
 
     def __str__(self) -> str:
-        return f"&{self.pointee_type}"
+        ptr_char = '&' if self.contents_is_mut else '^'
+        return ptr_char + str(self.pointee_type)
 
     @staticmethod
-    def new(pointee_type: BaseConcreteType):
-        return PointerType([('pointee', pointee_type)])
+    def new(pointee_type: BaseConcreteType, is_mut: bool):
+        return PointerType([('pointee', pointee_type)], contents_is_mut=is_mut)
 
     @classmethod
     def kind(cls):
