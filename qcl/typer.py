@@ -1142,13 +1142,22 @@ class Substitution(object):
         
         # Composite types: map rewrite on each component
         if isinstance(t, types.BaseCompositeType):
-            rt = t.copy_with_elements([
-                (element_name, self._rewrite_type(element_type, rw_in_progress_pair_list))
-                for element_name, element_type in t.fields
-            ])
-            if isinstance(t, types.PointerType):
-                rt.contents_is_mut = t.contents_is_mut
-            return rt
+            rt_is_t = False
+            new_fields = []
+            for element_name, element_type in t.fields:
+                rt_field_type = self._rewrite_type(element_type, rw_in_progress_pair_list)
+                new_field = (element_name, rt_field_type)
+                new_fields.append(new_field)
+                rt_is_t |= rt_field_type is not element_type
+            if rt_is_t:
+                rt = t.copy_with_elements(new_fields)
+                if isinstance(t, types.PointerType):
+                    rt.contents_is_mut = t.contents_is_mut
+                elif isinstance(t, types.ProcedureType):
+                    rt.is_c_variadic = t.is_c_variadic
+                return rt
+            else:
+                return t
         
         # Otherwise, just return the type as is:
         assert t.is_atomic or t.is_var

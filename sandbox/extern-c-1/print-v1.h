@@ -10,14 +10,14 @@
 
 struct File;
 
-// enum FileAccess {
-//     FILE_ACCESS__READ,
-//     FILE_ACCESS__WRITE
-// };
-// enum FileType {
-//     FILE_TYPE__TEXT,
-//     FILE_TYPE__BINARY
-// };
+enum FileAccess {
+    FILE_ACCESS__READ,
+    FILE_ACCESS__WRITE
+};
+enum FileType {
+    FILE_TYPE__TEXT,
+    FILE_TYPE__BINARY
+};
 
 File* stdout;
 File* stderr;
