@@ -3,6 +3,8 @@ import os.path
 import typing as t
 import argparse
 import enum
+import cProfile as profile
+import pstats
 
 import qcl
 
@@ -26,9 +28,18 @@ def main():
     return 0
 
 
-def main_wrapper():
+def main_wrapper(profiling=False):
     try:
-        return main()
+        if profiling:
+            with profile.Profile() as pr:
+                ec = main()
+
+            ps = pstats.Stats(pr)
+            ps.dump_stats("qc_profile_data.pstats")
+            return ec
+        else:
+            return main()
+        
     except qcl.panic.PanicException as exc:
         return exc.exit_code.value
 

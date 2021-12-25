@@ -54,7 +54,7 @@ class Emitter(base_emitter.BaseEmitter):
     #
 
     def emit_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp):
-        for src_file_path, src_obj in qyp.qy_src_map.items():
+        for src_file_path, src_obj in qyp.src_map.items():
             self.collect_pub_named_types(src_obj.stmt_list)
 
         # emit type definitions in a file unique to this type
@@ -182,7 +182,7 @@ class Emitter(base_emitter.BaseEmitter):
         
         print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
         
-        for src_file_path, src_obj in qyp.qy_src_map.items():
+        for src_file_path, src_obj in qyp.src_map.items():
             assert isinstance(src_obj, ast2.QySourceFile)
             for stmt in src_obj.stmt_list:
                 self.emit_module_body_stmt(cpp_file, hpp_file, stmt, is_top_level=True)

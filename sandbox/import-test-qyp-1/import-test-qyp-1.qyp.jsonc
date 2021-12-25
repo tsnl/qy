@@ -2,5 +2,7 @@
     "name": "import-test-1",
     "author": "https://github.com/tsnl",
     "help": "A helper module for `sandbox`.",
-    "src": []
+    "src": [
+        "hello.qy"
+    ]
 }

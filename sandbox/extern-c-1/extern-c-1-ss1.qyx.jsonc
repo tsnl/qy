@@ -1,0 +1,13 @@
+{
+    "name": "extern-c-1",
+    "author": "https://github.com/tsnl",
+    "help": "A Qy extension package: allow the user to link to code in a different language.",
+    "binder": "c-v1",
+    "cc-args": {
+        "*": {
+            "c-flags": ["-Wall"],
+            "sources": ["./print-v1.c"],
+            "headers": [{"path": "print-v1.h", "provides": ["File", "stdout", "printUtf8Char", "openFile", "closeFile"]}]
+        }
+    }
+}

@@ -210,7 +210,11 @@ class BaseCompositeType(BaseConcreteType):
             self.field_names = [singleton_field_name]
             self.field_types = [singleton_field_type]
         else:
-            self.field_names, self.field_types = zip(*self.fields)
+            if self.fields:
+                self.field_names, self.field_types = zip(*self.fields)
+            else:
+                self.field_names = []
+                self.field_types = []
         assert all((isinstance(t, BaseType) for t in self.field_types))
         assert all((isinstance(n, str) for n in self.field_names))
         self.opt_name = opt_name
@@ -254,6 +258,10 @@ class PointerType(BaseCompositeType):
 
 
 class ProcedureType(BaseCompositeType):
+    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None, contents_is_mut=None) -> None:
+        super().__init__(fields, opt_name=opt_name, contents_is_mut=contents_is_mut)
+        self.is_c_variadic = None
+    
     @property
     def ret_type(self):
         _, ret_type = self.fields[0]
@@ -278,11 +286,17 @@ class ProcedureType(BaseCompositeType):
         return f"({','.join(map(str, self.arg_types))})=>{self.ret_type}"
 
     @staticmethod
-    def new(arg_types: t.Iterable[BaseConcreteType], ret_type: BaseConcreteType) -> "ProcedureType":
-        return ProcedureType(
+    def new(
+        arg_types: t.Iterable[BaseConcreteType], 
+        ret_type: BaseConcreteType, 
+        is_c_variadic=False
+    ) -> "ProcedureType":
+        pt = ProcedureType(
             [('ret_type', ret_type)] +
             [(f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types)]
         )
+        pt.is_c_variadic = is_c_variadic
+        return pt
 
     @classmethod
     def kind(cls):

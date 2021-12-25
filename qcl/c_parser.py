@@ -29,6 +29,7 @@ import clang.cindex
 from . import ast1
 from . import panic
 from . import feedback
+from . import types
 
 index = clang.cindex.Index.create()
 CursorKind = clang.cindex.CursorKind
@@ -40,7 +41,7 @@ def parse_one_file(source_file_path, rem_provided_symbols: t.Set[str], is_header
         source_file_path,
         # options=clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
     )
-    print(f"Parsed C TranslationUnit (TU): {tu.spelling}")
+    print(f"INFO: Parsed C TranslationUnit (TU): {tu.spelling}")
     dbg_print_visit(tu, tu.cursor)
 
     all_provided_symbols = set(rem_provided_symbols)
@@ -73,6 +74,8 @@ def translate_tu_top_level_stmt(tu, node, rem_provided_symbols) -> t.Iterable[as
         yield from translate_enum_decl(tu, node, rem_provided_symbols)
     elif node.kind == CursorKind.FUNCTION_DECL:
         yield from translate_function_decl(tu, node, rem_provided_symbols)
+    elif node.kind == CursorKind.VAR_DECL:
+        yield from translate_variable_decl(tu, node, rem_provided_symbols)
 
     else:
         # ignore this statement
@@ -101,14 +104,8 @@ def translate_adt_decl(tu, node, rem_provided_symbols):
     adt_name = node.spelling
     if adt_name in rem_provided_symbols:
         rem_provided_symbols.remove(adt_name)
-        adt_ts = ast1.AdtTypeSpec(
-            loc(node),
-            lto_map[node.kind],
-            [
-                (field_node.spelling, translate_adt_field_decl_to_ts(tu, field_node, rem_provided_symbols))
-                for field_node in node.get_children()
-            ]
-        )
+        adt_ts = translate_clang_type_to_ts(node.type, is_direct_use=False)
+        assert adt_ts.opt_externally_forced_type is not None
         yield ast1.Bind1tStatement(loc(node), adt_name, adt_ts)
 
 
@@ -141,17 +138,32 @@ def translate_adt_field_decl_to_ts(tu, node, rem_provided_symbols):
 
 def translate_function_decl(tu, node, rem_provided_symbols):
     func_name = node.spelling
-    func_ret_type = node.type.get_result()
-    func_arg_types = node.type.argument_types()
-    func_arg_names = map(lambda x: x.spelling, node.get_arguments())
-    func_args = zip(func_arg_names, func_arg_types)
     if func_name in rem_provided_symbols:
         rem_provided_symbols.remove(func_name)
-        fn_str = func_ret_type.spelling + "(*)" + "(" + ', '.join((t.spelling for n, t in func_args)) + ")"
-        raise NotImplementedError(f"Translating a function forward declaration: {fn_str}")
-        # print()
+        clang_func_ret_type = node.type.get_result()
+        arg_names = [arg_node.spelling for arg_node in node.get_arguments()]
+        arg_typespecs = [
+            translate_clang_type_to_ts(clang_arg_type, False) 
+            for clang_arg_type in node.type.argument_types()
+        ]
+        ret_ts = translate_clang_type_to_ts(node.type.get_result())
+        fn_str = (
+            clang_func_ret_type.spelling + " " + 
+            node.spelling + 
+            "(" + ', '.join((t.spelling for t in node.type.argument_types())) + ")"
+        )
+        yield ast1.Extern1fStatement(loc(node), func_name, arg_names, arg_typespecs, ret_ts, fn_str)
+        
     # exit()
-    return iter(())
+
+
+def translate_variable_decl(tu, node, rem_provided_symbols):
+    var_name = node.spelling
+    if var_name in rem_provided_symbols:
+        rem_provided_symbols.remove(var_name)
+        var_ts = translate_clang_type_to_ts(node.type, True)
+        var_str = node.type.spelling + " " + node.spelling
+        yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str)
 
 
 def loc(node):
@@ -178,6 +190,11 @@ def dbg_print_visit(tu, node, indent_count=1, tab_w=2):
             tags.append("struct_decl")
         elif node.kind == CursorKind.ENUM_DECL:
             tags.append("enum_decl")
+        elif node.kind == CursorKind.VAR_DECL:
+            tags.append("var_decl")
+        else:
+            # raise NotImplementedError(f"CQyx: Unknown declaration: {node.kind}")
+            pass
     if node.kind.is_expression():
         tags.append("is_expression")
     if node.kind.is_statement():
@@ -208,11 +225,10 @@ def dbg_print_visit(tu, node, indent_count=1, tab_w=2):
         dbg_print_visit(tu, child, 1 + indent_count)
 
 
-def translate_clang_type_to_ts(c_type):
+def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
     c_type = c_type.get_canonical()
     size_in_bytes = c_type.get_size()
-    is_const_qualified = c_type.is_const_qualified()
-    if size_in_bytes <= 0:
+    if is_direct_use and size_in_bytes <= 0 and c_type.kind != TypeKind.VOID:
         # error: indirect type def used directly
         panic.because(
             panic.ExitCode.ExternCompileFailed,
@@ -221,11 +237,13 @@ def translate_clang_type_to_ts(c_type):
         )
 
     if c_type.kind == TypeKind.VOID:
-        return ast1.BuiltinPrimitiveTypeSpec(ast1.BuiltinPrimitiveTypeIdentity.Void)
+        ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Void)
+        ts.opt_externally_forced_type = types.VoidType.singleton
+        return ts
     elif c_type.kind == TypeKind.BOOL:
-        return ast1.BuiltinPrimitiveTypeSpec(ast1.BuiltinPrimitiveTypeIdentity.Bool)
-    elif c_type.kind == TypeKind.CHAR_S:
-        return ast1.BuiltinPrimitiveTypeSpec(ast1.BuiltinPrimitiveTypeIdentity.Int8)
+        ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Bool)
+        ts.opt_externally_forced_type = types.IntType.get(8, is_signed=False)
+        return ts
     elif c_type.kind in (TypeKind.CHAR_S, TypeKind.INT, TypeKind.LONG, TypeKind.LONGLONG):
         builtin_primitive_type_id = {
             1: ast1.BuiltinPrimitiveTypeIdentity.Int8,
@@ -233,7 +251,9 @@ def translate_clang_type_to_ts(c_type):
             4: ast1.BuiltinPrimitiveTypeIdentity.Int32,
             8: ast1.BuiltinPrimitiveTypeIdentity.Int64
         }[size_in_bytes]
-        return ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts.opt_externally_forced_type = types.IntType.get(8 * size_in_bytes, is_signed=True)
+        return ts
     elif c_type.kind in (TypeKind.UCHAR, TypeKind.UINT, TypeKind.ULONG, TypeKind.ULONGLONG):
         builtin_primitive_type_id = {
             1: ast1.BuiltinPrimitiveTypeIdentity.UInt8,
@@ -241,41 +261,66 @@ def translate_clang_type_to_ts(c_type):
             4: ast1.BuiltinPrimitiveTypeIdentity.UInt32,
             8: ast1.BuiltinPrimitiveTypeIdentity.UInt64
         }[size_in_bytes]
-        return ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts.opt_externally_forced_type = types.IntType.get(8 * size_in_bytes, is_signed=False)
+        return ts
     elif c_type.kind in (TypeKind.FLOAT, TypeKind.DOUBLE):
         builtin_primitive_type_id = {
             4: ast1.BuiltinPrimitiveTypeIdentity.Float32,
             8: ast1.BuiltinPrimitiveTypeIdentity.Float64
         }[size_in_bytes]
-        return ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
+        ts.opt_externally_forced_type = types.FloatType(8 * size_in_bytes)
+        return ts
     elif c_type.kind == TypeKind.RECORD:
         # struct or union: must recurse
         declaration = c_type.get_declaration()
-        fields = [(it.spelling, translate_clang_type_to_ts(it.type)) for it in c_type.get_fields()]
-        return ast1.AdtTypeSpec(
-            c_type_loc(c_type),
-            lto_map[declaration.kind],
-            fields    
-        )
+        type_name = declaration.spelling
+        opt_cached_ts = declaration_cache_map.get(type_name, None)
+        type_ctor = {
+            ast1.LinearTypeOp.Product: types.StructType,
+            ast1.LinearTypeOp.Sum: types.UnionType
+        }[lto_map[declaration.kind]]
+        if opt_cached_ts is not None:
+            assert opt_cached_ts.opt_externally_forced_type is not None
+            ts = ast1.IdRefTypeSpec(c_type_loc(c_type), type_name)
+            ts.opt_externally_forced_type = opt_cached_ts.opt_externally_forced_type
+            return ts
+        else:
+            fields = [(it.spelling, translate_clang_type_to_ts(it.type)) for it in c_type.get_fields()]
+            ts = ast1.AdtTypeSpec(c_type_loc(c_type), lto_map[declaration.kind], fields)
+            ts.opt_externally_forced_type = type_ctor(
+                [
+                    (field_name, field_ts.opt_externally_forced_type)
+                    for field_name, field_ts in fields
+                ],
+                opt_name=type_name
+            )
+            declaration_cache_map[type_name] = ts
+            return ts
     elif c_type.kind == TypeKind.POINTER:
-        pointee_ts = translate_clang_type_to_ts(c_type.get_pointee())
-        contents_is_mut = not pointee_ts.is_const_qualified()
-        return ast1.PtrTypeSpec(
-            c_type_loc(c_type),
-            pointee_ts,
-            contents_is_mut
-        )
+        clang_pointee_ts = c_type.get_pointee()
+        pointee_ts = translate_clang_type_to_ts(clang_pointee_ts, False)
+        contents_is_mut = not clang_pointee_ts.is_const_qualified()
+        ts = ast1.PtrTypeSpec(c_type_loc(c_type), pointee_ts, contents_is_mut)
+        ts.opt_externally_forced_type = types.PointerType.new(pointee_ts.opt_externally_forced_type, contents_is_mut)
+        return ts
     elif c_type.kind == TypeKind.ENUM:
-        return translate_clang_type_to_ts(c_type.get_declaration().enum_type)
+        ts = translate_clang_type_to_ts(c_type.get_declaration().enum_type)
+        assert ts.opt_externally_forced_type is not None
+        return ts
     elif c_type.kind == TypeKind.FUNCTIONPROTO:
         args = [(None, translate_clang_type_to_ts(arg_type)) for arg_type in c_type.argument_types()]
         ret_ts = translate_clang_type_to_ts(c_type.get_result())
         is_func_variadic = c_type.is_function_variadic()
+        if is_func_variadic:
+            raise NotImplementedError("Exposing variadic function type.")
         return ast1.ProcSignatureTypeSpec(c_type_loc(c_type), args, ret_ts)
     else:
         raise NotImplementedError(f"Unknown Clang canonical type kind for type: '{c_type.spelling}'")
 
 
+declaration_cache_map = {}
 lto_map = {
     CursorKind.STRUCT_DECL: ast1.LinearTypeOp.Product,
     CursorKind.UNION_DECL: ast1.LinearTypeOp.Sum

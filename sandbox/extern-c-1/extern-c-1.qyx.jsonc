@@ -3,35 +3,33 @@
     "author": "https://github.com/tsnl",
     "help": "A Qy extension package: allow the user to link to code in a different language.",
     "binder": "c-v1",
-    "binder-includes": [
-        {
-            "path": "print-v1.h",
-            "provides": [
-                "File", "FileAccess", "FileType",
-                "printUtf8Char",
-                "openFile", "closeFile",
-                "readCharFromFile"
-            ]
-        }
-    ],
-    "c-compiler-args": {
+    "cc-args": {
         "*": {
-            "include-dirs": [
-                "./"
-            ],
-            "flags": [
+            "c-flags": [
                 "-Wall"
             ],
             "sources": [
                 "./print-v1.c"
+            ],
+            "headers": [
+                {"path": "print-v1.h", "provides": [
+                    "File", "FileAccess", "FileType",
+                    "printUtf8Char",
+                    "openFile", "closeFile",
+                    "readCharFromFile",
+                    "stdout", "stderr"
+                ]}
             ]
         },
         
         // each of the above objects can be extended on a per-platform basis.
         // based on VCPKG triplets, but just two components since everything is 'dynamic' by default.
-        "macos-x64": {},
-        "windows-x32": {},
-        "windows-x64": {},
-        "emscripten-wasm32": {}
+        "macos-amd64": {},
+        "windows-x86": {},
+        "windows-amd64": {},
+        "wasm32": {},
+        "linux-amd64": {},
+        "macos-arm64": {}
+        // ... and more
     }
 }

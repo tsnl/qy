@@ -8,6 +8,7 @@ from . import typer
 from . import cpp_emitter
 from . import base_emitter
 from . import types
+from . import platform
 from . import main
 
 
@@ -15,7 +16,12 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     assert isinstance(path_to_input_root_qyp_file, str)
     assert isinstance(emitter, base_emitter.BaseEmitter)
 
-    qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file)
+    # TODO: auto-detect target platform
+    target_platform = platform.core_linux_amd64
+    target_platform = platform.core_windows_amd64
+    target_platform = platform.core_macos_amd64
+
+    qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file, target_platform)
     
     # basic checks
 
@@ -30,9 +36,9 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     dto_list = typer.DTOList()
     new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
     sub = typer.Substitution.empty
-    for _, _, source_file in qyp_set.iter_native_src_paths():
+    for _, _, source_file in qyp_set.iter_src_paths():
         typer.seed_one_source_file(source_file, new_ctx)
-    for _, _, source_file in qyp_set.iter_native_src_paths():
+    for _, _, source_file in qyp_set.iter_src_paths():
         sub = typer.model_one_source_file(source_file, dto_list, sub)
     dto_list.solve()
 
@@ -144,6 +150,6 @@ def verbose_unify(t, u, annotation=""):
 
 def print_contexts(qyp_set):
     print("... Contexts output")
-    for _, _, source_file in qyp_set.iter_native_src_paths():
+    for _, _, source_file in qyp_set.iter_src_paths():
         if source_file.wb_typer_ctx is not None:
             source_file.wb_typer_ctx.print(indent_count=1)

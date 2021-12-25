@@ -17,7 +17,11 @@ from . import ast2
 # source file typing: part 1: seeding
 #
 
-def seed_one_source_file(sf: ast2.QySourceFile, new_ctx):
+def seed_one_source_file(sf: ast2.BaseSourceFile, new_ctx):
+    seed_one_source_file(sf)
+
+
+def seed_one_source_file(sf: ast2.BaseSourceFile, new_ctx):
     """
     defines global symbols in a context using free variables, then sets it on `x_typer_ctx`
     """
@@ -35,22 +39,38 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
     
     new_definition = None
     if isinstance(stmt, ast1.Bind1vStatement):
+        extern_tag = None
+        if isinstance(stmt, ast1.Extern1vStatement):
+            extern_tag = "c"
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name, 
-            Scheme([], types.VarType(f"bind1v_{stmt.name}"))
+            Scheme([], types.VarType(f"bind1v_{stmt.name}")),
+            extern_tag=extern_tag
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
+        extern_tag = None
+        if isinstance(stmt, ast1.Extern1fStatement):
+            extern_tag = "c"
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            Scheme([], types.VarType(f"bind1f_{stmt.name}"))
+            Scheme([], types.VarType(f"bind1f_{stmt.name}")),
+            extern_tag=extern_tag
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
+        if stmt.initializer is not None and stmt.initializer.opt_externally_forced_type is not None:
+            extern_tag = "c"
+            bound_type = stmt.initializer.opt_externally_forced_type
+        else:
+            extern_tag = None
+            bound_type = types.VarType(f"bind1t_{stmt.name}")
+
         new_definition = TypeDefinition(
             stmt.loc,
             stmt.name,
-            Scheme([], types.VarType(f"bind1t_{stmt.name}"))
+            Scheme([], bound_type),
+            extern_tag=extern_tag
         )
     
     if new_definition is not None:
@@ -107,7 +127,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
 #
 
 def model_one_source_file(
-    sf: ast2.QySourceFile, dto_list: "DTOList", 
+    sf: ast2.BaseSourceFile, dto_list: "DTOList", 
     sub: t.Optional["Substitution"]
 ) -> "Substitution":
     sf_top_level_context = sf.wb_typer_ctx
@@ -165,7 +185,10 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
     stmt.wb_ctx = ctx
 
     if isinstance(stmt, ast1.Bind1vStatement):
-        exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
+        if isinstance(stmt, ast1.Extern1vStatement):
+            exp_sub, exp_type = model_one_type_spec(ctx, stmt.var_type_spec, dto_list)
+        else:
+            exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
         if ctx.kind == ContextKind.TopLevelOfQypSet:
             # definition is already seeded-- just retrieve and unify.
             definition = ctx.symbol_table[stmt.name]
@@ -191,12 +214,24 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
                 def_sub, def_type = definition.scheme.instantiate()
                 return def_sub
     elif isinstance(stmt, ast1.Bind1fStatement):
-        arg_type_list = [
-            types.VarType(f"arg{arg_index}:{arg_name}")
-            for arg_index, arg_name in enumerate(stmt.args)
-        ]
-        arg_name_type_list = list(zip(stmt.args, arg_type_list))
-        ret_sub, ret_type = model_one_block_in_function(ctx, arg_name_type_list, stmt.body, dto_list)
+        args_sub = Substitution.empty
+        if isinstance(stmt, ast1.Extern1fStatement):
+            assert stmt.ret_typespec.opt_externally_forced_type is not None
+            ret_sub, ret_type = model_one_type_spec(ctx, stmt.ret_typespec, dto_list)
+            arg_type_list = []
+            for arg_ts in stmt.arg_typespecs:
+                assert arg_ts.opt_externally_forced_type is not None
+                arg_ts_sub, arg_type = model_one_type_spec(ctx, arg_ts, dto_list)
+
+                args_sub = arg_ts_sub.compose(args_sub)
+                arg_type_list.append(arg_type)
+        else:
+            arg_type_list = [
+                types.VarType(f"arg{arg_index}:{arg_name}")
+                for arg_index, arg_name in enumerate(stmt.args)
+            ]
+            arg_name_type_list = list(zip(stmt.args, arg_type_list))
+            ret_sub, ret_type = model_one_block_in_function(ctx, arg_name_type_list, stmt.body, dto_list)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
         last_sub = def_sub.compose(ret_sub)
@@ -367,10 +402,14 @@ def model_one_type_spec(
     ts: "ast1.BaseTypeSpec", 
     dto_list: "DTOList"
 ) -> t.Tuple["Substitution", types.BaseType]:
-    ts.wb_ctx = ctx
-    ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
-    ts.wb_type = ts_type
-    return ts_sub, ts_sub.rewrite_type(ts_type)
+    if ts.opt_externally_forced_type is not None:
+        assert isinstance(ts.opt_externally_forced_type, types.BaseType)
+        return Substitution.empty, ts.opt_externally_forced_type
+    else:
+        ts.wb_ctx = ctx
+        ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
+        ts.wb_type = ts_type
+        return ts_sub, ts_sub.rewrite_type(ts_type)
 
 
 def help_model_one_type_spec(
@@ -972,12 +1011,13 @@ Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
 #
 
 class BaseDefinition(object, metaclass=abc.ABCMeta):
-    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme") -> None:
+    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme", extern_tag=None) -> None:
         super().__init__()
         self.loc = loc
         self.name = name
         self.scheme = scm
         self.bound_in_ctx = None
+        self.extern_tag = extern_tag
 
     @property
     def is_value_definition(self):
@@ -998,8 +1038,7 @@ class ValueDefinition(BaseDefinition):
         
 
 class TypeDefinition(BaseDefinition):
-    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme") -> None:
-        super().__init__(loc, name, scm)
+    pass
 
 
 #
