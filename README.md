@@ -1,58 +1,92 @@
-# Qy v4
+# `Q4` - Version 4 of the Qy Programming Language
 
-Qy v4 is a high level, manifestly typed, object-oriented, systems programming language.
+(WIP)
 
-Despite its manifest typing, writing code in Qy is more similar to writing code in Java or Python than C++, without any significant performance degradation.
+Q4 is a systems programming language that feels like Python.
 
-It can easily be interpreted or compiled, compiles quickly, and easily supports high-level concepts like reflection, iterative compilation, compile-time evaluation, refined types, persistent variables, and more over time.
+If we think of compilers as accepting scripts that program them to produce certain output, then this script is purely declarative for all existing programming languages.
 
-## Language Description
+Instead, Q4 uses an imperative scripting environment, and exploits the fact that iteratively JIT-ing each statement and linking into a larger accumulated object produces the desired compiled output within a closure.
 
-### USER MODEL
+Q4c compiles code in a single pass, loading and executing each statement iteratively just in time.
+During this loading process, any statement may invoke any prior statement (at compile-time) to compute results to integrate into the next statement.
+Combined with boxing and type inference, this produces a manifestly-typed language with a dynamic feel, since the user can evaluate and instantiate anything anywhere.
 
-To the end user, Qy is an interpreted front-end to describe how the compiler will work.
+Message passing is a key feature of this language. It allows...
+-   user-programmable manual memory management: define 'heap' objects as an interface to raw memory: implement your own collectors to work with a managed heap.
+-   complex metatyping: since types are first-class objects, it should be possible to define complex data-types and perform/embed refinement checks 
+    -   iterative compilation clearly communicates where the compiler will interpose on user flow (between statements)
+    -   first-class types allow the user to specify messages that are invoked during type-checks at compile-time
+    -   first-class everything allows the compiler to easily interface with the heap and read existing functions, values, etc.
+-   elegant compile-time evaluation
+    -   (Motivating backstory + comparison to C++ constexpr evaluation)
+    
+        In Qy-v1 (haha), I developed a sophisticated compile-time execution mechanism that allowed arbitrary expressions to be evaluated at compile time.
 
-In Qy, all data-types are either primitives (e.g. int, float, pointers, etc) or objects (always referenced by pointers). 
-Furthermore, all pointers are guaranteed to be of the same size.
-Note that types are first-class objects.
+        I was dissatisfied with its abilities, because like C++, it could only evaluate `constexpr` statements, and for good reason: the heap is frozen during compile-time evaluation because the heap does not exist yet.
 
-The Qy static type system is exceedingly simple, checking that only primitive types line up:
-all 'refined' type checking based on the contents of pointers is pushed into user space.
+        However, such compile-time evaluation was required to specify inputs to templates, a key feature of metaprogramming.
 
-Given a script, Qy sequentially executes each line, such that
--   single pass: the compiler/interpreter is strictly sequential
--   function definitions: generate LLVM bitcode as we process the definition
--   type definitions: generate LLVM bitcode as we process the definition
--   NOTE: types and functions may also be exported within function bodies: compiling these will be a challenge.
+        This meant that much of the language tended toward a functional style, devoid of side-effects.
 
-Supporting these features are two more ideas:
--   object-based semantics: the user can only define methods on boxed datatypes, be they sealed classes or interfaces with typed hole-methods.
+        Unfortunately, this **prevented me from solving my real-world issues** related to pre-processing data files during compile-time: wouldn't it be best if
+        we could parse data files into optimized blobs during compile-time?
 
-    This facilitates message passing, polymorphism, `const` tagging, etc.
+        **This approach overcomes these issues in the following ways...** 
+    
+    -   templates are now powered by a full-fledged runtime, using imperative, stateful calculations.
 
--   metatyping: types are just constructor objects that use more primitive constructor objects.
+    -   this permits **arbitrary compile-time evaluation and the creation of rich data-structures in a way that is simplest for the user.**
 
-    In other words, types are just weird 'allocator' instances that expose ways for the compiler to query about a (static?) layout.
+        In interpreted mode, a 'main' callback defined by the user is invoked immediately after compiling/evaluating each statement.
+        After compiling/evaluating each statement, the source code is frozen, and no more computation can occur unless we invoke a function, so we can compile any loaded functions into an executable, confident that any future function calls will be within a closure ball covered by this executable.
 
-Thus, while traditional programming languages (like C, C++, Java) can be thought of as providing
-a declarative scripting interface to a compiler, we provide an imperative one.
+        When the program is compiled to an executable, we 'freeze' the state immediately before calling 'main', saving it to an executable file.
 
-### COMPILER MODEL
+        Thus, a programmer may treat any code evaluated during load-time as 'compile-time' evaluation, and any code invoked from a bound entry point as
+        'run-time' evaluation.
 
-In reality, we don't interpret code at all, but rather compile it to machine code along with an embedded runtime library.
--   the TAILS experiment highlighted how all ADTs and their associated type information can be computed computed, stored, and distributed at run-time.
--   if we enforce a single-pass restriction, we can compute these results at run-time, and then use them to generate all future assembly at a quality level matching statically compiled programming languages.
--   this compiler interface can eventually become the heart of arbitrarily many DSLs powered by macros.
--   can use shadowing, forward declarations, and more to convert interpreted code into compiled code.
--   we perform static type verification based on type information available at the start of each statement.
+See [doc/001.Manual.md](/doc/001.Manual.md) for notes about the language.
 
-    we can use similar closure verification to even generate template instantiations.
+## Build Instructions
 
-Implementation-wise, this means switching to a statement-by-statement compilation model with the ability to evaluate/call into already compiled code. Maybe LLVM ORC is the way?
+-   Requirements:
+    -   (On Linux) install these packages (for Ubuntu): `pkg-config`, `uuid-dev`
+    -   CMake + a CMake-compatible C++ build toolchain
+    -   A recent Java runtime environment
+-   Run `scripts/setup.001-antlr_build.*` based on your platform.
+    -   Builds ANTLR
+    -   Generates C++ source code from grammar
+-   Build this project with CMake.
+    
+    (Make a build directory, configure with this repo's root as the source directory, configure and build using your CMake toolchain)
 
-### EXECUTION FLOW
+    ```bash
+    $ pwd
+    # should display the path to where you cloned this repo
+    $ cd build
+    # on Linux:
+        $ ccmake ..
+    # on Windows:
+        $ cmake-gui ..
+    # ...configure your build, then...
+    $ cmake ..
+    $ cmake --build .
+    # may need to run `cmake --build .` twice if clock skew is detected (e.g. on WSL)
+    $ cd ..
+    ```
 
-Since we may still compile code while loading a script, the user should define a `main` callback that is invoked by the compiler after all code-loading is finalized.
+Then, run the `q4c` executable with no arguments to see help.
+-   Run `$ q4c <target-file-path>` to interpret a specified file
+-   Run `$ q4c <target-file-path> -o <output-file-path>` to compile an output executable, then exit. Use `-x` instead of `-o` to execute after
+building.
+-   Run `$ q4c` or `$ q4c -h` to print help.
 
-This doesn't mean the user can't evaluate things at compile-time: indeed, all types are generated/referenced using compile-time evaluation. It just means this slower mechanism should be disabled once we know things like the type system are frozen.
 
+## Resources
+
+-   https://llvm.org/docs/tutorial/BuildingAJIT1.html
+
+    "just referencing a definition, even if it is never used, will be enough to trigger compilation": just what we want [for now, at least?].
+
+-   See: https://tomassetti.me/getting-started-antlr-cpp/

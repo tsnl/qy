@@ -1,0 +1,13 @@
+#pragma once
+
+#define Q4_VERSION                   
+#define Q4_CACHE_LINE_SIZE_IN_BYTES  (@Q4_CACHE_LINE_SIZE_IN_BYTES@)
+#define Q4_ENABLE_TRACES             (@Q4_ENABLE_TRACES@)
+
+#define Q4_PRINT_SCOPES
+
+#define Q4_MAX_STMT_COUNT_PER_BLOCK   (4*1024)
+#define Q4_MAX_PAIRS_PER_NS           (40)
+#define Q4_MAX_PAIRS_PER_DICT_LITERAL (1024)
+#define Q4_MAX_ARGS_PER_FUNCTION      (256)
+#define Q4_MAX_IDS_PER_CS_ID_LIST     (256)
