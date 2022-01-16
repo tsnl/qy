@@ -19,10 +19,10 @@ fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
 ID: L D* ;
-LIT_BIN_INT: ('+'|'-')? '0b' (B|'_')+ IS? ;
-LIT_DEC_INT: ('+'|'-')?      (D|'_')+ IS? ;
-LIT_HEX_INT: ('+'|'-')? '0x' (H|'_')+ IS? ;
-LIT_DEC_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
+LIT_BIN_INT: ('+'|'-')? '0b' B+ IS? ;
+LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
+LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
+LIT_DEC_REAL: (LIT_DEC_INT '.' LIT_DEC_INT FS?) | (LIT_DEC_INT FS);
 LIT_SQ_STRING: ('\'' (ANY_ESC|'\\\''|~[\r\n\\'])*?  '\'');
 LIT_DQ_STRING: ('"'  (ANY_ESC|'\\"' |~[\r\n\\"])*?  '"');
 LIT_ML_SQ_STRING: '\'\'\'' (.)*? '\'\'\'';
@@ -32,22 +32,23 @@ LINE_COMMENT: '//' ~[\r\n]* -> skip;
 BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> skip;
 WHITESPACE: ('\n'|'\r'|'\t'|' ') -> skip;
 
-stringLiteralChunk: LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING ;
+stringLiteralChunk: sq=LIT_SQ_STRING | dq=LIT_DQ_STRING | mlSq=LIT_ML_SQ_STRING | mlDq=LIT_ML_DQ_STRING ;
 stringLiteral: (chunks+=stringLiteralChunk)+ ;
 
 file: EOF | (stmts+=stmt)+ EOF;
 
-stmt: globalBindStmt | localBindStmt | evalStmt | importStmt | implStmt | declareStmt;
-globalBindStmt: ID ':' expr ;
-localBindStmt: ID '=' expr ;
+stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt | declare=declareStmt;
+bindStmt: ID '=' expr ;
 evalStmt: expr ;
 importStmt: 'import' stringLiteral ;
-implStmt: 'impl' expr '::' expr 'using' '{' unwrappedImplBody '}';
-declareStmt: (isPub='pub'|isPvt='pvt'|isLoc='let') ID '::' expr ;
+implStmt: 'impl' expr ':' expr 'using' '(' 'this' ':' 'This' ')' '{' unwrappedImplBody '}';
+declareStmt: (isPub='pub'|isPvt='pvt'|isLoc='local') ID ':' expr ;
+staticImplBindStmt: 'This' '.' ID ':' expr;
+
+// impl body:
 unwrappedImplBody: (stmts+=implBodyStmt) ;
 implBodyStmt: nonstaticImplBindStmt | staticImplBindStmt;
-nonstaticImplBindStmt: 'self' '.' ID ':' expr;
-staticImplBindStmt: 'Self' '.' ID ':' expr;
+nonstaticImplBindStmt: 'this' '.' ID ':' expr;
 
 expr: primaryExpr ;
 wrappedExpr     // single-token, string, or '(...)' '{...}'
@@ -72,7 +73,7 @@ literalExpr
     | litBinInt=LIT_BIN_INT
     | litDecInt=LIT_DEC_INT
     | litHexInt=LIT_HEX_INT
-    | litFloat=LIT_DEC_FLOAT
+    | litReal=LIT_DEC_REAL
     | litString=stringLiteral
     ;
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
@@ -90,8 +91,8 @@ adtTSE
 interfaceTSE: 'interface' '(' 'self' '::' 'Self' ')' '{' interfaceHeader ';' (interfaceBody+=stmt ';')* '}' ;
 interfaceHeader: 'requires' '{' (reqs+=expr ';')* '}' 'for' '{' (provisions+=interfaceProvisionSpec ';')* '}';
 interfaceProvisionSpec
-    : 'self' '.' ID '::' expr   #interfaceProvisionSpec_nonstatic
-    | 'Self' '.' ID '::' expr   #interfaceProvisionSpec_static
+    : 'self' '.' ID '::' expr   #interfaceProvisionSpecForNonStatic
+    | 'Self' '.' ID '::' expr   #interfaceProvisionSpecForStatic
     ;
 iteExpr: 'if' '(' condExpr=expr ')' thenBranchExpr=wrappedExpr ('else' optElseBranchExpr=wrappedExprOrIteExpr)? ;
 wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
@@ -100,7 +101,7 @@ wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
 //  - unary, binary expressions are pretty straightforward, EXCEPT
 //      - include 'mut' as a unary operator
 //      - binary:
-//          - support '::' as a binary expression, with special meaning in `interface` and `assert`
+//          - support ':' as a binary expression, with special meaning in `interface` and `assert`
 //          - support 'is' and 'is not' i.e. multiple tokens in binary operator.
 //          - support '->' as a chaining operator (for function types)
 //  - postfix expressions: '(...)', '[...]', and '{...}' accept arbitrary numbers of arguments, functors are a thing, constructors are just function calls

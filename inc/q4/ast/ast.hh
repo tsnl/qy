@@ -2,16 +2,18 @@
 
 #include "loc.hh"
 #include "source.hh"
+#include "node.hh"
+#include "exp.hh"
+#include "stmt.hh"
 
 namespace q4 {
+    template <typename T, typename... TArgs> T* newAstNode(Source* source, TArgs... args);
+}
 
-class BaseNode {
-  private:
-    Span m_span;
-  public:
-    BaseNode(Span span);
-  public:
-    BaseFileLoc* loc(Source* source) const { return source->alloc<FileSpanLoc>(source, m_span); }
-};
-
+// Inline implementation:
+namespace q4 {
+    template <typename T, typename... TArgs>
+    T* newAstNode(Source* source, Span span, TArgs... args) {
+        return source->alloc<T>(span, args...);
+    }
 }

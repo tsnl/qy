@@ -19,7 +19,7 @@ fi
 
 if [ ! -f ${ANTLR_SOURCE_TEST_FILE_PATH} ]; then
     mkdir -p dev/antlr4-cpp-runtime/build dev/antlr4-cpp-runtime/source
-    unzip -O gbk dev/antlr4-cpp-runtime-4.9.3-source.zip -d dev/antlr4-cpp-runtime/source/
+    unzip dev/antlr4-cpp-runtime-4.9.3-source.zip -d dev/antlr4-cpp-runtime/source/
 fi
 
 if [ ! -f ${ANTLR_BUILD_TEST_FILE_PATH} ]; then
