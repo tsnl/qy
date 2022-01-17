@@ -50,7 +50,7 @@ unwrappedImplBody: (stmts+=implBodyStmt) ;
 implBodyStmt: nonstaticImplBindStmt | staticImplBindStmt;
 nonstaticImplBindStmt: 'this' '.' ID ':' expr;
 
-expr: primaryExpr ;
+expr: binaryExpr ;
 wrappedExpr     // single-token, string, or '(...)' '{...}'
     : id=ID
     | kwSelf='self'
@@ -96,14 +96,25 @@ interfaceProvisionSpec
     ;
 iteExpr: 'if' '(' condExpr=expr ')' thenBranchExpr=wrappedExpr ('else' optElseBranchExpr=wrappedExprOrIteExpr)? ;
 wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
-
-// TODO: implement rest of grammar from example.
-//  - unary, binary expressions are pretty straightforward, EXCEPT
-//      - include 'mut' as a unary operator
-//      - binary:
-//          - support ':' as a binary expression, with special meaning in `interface` and `assert`
-//          - support 'is' and 'is not' i.e. multiple tokens in binary operator.
-//          - support '->' as a chaining operator (for function types)
-//  - postfix expressions: '(...)', '[...]', and '{...}' accept arbitrary numbers of arguments, functors are a thing, constructors are just function calls
-//      - NOTE: {...} postfix also invokes a message, builtins use it for array initialization
-
+postfixExpr
+    : through=primaryExpr                                           #throughPostfixExpr
+    | self=postfixExpr '[' (args+=expr (',' args+= expr)*)? ']'     #lookupPostfixExpr
+    | self=postfixExpr '[' optBeg=expr? ':' optEnd=expr? ']'        #slicePostfixExpr
+    | self=postfixExpr '(' (args+=expr (',' args+= expr)*)? ')'     #callPostfixExpr
+    | self=postfixExpr '{' (args+=expr (',' args+= expr)*)? '}'     #initializerPostfixExpr
+    | container=postfixExpr '.' keyName=ID                          #dotPostfixExpr
+    ;
+unaryExpr
+    : through=postfixExpr 
+    | (mutUnaryOp='mut'|logicalNotUnaryOp='not'|bitwiseNotUnaryOp='~'|posUnaryOp='+'|negUnaryOp='-') arg=unaryExpr
+    ;
+mulBinaryExpr: through=unaryExpr     | ltArg=mulBinaryExpr (mul='*'|div='/'|rem='%') rtArg=unaryExpr ;
+addBinaryExpr: through=mulBinaryExpr | ltArg=addBinaryExpr (add='+'|sub='-') rtArg=mulBinaryExpr ;
+typingBinaryExpr: through=addBinaryExpr | ltArg=typingBinaryExpr (is='is'|is_not='is!'|of=':'|sgn='->') rtArg=addBinaryExpr ;
+cmpBinaryExpr: through=typingBinaryExpr | ltArg=cmpBinaryExpr (lt='<'|gt='>'|le='<='|ge='>='|eq='=='|neq='!=') rtArg=typingBinaryExpr ;
+bitwiseXOrBinaryExpr: through=cmpBinaryExpr | ltArg=bitwiseXOrBinaryExpr '^' rtArg=cmpBinaryExpr ;
+bitwiseAndBinaryExpr: through=bitwiseXOrBinaryExpr | ltArg=bitwiseAndBinaryExpr '&' rtArg=bitwiseXOrBinaryExpr ;
+bitwiseOrBinaryExpr: through=bitwiseAndBinaryExpr | ltArg=bitwiseOrBinaryExpr '|' rtArg=bitwiseAndBinaryExpr ;
+logicalAndBinaryExpr: through=bitwiseOrBinaryExpr | ltArg=logicalAndBinaryExpr 'and' rtArg=bitwiseOrBinaryExpr ;
+logicalOrBinaryExpr: through=logicalAndBinaryExpr | ltArg=logicalOrBinaryExpr 'or' rtArg=logicalAndBinaryExpr ;
+binaryExpr: logicalOrBinaryExpr;
