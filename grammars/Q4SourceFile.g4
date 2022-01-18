@@ -19,6 +19,7 @@ fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
 ID: L D* ;
+LIT_SYMBOL: '#' (D|L|'.')+;
 LIT_BIN_INT: ('+'|'-')? '0b' B+ IS? ;
 LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
 LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
@@ -37,12 +38,11 @@ stringLiteral: (chunks+=stringLiteralChunk)+ ;
 
 file: EOF | (stmts+=stmt)+ EOF;
 
-stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt | declare=declareStmt;
+stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt ;
 bindStmt: ID '=' expr ;
 evalStmt: expr ;
 importStmt: 'import' stringLiteral ;
-implStmt: 'impl' expr ':' expr 'using' '(' 'this' ':' 'This' ')' '{' unwrappedImplBody '}';
-declareStmt: (isPub='pub'|isPvt='pvt'|isLoc='local') ID ':' expr ;
+implStmt: 'impl' t=expr ':' ifc=expr 'using' '(' 'this' ':' 'This' ')' '{' unwrappedImplBody '}';
 staticImplBindStmt: 'This' '.' ID ':' expr;
 
 // impl body:
@@ -53,7 +53,7 @@ nonstaticImplBindStmt: 'this' '.' ID ':' expr;
 expr: binaryExpr ;
 wrappedExpr     // single-token, string, or '(...)' '{...}'
     : id=ID
-    | kwSelf='self'
+    | kwSelf='this'
     | literal=literalExpr
     | paren=parenExpr
     | chain=chainExpr
@@ -61,7 +61,10 @@ wrappedExpr     // single-token, string, or '(...)' '{...}'
 primaryExpr
     : wrapped=wrappedExpr
     | lambda=lambdaExpr
+    | aotLambda=aotLambdaExpr
+    | signature=signatureExpr
     | ite=iteExpr
+    | literal=literalExpr
     | adt=adtTSE
     | ifc=interfaceTSE
     ;
@@ -69,7 +72,7 @@ literalExpr
     : litBoolT='true'
     | litBoolF='false'
     | litNone='none'
-    | '#' litSymbol=ID
+    | litSymbol=LIT_SYMBOL
     | litBinInt=LIT_BIN_INT
     | litDecInt=LIT_DEC_INT
     | litHexInt=LIT_HEX_INT
@@ -79,20 +82,24 @@ literalExpr
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
 chainExpr: '{' '}' | '{' optExpr=expr '}' | '{' (prefix+=stmt ';')+ '}' | '{' (prefix+=stmt ';')+ optTail=expr '}';
 lambdaExpr
-    : argNames+=ID '=>' body=expr
-    | '(' argNames+=ID ')' '=>' body=expr
-    | '(' argNames+= ID (',' argNames+= ID) ')' '=>' body=expr
-    | '(' ')' '=>' body=expr
+    : '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' body=expr
+    ;
+aotLambdaExpr
+    : '[' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ']' '=>' body=expr
+    ;
+signatureExpr
+    : '(' ')' '->' ret_t=expr
+    | '(' argTypes+=expr (',' argTypes+=expr)* ')' '->' retType=expr
     ;
 adtTSE
-    : (prod='struct'|sum='enum')
-        '{' (names+=ID ':' inits+=expr (',' names+=ID ':' inits+=expr)*)? '}'
+    : (prod='struct'|sum='union')
+        '{' (names+=ID ':' types+=expr (',' names+=ID ':' types+=expr)*)? '}'
     ;
-interfaceTSE: 'interface' '(' 'self' '::' 'Self' ')' '{' interfaceHeader ';' (interfaceBody+=stmt ';')* '}' ;
+interfaceTSE: 'interface' '{' interfaceHeader ';' (interfaceBody+=stmt ';')* '}' ;
 interfaceHeader: 'requires' '{' (reqs+=expr ';')* '}' 'for' '{' (provisions+=interfaceProvisionSpec ';')* '}';
 interfaceProvisionSpec
-    : 'self' '.' ID '::' expr   #interfaceProvisionSpecForNonStatic
-    | 'Self' '.' ID '::' expr   #interfaceProvisionSpecForStatic
+    : 'this' '.' ID ':' expr   #interfaceProvisionSpecForNonStatic
+    | 'This' '.' ID ':' expr   #interfaceProvisionSpecForStatic
     ;
 iteExpr: 'if' '(' condExpr=expr ')' thenBranchExpr=wrappedExpr ('else' optElseBranchExpr=wrappedExprOrIteExpr)? ;
 wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
@@ -110,7 +117,7 @@ unaryExpr
     ;
 mulBinaryExpr: through=unaryExpr     | ltArg=mulBinaryExpr (mul='*'|div='/'|rem='%') rtArg=unaryExpr ;
 addBinaryExpr: through=mulBinaryExpr | ltArg=addBinaryExpr (add='+'|sub='-') rtArg=mulBinaryExpr ;
-typingBinaryExpr: through=addBinaryExpr | ltArg=typingBinaryExpr (is='is'|is_not='is!'|of=':'|sgn='->') rtArg=addBinaryExpr ;
+typingBinaryExpr: through=addBinaryExpr | ltArg=typingBinaryExpr (is='is'|is_not='is!') rtArg=addBinaryExpr ;
 cmpBinaryExpr: through=typingBinaryExpr | ltArg=cmpBinaryExpr (lt='<'|gt='>'|le='<='|ge='>='|eq='=='|neq='!=') rtArg=typingBinaryExpr ;
 bitwiseXOrBinaryExpr: through=cmpBinaryExpr | ltArg=bitwiseXOrBinaryExpr '^' rtArg=cmpBinaryExpr ;
 bitwiseAndBinaryExpr: through=bitwiseXOrBinaryExpr | ltArg=bitwiseAndBinaryExpr '&' rtArg=bitwiseXOrBinaryExpr ;

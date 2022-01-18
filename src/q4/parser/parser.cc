@@ -38,7 +38,6 @@ class Q4SfParser: private Q4SourceFileBaseVisitor {
     antlrcpp::Any visitEvalStmt(Q4SourceFileParser::EvalStmtContext* context) override;
     antlrcpp::Any visitImportStmt(Q4SourceFileParser::ImportStmtContext* context) override;
     antlrcpp::Any visitImplStmt(Q4SourceFileParser::ImplStmtContext* context) override;
-    antlrcpp::Any visitDeclareStmt(Q4SourceFileParser::DeclareStmtContext* context) override;
     antlrcpp::Any visitUnwrappedImplBody(Q4SourceFileParser::UnwrappedImplBodyContext* context) override;
     antlrcpp::Any visitImplBodyStmt(Q4SourceFileParser::ImplBodyStmtContext* context) override;
     antlrcpp::Any visitNonstaticImplBindStmt(Q4SourceFileParser::NonstaticImplBindStmtContext* context) override;
@@ -56,6 +55,23 @@ class Q4SfParser: private Q4SourceFileBaseVisitor {
     antlrcpp::Any visitInterfaceProvisionSpecForNonStatic(Q4SourceFileParser::InterfaceProvisionSpecForNonStaticContext* context) override;
     antlrcpp::Any visitInterfaceProvisionSpecForStatic(Q4SourceFileParser::InterfaceProvisionSpecForStaticContext* context) override;
     antlrcpp::Any visitIteExpr(Q4SourceFileParser::IteExprContext* context) override;
+    antlrcpp::Any visitSlicePostfixExpr(Q4SourceFileParser::SlicePostfixExprContext *ctx) override;
+    antlrcpp::Any visitLookupPostfixExpr(Q4SourceFileParser::LookupPostfixExprContext *ctx) override;
+    antlrcpp::Any visitInitializerPostfixExpr(Q4SourceFileParser::InitializerPostfixExprContext *ctx) override;
+    antlrcpp::Any visitThroughPostfixExpr(Q4SourceFileParser::ThroughPostfixExprContext *ctx) override;
+    antlrcpp::Any visitCallPostfixExpr(Q4SourceFileParser::CallPostfixExprContext *ctx) override;
+    antlrcpp::Any visitDotPostfixExpr(Q4SourceFileParser::DotPostfixExprContext *ctx) override;
+    antlrcpp::Any visitUnaryExpr(Q4SourceFileParser::UnaryExprContext *ctx) override;
+    antlrcpp::Any visitMulBinaryExpr(Q4SourceFileParser::MulBinaryExprContext *ctx) override;
+    antlrcpp::Any visitAddBinaryExpr(Q4SourceFileParser::AddBinaryExprContext *ctx) override;
+    antlrcpp::Any visitTypingBinaryExpr(Q4SourceFileParser::TypingBinaryExprContext *ctx) override;
+    antlrcpp::Any visitCmpBinaryExpr(Q4SourceFileParser::CmpBinaryExprContext *ctx) override;
+    antlrcpp::Any visitBitwiseXOrBinaryExpr(Q4SourceFileParser::BitwiseXOrBinaryExprContext *ctx) override;
+    antlrcpp::Any visitBitwiseAndBinaryExpr(Q4SourceFileParser::BitwiseAndBinaryExprContext *ctx) override;
+    antlrcpp::Any visitBitwiseOrBinaryExpr(Q4SourceFileParser::BitwiseOrBinaryExprContext *ctx) override;
+    antlrcpp::Any visitLogicalAndBinaryExpr(Q4SourceFileParser::LogicalAndBinaryExprContext *ctx) override;
+    antlrcpp::Any visitLogicalOrBinaryExpr(Q4SourceFileParser::LogicalOrBinaryExprContext *ctx) override;
+    antlrcpp::Any visitBinaryExpr(Q4SourceFileParser::BinaryExprContext *ctx) override;
 };
 
 Q4SfParser::Q4SfParser(Source* source)
@@ -178,9 +194,9 @@ antlrcpp::Any Q4SfParser::visitStmt(Q4SourceFileParser::StmtContext* context) {
     else if (context->eval) { return visitEvalStmt(context->eval); }
     else if (context->import_) { return visitImportStmt(context->import_); }
     else if (context->impl) { return visitImplStmt(context->impl); }
-    else if (context->declare) { return visitDeclareStmt(context->declare); }
     else {
         panic("NotImplemented: constructing an unknown stmt: %s", context->getText().c_str());
+        return nullptr;
     }
 }
 antlrcpp::Any Q4SfParser::visitBindStmt(Q4SourceFileParser::BindStmtContext* context) {
@@ -193,9 +209,6 @@ antlrcpp::Any Q4SfParser::visitImportStmt(Q4SourceFileParser::ImportStmtContext*
 
 }
 antlrcpp::Any Q4SfParser::visitImplStmt(Q4SourceFileParser::ImplStmtContext* context) {
-
-}
-antlrcpp::Any Q4SfParser::visitDeclareStmt(Q4SourceFileParser::DeclareStmtContext* context) {
 
 }
 antlrcpp::Any Q4SfParser::visitUnwrappedImplBody(Q4SourceFileParser::UnwrappedImplBodyContext* context) {

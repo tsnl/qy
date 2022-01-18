@@ -1,0 +1,34 @@
+// Q4 enables creative programming APIs by allowing types to be first-class objects in an efficient runtime environment.
+
+// This document covers `[...] => {...}` lambdas, which are used for templates at load-time.
+// We NEED these to ensure certain functions are only evaluated at load-time.
+
+// However, since they introduce significant complexity, I propose they be pushed to a future update.
+// Instead, like Go, version 1 should focus on robustly supporting 'any' and interfaces.
+// However, several insights can be gleaned about behavior.
+
+// Use '[...] => {...}' lambdas to always evaluate at load-time.
+// - These lambdas are bound like regular lambdas.
+// - When invoked, we use the args to produce a **cached** instantiation of the body
+//   - this is just like templates in C++, but anonymized
+//   - []-args must be one of...
+//     - a bound []-lambda formal argument
+//     - a global symbol bound in a prior statement (whose value is hence known)
+//     - another []-lambda call
+//     - a simple literal/constant
+// - KEY: no new instantiations occur after load-time
+//   - simply no new lines of code
+// PIVOT: stick to C/C++ type system.
+// - use pointer tagging to reserve special lambda, type, and template/macro-lambda 
+// - manual memory management through and through with C++-style constructor/destructor messages
+
+Vector = [T: IType] => struct {x: T, y: T};
+vec2f = (x: Float32, y: Float32) => { Vector[Float32]{x, y} };      // Vector[Float32] evaluated with the closure
+vec2 = [T: IType] => (x: T, y: T) => { Vector[T](x, y) };           // Vector[T] cannot be evaluated, but can wait for T, a [bound] var, so OK
+bad1 = (T: IType) => (x: T, y: T) => { Vector[T](x, y) };           // broken: expect 'T' at compile-time for formal args, 'Vector' call
+bad1 = (T: IType) => (x: T, y: T) => { Vector(T)(x, y) };           // broken: expect 'T' at compile time for formal args
+oops = (T: IType) => (x: IAny, y: IAny) => { DefinedFn(T)(x, y); }  // may compile! but no type instantiation possible.
+
+v1 = vec2f(0.0f, 1.0f);
+v2 = Vec2f{42.0f, 0.0f};
+v3 = vec2[Float32](0.0f, 1.0f);

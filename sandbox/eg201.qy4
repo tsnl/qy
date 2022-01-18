@@ -1,1 +1,14 @@
-// In Qy, 
+Vec2f = struct {x: Float32, y: Float32};
+v1 = Vec2f{0, 0};
+v2 = Vec2f{1, 1};
+
+v2f_add = (v1: Vec2f, v2: Vec2f) => {
+    Vec2f{v1.x+v2.x, v1.y+v2.y}
+};
+v2f_eq = (v1: Vec2f, v2: Vec2f) => {
+    v1.x == v2.x and
+    v1.y == v2.y
+};
+
+assert(v2f_eq(v2f_add(v1, v2), v2));
+assert(v2f_eq(v2f_add(v2, v2), v2f_add(v1, v2f_add(v2, v2))));
