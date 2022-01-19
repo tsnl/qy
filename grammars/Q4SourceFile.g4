@@ -1,5 +1,3 @@
-// For reference only: not an actual source file, some features simplified.
-
 grammar Q4SourceFile;
 options {
     language = 'Cpp';
@@ -42,7 +40,7 @@ stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt ;
 bindStmt: ID '=' expr ;
 evalStmt: expr ;
 importStmt: 'import' stringLiteral ;
-implStmt: 'impl' t=expr ':' ifc=expr 'using' '(' 'this' ':' 'This' ')' '{' unwrappedImplBody '}';
+implStmt: 'impl' t=expr ':' ifc=expr 'using' '[' 'this' ':' 'This' ']' '{' unwrappedImplBody '}';
 staticImplBindStmt: 'This' '.' ID ':' expr;
 
 // impl body:
@@ -82,7 +80,7 @@ literalExpr
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
 chainExpr: '{' '}' | '{' optExpr=expr '}' | '{' (prefix+=stmt ';')+ '}' | '{' (prefix+=stmt ';')+ optTail=expr '}';
 lambdaExpr
-    : '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' body=expr
+    : '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr
     ;
 aotLambdaExpr
     : '[' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ']' '=>' body=expr
@@ -90,6 +88,7 @@ aotLambdaExpr
 signatureExpr
     : '(' ')' '->' ret_t=expr
     | '(' argTypes+=expr (',' argTypes+=expr)* ')' '->' retType=expr
+    | '[' argTypes+=expr (',' argTypes+=expr)* ']' '->' retType=expr
     ;
 adtTSE
     : (prod='struct'|sum='union')
@@ -106,7 +105,7 @@ wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
 postfixExpr
     : through=primaryExpr                                           #throughPostfixExpr
     | self=postfixExpr '[' (args+=expr (',' args+= expr)*)? ']'     #lookupPostfixExpr
-    | self=postfixExpr '[' optBeg=expr? ':' optEnd=expr? ']'        #slicePostfixExpr
+    | self=postfixExpr '(' optBeg=expr? ':' optEnd=expr? ')'        #slicePostfixExpr
     | self=postfixExpr '(' (args+=expr (',' args+= expr)*)? ')'     #callPostfixExpr
     | self=postfixExpr '{' (args+=expr (',' args+= expr)*)? '}'     #initializerPostfixExpr
     | container=postfixExpr '.' keyName=ID                          #dotPostfixExpr
@@ -115,7 +114,7 @@ unaryExpr
     : through=postfixExpr 
     | (mutUnaryOp='mut'|logicalNotUnaryOp='not'|bitwiseNotUnaryOp='~'|posUnaryOp='+'|negUnaryOp='-') arg=unaryExpr
     ;
-mulBinaryExpr: through=unaryExpr     | ltArg=mulBinaryExpr (mul='*'|div='/'|rem='%') rtArg=unaryExpr ;
+mulBinaryExpr: through=unaryExpr | ltArg=mulBinaryExpr (mul='*'|div='/'|rem='%') rtArg=unaryExpr ;
 addBinaryExpr: through=mulBinaryExpr | ltArg=addBinaryExpr (add='+'|sub='-') rtArg=mulBinaryExpr ;
 typingBinaryExpr: through=addBinaryExpr | ltArg=typingBinaryExpr (is='is'|is_not='is!') rtArg=addBinaryExpr ;
 cmpBinaryExpr: through=typingBinaryExpr | ltArg=cmpBinaryExpr (lt='<'|gt='>'|le='<='|ge='>='|eq='=='|neq='!=') rtArg=typingBinaryExpr ;
