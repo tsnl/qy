@@ -33,6 +33,7 @@ class Q4SfParser: private Q4SourceFileBaseVisitor {
   private:
     antlrcpp::Any visitStringLiteralChunk(Q4SourceFileParser::StringLiteralChunkContext* context) override;
     antlrcpp::Any visitStringLiteral(Q4SourceFileParser::StringLiteralContext* context) override;
+    antlrcpp::Any visitFormalArg(Q4SourceFileParser::FormalArgContext* context) override;
     antlrcpp::Any visitFile(Q4SourceFileParser::FileContext* context) override;
     antlrcpp::Any visitStmt(Q4SourceFileParser::StmtContext* context) override;
     antlrcpp::Any visitBindStmt(Q4SourceFileParser::BindStmtContext* context) override;
@@ -182,6 +183,14 @@ antlrcpp::Any Q4SfParser::visitStringLiteral(Q4SourceFileParser::StringLiteralCo
     return newExp;
 }
 
+antlrcpp::Any Q4SfParser::visitFormalArg(Q4SourceFileParser::FormalArgContext* context) {
+    return FormalArg{
+        intern(context->name->getText()), 
+        visitExpr(context->tse).as<PExp>(), 
+        span(context)
+    };
+}
+
 antlrcpp::Any Q4SfParser::visitFile(Q4SourceFileParser::FileContext* context) {
     std::vector<PStmt> stmts;
     for (auto stmtContext: context->stmts) {
@@ -228,27 +237,78 @@ antlrcpp::Any Q4SfParser::visitStaticImplBindStmt(Q4SourceFileParser::StaticImpl
 antlrcpp::Any Q4SfParser::visitExpr(Q4SourceFileParser::ExprContext* context) {
 
 }
-antlrcpp::Any Q4SfParser::visitWrappedExpr(Q4SourceFileParser::WrappedExprContext* context) {
-
-}
 antlrcpp::Any Q4SfParser::visitPrimaryExpr(Q4SourceFileParser::PrimaryExprContext* context) {
-
+    if (context->wrapped) { return visitWrappedExpr(context->wrapped); }
+    if (context->lambda) { return visitLambdaExpr(context->lambda); }
+    if (context->aotLambda) { return visitAotLambdaExpr(context->aotLambda); }
+    if (context->signature) { return visitSignatureTSE(context->signature); }
+    if (context->ite) { return visitIteExpr(context->ite); }
+    if (context->adt) { return visitAdtTSE(context->adt); }
+    if (context->ifc) { return visitInterfaceTSE(context->ifc); }
+    if (context->builtinOp) { return visitBuiltinOpExpr(context->builtinOp); }
+    throw std::runtime_error("PARSER: visitPrimaryExpr: unexpected context: " + context->getText());
+}
+antlrcpp::Any Q4SfParser::visitWrappedExpr(Q4SourceFileParser::WrappedExprContext* context) {
+    if (context->id) { return new IdRefExp(span(context), intern(context->id->getText())); }
+    if (context->kwThis) { return new ThisRefExp(span(context)); }
+    if (context->literal) { return visitLiteralExpr(context->literal); }
+    if (context->paren) { return visitParenExpr(context->paren); }
+    if (context->chain) { return visitChainExpr(context->chain); }
+    throw std::runtime_error("PARSER: visitWrappedExpr: unexpected context: " + context->getText());
 }
 antlrcpp::Any Q4SfParser::visitLiteralExpr(Q4SourceFileParser::LiteralExprContext* context) {
-
+    if (context->litBoolT) { return new TLiteralBoolExp(span(context)); }
+    if (context->litBoolF) { return new FLiteralBoolExp(span(context)); }
+    if (context->litNone) { return new LiteralNoneExp(span(context)); }
+    if (context->litDecReal) { return new LiteralRealExp(span(context), context->litDecReal->getText()); }
+    if (context->litDecInt) { return new LiteralIntExp(span(context), context->litDecInt->getText(), 10); }
+    if (context->litHexInt) { return new LiteralIntExp(span(context), context->litHexInt->getText(), 16); }
+    if (context->litBinInt) { return new LiteralIntExp(span(context), context->litBinInt->getText(), 2); }
+    if (context->litSymbol) { return new LiteralSymbolExp(span(context), intern(context->litSymbol->getText())); }
+    if (context->litString) { return visitStringLiteral(context->litString); }
+    throw std::runtime_error("PARSER: visitLiteralExpr: unexpected context: " + context->getText());
 }
 antlrcpp::Any Q4SfParser::visitParenExpr(Q4SourceFileParser::ParenExprContext* context) {
-
+    return (context->optExpr) ?
+        visitExpr(context->optExpr) :
+        new UnitRefExp(span(context));
 }
 antlrcpp::Any Q4SfParser::visitChainExpr(Q4SourceFileParser::ChainExprContext* context) {
-
+    std::vector<PStmt> prefix{context->prefix.size()};
+    for (size_t i = 0; i < prefix.size(); i++) {
+        prefix[i] = visitStmt(context->prefix[i]).as<PStmt>();
+    }
+    PExp optTailExp = context->optExpr ? visitExpr(context->optExpr).as<PExp>() : nullptr;
+    return new ChainExp(span(context), std::move(prefix), optTailExp);
 }
 antlrcpp::Any Q4SfParser::visitLambdaExpr(Q4SourceFileParser::LambdaExprContext* context) {
-
+    std::vector<FormalArg> args;
+    args.resize(context->formalArgs.size());
+    for (size_t iArg = 0; iArg < args.size(); iArg++) {
+        auto formalArg = visitFormalArg(context->formalArgs[iArg]).as<FormalArg>();
+        args.push_back(formalArg);
+    }
+    PExp body = visitExpr(context->body).as<PExp>();
+    return new LambdaExp(span(context), std::move(args), body);
 }
+// todo: add support for aotLambdaExpr
+// todo: add support for signatureTSE
 antlrcpp::Any Q4SfParser::visitAdtTSE(Q4SourceFileParser::AdtTSEContext* context) {
+    AdtKind adtKind;
+    if (context->prod) { adtKind = AdtKind::Struct; }
+    else if (context->sum) { adtKind = AdtKind::Union; }
+    else { throw std::runtime_error("ERROR: visitAdtTSE: unknown prefix keyword: " + context->getText()); }
+    
+    std::vector<FormalArg> fields;
+    fields.reserve(context->formalArgs.size());
+    for (size_t iField = 0; iField < fields.size(); iField++) {
+        auto formalArg = visitFormalArg(context->formalArgs[iField]).as<FormalArg>();
+        fields.push_back(formalArg);
+    }
 
+    return new AdtTSE(span(context), adtKind, std::move(fields));
 }
+// todo: implement all below methods
 antlrcpp::Any Q4SfParser::visitInterfaceTSE(Q4SourceFileParser::InterfaceTSEContext* context) {
 
 }

@@ -44,9 +44,10 @@ namespace q4 {
 namespace q4 {
     struct FormalArg { 
         IntStr name; PExp tse; Span span; 
+        FormalArg(IntStr name, PExp tse, Span span);
     };
     enum class UnaryOperator { 
-        Mut, LogicalNot, BitwiseNot, Pos, Neg 
+        Mut, LogicalNot, BitwiseNot, Pos, Neg, DeRef
     };
     enum class BinaryOperator { 
         Mul, Div, Rem, 
@@ -66,6 +67,9 @@ namespace q4 {
     enum class LiteralRealFlag: LiteralRealFlags { 
         Suffix_Float32=0x1, Suffix_Float64=0x2 
     };
+    enum class AdtKind {
+        Struct, Union
+    };
 }
 
 // expressions:
@@ -74,8 +78,6 @@ namespace q4 {
     public:
         LiteralNoneExp(Span span); 
     };
-    struct TLiteralBoolExp;
-    struct FLiteralBoolExp;
     class BaseLiteralBoolExp: public BaseExp {
     protected:
         BaseLiteralBoolExp(Span span);
@@ -90,6 +92,12 @@ namespace q4 {
     struct FLiteralBoolExp: public BaseLiteralBoolExp { 
         FLiteralBoolExp(Span span); 
     };
+    class LiteralSymbolExp: public BaseExp {
+    private:
+        IntStr m_symbolCode;
+    public:
+        LiteralSymbolExp(Span span, IntStr symbolCode);
+    };
     class LiteralIntExp: public BaseExp {
     private:
         unsigned long long m_mantissa;
@@ -97,7 +105,7 @@ namespace q4 {
         std::string m_cleanText;
         LiteralIntFlags m_flags;
     public:
-        LiteralIntExp(Span span, std::string rawText, LiteralIntFlags flags);
+        LiteralIntExp(Span span, std::string rawText, int base);
     };
     class LiteralRealExp: public BaseExp {
     private:
@@ -105,18 +113,32 @@ namespace q4 {
         std::string m_text;
         LiteralRealFlags m_flags;
     public:
-        LiteralRealExp(Span span, std::string text, LiteralRealFlags flags);
+        LiteralRealExp(Span span, std::string text);
     };
     class LiteralStringExp: public BaseExp {
     public:
         LiteralStringExp(Span span, std::vector<int> runes);
     };
+    class UnitRefExp: public BaseExp {
+    public:
+        UnitRefExp(Span span);
+    };
+    class ThisRefExp: public BaseExp {
+    public:
+        ThisRefExp(Span span);
+    };
+    class IdRefExp: public BaseExp {
+    private:
+        IntStr m_name;
+    public:
+        IdRefExp(Span span, IntStr name);
+    };
     class ChainExp: public BaseExp {
     private:
         std::vector<PStmt> m_prefix;
-        PExp m_opt_tail;
+        PExp m_optTail;
     public:
-        ChainExp(std::vector<PStmt>&& prefix, PExp opt_tail);
+        ChainExp(Span span, std::vector<PStmt>&& prefix, PExp optTail);
     };
     class BaseLambdaExp: public BaseExp {
     private:
@@ -140,9 +162,10 @@ namespace q4 {
     };
     class AdtTSE: public BaseExp {
     private:
+        AdtKind m_adtKind;
         std::vector<FormalArg> m_fields;
     public:
-        AdtTSE(Span span, std::vector<FormalArg> fields);
+        AdtTSE(Span span, AdtKind adtKind, std::vector<FormalArg> fields);
     };
     class InterfaceTSE: public BaseExp {
     public:

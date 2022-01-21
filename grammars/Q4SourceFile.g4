@@ -34,6 +34,8 @@ WHITESPACE: ('\n'|'\r'|'\t'|' ') -> skip;
 stringLiteralChunk: sq=LIT_SQ_STRING | dq=LIT_DQ_STRING | mlSq=LIT_ML_SQ_STRING | mlDq=LIT_ML_DQ_STRING ;
 stringLiteral: (chunks+=stringLiteralChunk)+ ;
 
+formalArg: name=ID ':' tse=expr ;
+
 file: EOF | (stmts+=stmt)+ EOF;
 
 stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt ;
@@ -49,39 +51,38 @@ nonstaticImplBindStmt: 'this' '.' ID '=' expr;
 staticImplBindStmt: 'This' '.' ID '=' expr;
 
 expr: binaryExpr ;
-wrappedExpr     // single-token, string, or '(...)' '{...}'
-    : id=ID
-    | kwSelf='this'
-    | literal=literalExpr
-    | paren=parenExpr
-    | chain=chainExpr
-    ;
 primaryExpr
     : wrapped=wrappedExpr
     | lambda=lambdaExpr
     | aotLambda=aotLambdaExpr
     | signature=signatureTSE
     | ite=iteExpr
-    | literal=literalExpr
     | adt=adtTSE
     | ifc=interfaceTSE
     | builtinOp=builtinOpExpr
+    ;
+wrappedExpr     // single-token, string, or '(...)' '{...}'
+    : id=ID
+    | kwThis='this'
+    | literal=literalExpr
+    | paren=parenExpr
+    | chain=chainExpr
     ;
 literalExpr
     : litBoolT='%t'
     | litBoolF='%f'
     | litNone='%none'
-    | litSymbol=LIT_SYMBOL
-    | litBinInt=LIT_BIN_INT
+    | litDecReal=LIT_DEC_REAL
     | litDecInt=LIT_DEC_INT
     | litHexInt=LIT_HEX_INT
-    | litReal=LIT_DEC_REAL
+    | litBinInt=LIT_BIN_INT
+    | litSymbol=LIT_SYMBOL
     | litString=stringLiteral
     ;
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
 chainExpr: '{' '}' | '{' optExpr=expr '}' | '{' (prefix+=stmt ';')+ '}' | '{' (prefix+=stmt ';')+ optTail=expr '}';
-lambdaExpr: '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr ;
-aotLambdaExpr: '[' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ']' '=>' body=expr ;
+lambdaExpr: '(' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr ;
+aotLambdaExpr: '[' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? ']' '=>' body=expr ;
 signatureTSE
     : '(' ')' '->' ret_t=expr
     | '(' argTypes+=expr (',' argTypes+=expr)* ')' '->' retType=expr
@@ -89,7 +90,7 @@ signatureTSE
     ;
 adtTSE
     : (prod='struct'|sum='union')
-        '{' (names+=ID ':' types+=expr (',' names+=ID ':' types+=expr)*)? '}'
+        '{' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? '}'
     ;
 interfaceTSE: 'interface' '{' interfaceHeader ';' (interfaceBody+=implBodyStmt ';')* '}' ;
 interfaceHeader: 'requires' '{' (reqs+=interfaceRequirementSpec ';')* '}' 'for' '{' (provisions+=interfaceProvisionSpec ';')* '}';
@@ -117,7 +118,7 @@ postfixExpr
     ;
 unaryExpr
     : through=postfixExpr 
-    | (mutUnaryOp='mut'|logicalNotUnaryOp='not'|bitwiseNotUnaryOp='~'|posUnaryOp='+'|negUnaryOp='-') arg=unaryExpr
+    | (mutUnaryOp='mut'|logicalNotUnaryOp='not'|bitwiseNotUnaryOp='~'|posUnaryOp='+'|negUnaryOp='-'|deRefOp='*') arg=unaryExpr
     ;
 mulBinaryExpr: through=unaryExpr | ltArg=mulBinaryExpr (mul='*'|div='/'|rem='%') rtArg=unaryExpr ;
 addBinaryExpr: through=mulBinaryExpr | ltArg=addBinaryExpr (add='+'|sub='-') rtArg=mulBinaryExpr ;
