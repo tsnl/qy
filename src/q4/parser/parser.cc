@@ -11,7 +11,8 @@
 #include "Q4SourceFileParser.h"
 #include "Q4SourceFileBaseVisitor.h"
 
-#include "q4/ast/ast.hh"
+#include "q4/ast/node.hh"
+#include "q4/ast/source.hh"
 #include "q4/util/feedback.hh"
 
 namespace q4 {
@@ -176,7 +177,7 @@ antlrcpp::Any Q4SfParser::visitStringLiteral(Q4SourceFileParser::StringLiteralCo
         int ec = visitStringLiteralChunk(chunkContext).as<int>();
         assert(ec == 0 && "visitStringLiteralChunk failed");
     }
-    PExp newExp = q4::newAstNode<LiteralStringExp>(m_source, span(context), std::move(m_tmpRuneBuf));
+    PExp newExp = new q4::LiteralStringExp(span(context), std::move(m_tmpRuneBuf));
     m_tmpRuneBuf = std::vector<int>();
     return newExp;
 }
@@ -200,7 +201,7 @@ antlrcpp::Any Q4SfParser::visitStmt(Q4SourceFileParser::StmtContext* context) {
     }
 }
 antlrcpp::Any Q4SfParser::visitBindStmt(Q4SourceFileParser::BindStmtContext* context) {
-
+    
 }
 antlrcpp::Any Q4SfParser::visitEvalStmt(Q4SourceFileParser::EvalStmtContext* context) {
 

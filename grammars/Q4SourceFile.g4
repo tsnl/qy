@@ -40,13 +40,13 @@ stmt: bind=bindStmt | eval=evalStmt | import_=importStmt | impl=implStmt ;
 bindStmt: ID '=' expr ;
 evalStmt: expr ;
 importStmt: 'import' stringLiteral ;
-implStmt: 'impl' t=expr ':' ifc=expr 'using' '[' 'this' ':' 'This' ']' '{' unwrappedImplBody '}';
-staticImplBindStmt: 'This' '.' ID ':' expr;
+implStmt: t=expr ':' ifc=expr 'using' '[' 'this' ':' 'This' ']' '{' unwrappedImplBody '}';
 
 // impl body:
 unwrappedImplBody: (stmts+=implBodyStmt) ;
-implBodyStmt: nonstaticImplBindStmt | staticImplBindStmt;
-nonstaticImplBindStmt: 'this' '.' ID ':' expr;
+implBodyStmt: ns=nonstaticImplBindStmt | s=staticImplBindStmt;
+nonstaticImplBindStmt: 'this' '.' ID '=' expr;
+staticImplBindStmt: 'This' '.' ID '=' expr;
 
 expr: binaryExpr ;
 wrappedExpr     // single-token, string, or '(...)' '{...}'
@@ -60,16 +60,17 @@ primaryExpr
     : wrapped=wrappedExpr
     | lambda=lambdaExpr
     | aotLambda=aotLambdaExpr
-    | signature=signatureExpr
+    | signature=signatureTSE
     | ite=iteExpr
     | literal=literalExpr
     | adt=adtTSE
     | ifc=interfaceTSE
+    | builtinOp=builtinOpExpr
     ;
 literalExpr
-    : litBoolT='true'
-    | litBoolF='false'
-    | litNone='none'
+    : litBoolT='%t'
+    | litBoolF='%f'
+    | litNone='%none'
     | litSymbol=LIT_SYMBOL
     | litBinInt=LIT_BIN_INT
     | litDecInt=LIT_DEC_INT
@@ -79,13 +80,9 @@ literalExpr
     ;
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
 chainExpr: '{' '}' | '{' optExpr=expr '}' | '{' (prefix+=stmt ';')+ '}' | '{' (prefix+=stmt ';')+ optTail=expr '}';
-lambdaExpr
-    : '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr
-    ;
-aotLambdaExpr
-    : '[' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ']' '=>' body=expr
-    ;
-signatureExpr
+lambdaExpr: '(' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr ;
+aotLambdaExpr: '[' (argNames+=ID ':' argTypes+=expr (',' argNames+=ID ':' argTypes+=expr)*)? ']' '=>' body=expr ;
+signatureTSE
     : '(' ')' '->' ret_t=expr
     | '(' argTypes+=expr (',' argTypes+=expr)* ')' '->' retType=expr
     | '[' argTypes+=expr (',' argTypes+=expr)* ']' '->' retType=expr
@@ -94,14 +91,22 @@ adtTSE
     : (prod='struct'|sum='union')
         '{' (names+=ID ':' types+=expr (',' names+=ID ':' types+=expr)*)? '}'
     ;
-interfaceTSE: 'interface' '{' interfaceHeader ';' (interfaceBody+=stmt ';')* '}' ;
-interfaceHeader: 'requires' '{' (reqs+=expr ';')* '}' 'for' '{' (provisions+=interfaceProvisionSpec ';')* '}';
-interfaceProvisionSpec
-    : 'this' '.' ID ':' expr   #interfaceProvisionSpecForNonStatic
-    | 'This' '.' ID ':' expr   #interfaceProvisionSpecForStatic
+interfaceTSE: 'interface' '{' interfaceHeader ';' (interfaceBody+=implBodyStmt ';')* '}' ;
+interfaceHeader: 'requires' '{' (reqs+=interfaceRequirementSpec ';')* '}' 'for' '{' (provisions+=interfaceProvisionSpec ';')* '}';
+interfaceRequirementSpec
+    : 'this' '.' ID ':' expr    #interfaceRequirementSpecForNonStatic
+    | 'This' '.' ID ':' expr    #interfaceRequirementSpecForStatic
+    | ID ':' expr               #interfaceRequirementSpecForEnv
     ;
-iteExpr: 'if' '(' condExpr=expr ')' thenBranchExpr=wrappedExpr ('else' optElseBranchExpr=wrappedExprOrIteExpr)? ;
+interfaceProvisionSpec
+    : 'this' '.' ID ':' expr    #interfaceProvisionSpecForNonStatic
+    | 'This' '.' ID ':' expr    #interfaceProvisionSpecForStatic
+    ;
+iteExpr: 'if' condExpr=expr thenBranchExpr=wrappedExpr ('else' optElseBranchExpr=wrappedExprOrIteExpr)? ;
 wrappedExprOrIteExpr: wrapped=wrappedExpr | ite=iteExpr ;
+builtinOpExpr
+    : (sizeof_='%size'|typeof_='%type') '[' arg=expr ']'
+    ;
 postfixExpr
     : through=primaryExpr                                           #throughPostfixExpr
     | self=postfixExpr '[' (args+=expr (',' args+= expr)*)? ']'     #lookupPostfixExpr
@@ -123,4 +128,5 @@ bitwiseAndBinaryExpr: through=bitwiseXOrBinaryExpr | ltArg=bitwiseAndBinaryExpr 
 bitwiseOrBinaryExpr: through=bitwiseAndBinaryExpr | ltArg=bitwiseOrBinaryExpr '|' rtArg=bitwiseAndBinaryExpr ;
 logicalAndBinaryExpr: through=bitwiseOrBinaryExpr | ltArg=logicalAndBinaryExpr 'and' rtArg=bitwiseOrBinaryExpr ;
 logicalOrBinaryExpr: through=logicalAndBinaryExpr | ltArg=logicalOrBinaryExpr 'or' rtArg=logicalAndBinaryExpr ;
-binaryExpr: logicalOrBinaryExpr;
+assignBinaryExpr: through=logicalOrBinaryExpr | ltArg=assignBinaryExpr ':=' rtArg=logicalOrBinaryExpr ;
+binaryExpr: assignBinaryExpr;

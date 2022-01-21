@@ -3,7 +3,7 @@
 #include <stack>
 #include <cstdint>
 
-#include "q4/ast/ast.hh"
+#include "q4/ast/node.hh"
 #include "q4/util/intern.hh"
 #include "scope.hh"
 #include "frame.hh"

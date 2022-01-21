@@ -1,4 +1,4 @@
-#include "q4/q4.hh"
+#include "q4/ast/node.hh"
 #include <iostream>
 
 int main() {

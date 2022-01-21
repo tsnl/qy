@@ -1,8 +1,9 @@
 import "filepath";  // import is like a cached include.
 
-// NOTE: use `#<id>` for symbol codes/tags.
+// NOTE: use `#<(id.)*id>` for symbol codes/tags.
+// NOTE: use `%<id>` for builtins
 // NOTE: use '=' to bind values to identifiers. Bindings cannot be changed, though bound objects can be mutated.
-moduleID: #q4_eg1;
+moduleID = #q4_eg1;
 
 // **All types must be statically, manifestly, and monomorphically typed at the time of their creation.**
 // However, types are anonymous and first-class objects, so they can be created with functions.
@@ -31,7 +32,6 @@ v4 = polynomial(Array[Float32, v]{1, 2, 3, 4}); // v is known at compile time he
 // methods are type-overloadable even by refined type.
 w = polynomial(Vec3f(0.0f));
 
-// NOTE: use `:` as an `isa` binary operator which holds special meaning in some contexts.
 // NOTE: `this` and `This` are keywords
 IScalar = interface {
     requires {
@@ -69,7 +69,7 @@ IVector = [T: IScalar, n: Int32] => interface {
 };
 
 // TODO: can implement this generically! Cover more of the `Vector T n` space.
-impl Float32: IScalar using [this: This] {
+Float32: IScalar using [this: This] {
     // NOTE: we can inject the static constant 'mulIdentity' for even builtins like 'Float32'
     This.mulIdentity = 1.0f;
     
@@ -77,14 +77,14 @@ impl Float32: IScalar using [this: This] {
     // via 'interface' like Go)
     this.mulInPlace = scalar => { this *= scalar; };
 };
-impl Vec3f: IVector(Float32, 3) using [this: This] {
+Vec3f: IVector(Float32, 3) using [this: This] {
     this.lengthSquared = () => { 
-        this[0]*this[0] + this[1]*this[1] * this[2]*this[2] 
+        this(0)*this(0) + this(1)*this(1) * this(2)*this(2)
     };
     this.scale = () => { 
-        this[0].scale(this.length().mulInverse());
-        this[1].scale(this.length().mulInverse());
-        this[2].scale(this.length().mulInverse());
+        this(0).scale(this.length().mulInverse());
+        this(1).scale(this.length().mulInverse());
+        this(2).scale(this.length().mulInverse());
     };
 };
 
