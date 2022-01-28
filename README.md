@@ -2,91 +2,48 @@
 
 (WIP)
 
-Q4 is a systems programming language that feels like Python.
+Q4 is a verified systems programming language that is designed to enable 
+-   safety, for any program you could write in assembly
+    -   the compiler checks both types and values to ensure your program proves it computes the expected output
+    -   the compiler does not impose any stylistic check: if you can prove it, you can use it
+    -   e.g. refinement types and dependent types, which incorporate static or dynamic values resp. into type definitions with a predicate
+    -   elides as many run-time type checks as possible, try to guarantee no runtime errors unless hardware issue.
+-   time-saving compiler-driven inference
+    -   in conjunction with DSLs and/or custom parsers/loaders/translaters, the Q4 compiler can be extended to check arbitrary logic.
+    -   the theorem prover can be used to solve for arbitrary unknowns at compile-time, saving error-prone hard-coding where unrequired
+-   10x productivity on small and medium size projects
+    -   these goals should result from improved error messages, autocomplete, but mostly finding pitfalls as early as possible.
+    -   these proof systems have trouble scaling up to larger projects, piecewise analysis of crates/packages/modules is the only way to go
+-   the next generation of programs
+    -   Programs are just a series of bits, and the ways we assemble programs now need to get better if we want to assemble better programs.
+    -   Encoding value information at compile-time empowers the compiler to infer much more about program structure.
+        -   e.g. awareness of IO interfaces provided by an OS/platform like files, sockets, websockets, ports, etc.
+            -   the crucial next-step to smarter inference
+            -   vital for distributed systems
+        -   e.g. awareness of hardware interfaces provided by a piece of hardware
+        -   e.g. solving high-level constraints using the most efficient, provably correct low-level code possible
+        -   e.g. probabilistic approaches to programming, which will yield the best performance optimizations
+            -   key is to embed an algebra describing random variables into the type solver
+            -   e.g. describing real-world phenomena (this interrupt has 0.0000005% probability of being triggered per us, that interrupt has 85% probability per us, but more granular)
+            -   e.g. generating (maybe even weighted) hints for branch prediction, using iterative compilation and POGO in its ultimate form
+            -   e.g. zero-error/error-acceptable approximate data-representations
+            -   e.g. true error estimates for things like time, failure rates, etc.
+    -   We need ways to run higher-level languages faster: why not embed in a low-level languages?
+        -   e.g. latent typing is traditionally hard to infer and hard to check: but a boxed data model in Q4 is first proved to be correct with invariants by the programmer.
+            -   latent typing relies on using the same base-type for all/many instances, and querying values to determine typing
+            -   a-ha! **refinement types can be used to encode latent type systems in a manifest type-system, and in a verifiably safe way!**
+        -   this would allow transparent data-sharing between different ecosystems
+            -   certain parts of the application can be written in a simpler sub-language, while performance-sensitive areas are coded in a language at C-level.
 
-If we think of compilers as accepting scripts that program them to produce certain output, then this script is purely declarative for all existing programming languages.
-
-Instead, Q4 uses an imperative scripting environment, and exploits the fact that iteratively JIT-ing each statement and linking into a larger accumulated object produces the desired compiled output within a closure.
-
-Q4c compiles code in a single pass, loading and executing each statement iteratively just in time.
-During this loading process, any statement may invoke any prior statement (at compile-time) to compute results to integrate into the next statement.
-Combined with boxing and type inference, this produces a manifestly-typed language with a dynamic feel, since the user can evaluate and instantiate anything anywhere.
-
-Message passing is a key feature of this language. It allows...
--   user-programmable manual memory management: define 'heap' objects as an interface to raw memory: implement your own collectors to work with a managed heap.
--   complex metatyping: since types are first-class objects, it should be possible to define complex data-types and perform/embed refinement checks 
-    -   iterative compilation clearly communicates where the compiler will interpose on user flow (between statements)
-    -   first-class types allow the user to specify messages that are invoked during type-checks at compile-time
-    -   first-class everything allows the compiler to easily interface with the heap and read existing functions, values, etc.
--   elegant compile-time evaluation
-    -   (Motivating backstory + comparison to C++ constexpr evaluation)
-    
-        In Qy-v1 (haha), I developed a sophisticated compile-time execution mechanism that allowed arbitrary expressions to be evaluated at compile time.
-
-        I was dissatisfied with its abilities, because like C++, it could only evaluate `constexpr` statements, and for good reason: the heap is frozen during compile-time evaluation because the heap does not exist yet.
-
-        However, such compile-time evaluation was required to specify inputs to templates, a key feature of metaprogramming.
-
-        This meant that much of the language tended toward a functional style, devoid of side-effects.
-
-        Unfortunately, this **prevented me from solving my real-world issues** related to pre-processing data files during compile-time: wouldn't it be best if
-        we could parse data files into optimized blobs during compile-time?
-
-        **This approach overcomes these issues in the following ways...** 
-    
-    -   templates are now powered by a full-fledged runtime, using imperative, stateful calculations.
-
-    -   this permits **arbitrary compile-time evaluation and the creation of rich data-structures in a way that is simplest for the user.**
-
-        In interpreted mode, a 'main' callback defined by the user is invoked immediately after compiling/evaluating each statement.
-        After compiling/evaluating each statement, the source code is frozen, and no more computation can occur unless we invoke a function, so we can compile any loaded functions into an executable, confident that any future function calls will be within a closure ball covered by this executable.
-
-        When the program is compiled to an executable, we 'freeze' the state immediately before calling 'main', saving it to an executable file.
-
-        Thus, a programmer may treat any code evaluated during load-time as 'compile-time' evaluation, and any code invoked from a bound entry point as
-        'run-time' evaluation.
-
-See [doc/001.Manual.md](/doc/001.Manual.md) for notes about the language.
-
-## Build Instructions
-
--   Requirements:
-    -   (On Linux) install these packages (for Ubuntu): `pkg-config`, `uuid-dev`
-    -   CMake + a CMake-compatible C++ build toolchain
-    -   A recent Java runtime environment
--   Run `scripts/setup.001-antlr_build.*` based on your platform.
-    -   Builds ANTLR
-    -   Generates C++ source code from grammar
--   Build this project with CMake.
-    
-    (Make a build directory, configure with this repo's root as the source directory, configure and build using your CMake toolchain)
-
-    ```bash
-    $ pwd
-    # should display the path to where you cloned this repo
-    $ cd build
-    # on Linux:
-        $ ccmake ..
-    # on Windows:
-        $ cmake-gui ..
-    # ...configure your build, then...
-    $ cmake ..
-    $ cmake --build .
-    # may need to run `cmake --build .` twice if clock skew is detected (e.g. on WSL)
-    $ cd ..
-    ```
-
-Then, run the `q4c` executable with no arguments to see help.
--   Run `$ q4c <target-file-path>` to interpret a specified file
--   Run `$ q4c <target-file-path> -o <output-file-path>` to compile an output executable, then exit. Use `-x` instead of `-o` to execute after
-building.
--   Run `$ q4c` or `$ q4c -h` to print help.
-
-
-## Resources
-
--   https://llvm.org/docs/tutorial/BuildingAJIT1.html
-
-    "just referencing a definition, even if it is never used, will be enough to trigger compilation": just what we want [for now, at least?].
-
--   See: https://tomassetti.me/getting-started-antlr-cpp/
+You, the user, define 'refinement types', which are sets of values that, in addition to being of the same base-type, _always_ obey some invariants you choose.
+To check these, Q4 uses liquid types, a type-checking technique that uses the following steps:
+-   first, a 'base-type', which describes only data layout but not (much) semantics, is determined using conventional type-checking and type-inference rules.
+    -   e.g. this is a pointer, this is an int, this is a struct that was defined on line X, etc.
+    -   if any errors are detected, the compiler halts.
+-   next, 'liquid types' are initialized for each value 'slot' in the program: these are variables we can reason about using the Z3 theorem-prover.
+    -   using the rules of liquid type inference, we can systematically verify that our invariants hold just like a type-checker ensures that typing-invariants hold.
+    -   e.g. constraining the range of an integer to prevent overflow
+    -   e.g. parsing memory stored at an opaque object handle/a tagged union object handle
+-   if the program can be proved successfully, then LLVM IR can be emitted using base-types, and refinements can be used to help the backend/optimizer.
+    -   e.g. eliminating dynamic checks for conditions we know to be true
+    -   e.g. eliminating unreachable pieces of code or always-true branches
