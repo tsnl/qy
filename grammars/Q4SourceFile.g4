@@ -69,9 +69,9 @@ wrappedExpr     // single-token, string, or '(...)' '{...}'
     | chain=chainExpr
     ;
 literalExpr
-    : litBoolT='%t'
-    | litBoolF='%f'
-    | litNone='%none'
+    : litBoolT='true'
+    | litBoolF='false'
+    | litNone='none'
     | litDecReal=LIT_DEC_REAL
     | litDecInt=LIT_DEC_INT
     | litHexInt=LIT_HEX_INT
