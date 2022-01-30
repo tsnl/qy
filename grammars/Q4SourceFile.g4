@@ -71,7 +71,6 @@ wrappedExpr     // single-token, string, or '(...)' '{...}'
 literalExpr
     : litBoolT='true'
     | litBoolF='false'
-    | litNone='none'
     | litDecReal=LIT_DEC_REAL
     | litDecInt=LIT_DEC_INT
     | litHexInt=LIT_HEX_INT
@@ -81,7 +80,7 @@ literalExpr
     ;
 parenExpr: '(' ')' | '(' optExpr=expr ')' ;
 chainExpr: '{' '}' | '{' optExpr=expr '}' | '{' (prefix+=stmt ';')+ '}' | '{' (prefix+=stmt ';')+ optTail=expr '}';
-lambdaExpr: '(' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? ')' '=>' (ses_g='mut')? (ses_c='closed')? body=expr ;
+lambdaExpr: '(' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? ')' (ses_g='mut')? (ses_c='closed')? body=expr ;
 aotLambdaExpr: '[' (formalArgs+=formalArg (',' formalArgs+=formalArg)*)? ']' '=>' body=expr ;
 signatureTSE
     : '(' ')' '->' ret_t=expr
