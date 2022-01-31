@@ -1,3 +1,4 @@
+import dataclasses
 import os
 import os.path
 import typing as t
@@ -39,21 +40,37 @@ class Emitter(base_emitter.BaseEmitter):
         os.makedirs(self.types_abs_output_dir_path, exist_ok=True)
         os.makedirs(self.modules_abs_output_dir_path, exist_ok=True)
 
+        # collecting all extern headers:
+        extern_header_source_file_paths = []
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
-            if isinstance(qyp, ast2.NativeQyp):
-                self.emit_per_type_headers(qyp_name, qyp)
+            if isinstance(qyp, ast2.CQyxV1):
+                for c_source_file in qyp.c_source_files:
+                    path = c_source_file.file_path
+                    assert os.path.isabs(path)
+                    extern_header_source_file_paths.append(c_source_file.file_path)
 
+        # emitting the 'types' subdirectory of build:
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.NativeQyp):
-                self.emit_module_body(qyp_name, qyp)
+                self.emit_native_qyp_per_type_headers(qyp_name, qyp, extern_header_source_file_paths)
+            # else:
+            #     raise NotImplementedError(f"'emit_per_type_headers' for Qyp of type '{qyp.__class__.__name__}'")
+
+        # emitting the 'modules' subdirectory of build:
+        for qyp_name, qyp in qyp_set.qyp_name_map.items():
+            if isinstance(qyp, ast2.NativeQyp):
+                self.emit_native_qyp_module_body(qyp_name, qyp, extern_header_source_file_paths)
+            # else:
+            #     raise NotImplementedError(f"'emit_module_body' for Qyp of type '{qyp.__class__.__name__}'")
         
+        # emitting any CMake files used to build the whole project:
         self.emit_cmake_lists(qyp_set)
 
     #
     # part 1: emitting type headers.
     #
 
-    def emit_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp):
+    def emit_native_qyp_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_file_paths: t.List[str]):
         for src_file_path, src_obj in qyp.src_map.items():
             self.collect_pub_named_types(src_obj.stmt_list)
 
@@ -63,10 +80,18 @@ class Emitter(base_emitter.BaseEmitter):
         #       - some types have only a declaration and not a definition-- atomic aliases
         #   - include types' headers based on whether they are required via direct or indirect reference
         for qy_type, type_name in self.pub_type_to_header_name_map.items():
+            # creating file writers, adding all extern source paths as headers:
             type_files_stem = f"{self.types_abs_output_dir_path}/{type_name}"
-            type_decl_file = CppFile(CppFileType.TypeDeclHeader, type_files_stem)
-            type_def_file = CppFile(CppFileType.TypeDefHeader, type_files_stem)
+            type_decl_file = CppFileWriter(CppFileType.TypeDeclHeader, type_files_stem)
+            type_def_file = CppFileWriter(CppFileType.TypeDefHeader, type_files_stem)
+            for abs_extern_header_path in extern_header_source_file_paths:
+                type_decl_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False))
+                type_def_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False))
+            
+            # emitting:
             self.emit_one_per_type_header_pair(qy_type, type_name, type_decl_file, type_def_file)
+            
+            # finalizing:
             type_decl_file.close()
             type_def_file.close()
 
@@ -106,7 +131,7 @@ class Emitter(base_emitter.BaseEmitter):
             raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
         
         # linking definition to declaration:
-        type_def_file.include_paths.append((False, type_decl_file.file_name))
+        type_def_file.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=type_decl_file.file_name))
 
         # emitting definitions:
         if qy_type.is_composite:
@@ -130,17 +155,17 @@ class Emitter(base_emitter.BaseEmitter):
                 ))
                 type_def_file.print(f"using {type_name} = {return_type}(*)({args_str});")
 
-    def insert_type_ref_includes(self, print_file: "CppFile", qy_type: types.BaseType, direct_ref: bool):
+    def insert_type_ref_includes(self, print_file: "CppFileWriter", qy_type: types.BaseType, direct_ref: bool):
         # NOTE: every compound just includes dependencies required to write the type.
         
         # first, checking if this type has a name: just include it directly.
         opt_existing_name = self.pub_type_to_header_name_map.get(qy_type, None)
         if opt_existing_name:
             if direct_ref:
-                extension = CppFile.file_type_suffix[CppFileType.TypeDefHeader]
+                extension = CppFileWriter.file_type_suffix[CppFileType.TypeDefHeader]
             else:
-                extension = CppFile.file_type_suffix[CppFileType.TypeDeclHeader]
-            print_file.include_paths.append((False, f"{opt_existing_name}{extension}"))
+                extension = CppFileWriter.file_type_suffix[CppFileType.TypeDeclHeader]
+            print_file.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"{opt_existing_name}{extension}"))
 
         # otherwise, this is an anonymous type.
         # we must include all types used to write this type.
@@ -175,10 +200,14 @@ class Emitter(base_emitter.BaseEmitter):
     # part 2: emitting module body
     #
 
-    def emit_module_body(self, qyp_name: str, qyp: ast2.NativeQyp):
+    def emit_native_qyp_module_body(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_file_paths: t.List[str]):
+        # creating output files, adding external project headers to all includes:
         output_file_stem = os.path.join(self.modules_abs_output_dir_path, qyp_name)
-        hpp_file = CppFile(CppFileType.MainHeader, output_file_stem)
-        cpp_file = CppFile(CppFileType.MainSource, output_file_stem)
+        hpp_file = CppFileWriter(CppFileType.MainHeader, output_file_stem)
+        cpp_file = CppFileWriter(CppFileType.MainSource, output_file_stem)
+        for abs_extern_header_path in extern_header_source_file_paths:
+            hpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str="C"))
+            cpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str="C"))
         
         print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
         
@@ -190,7 +219,7 @@ class Emitter(base_emitter.BaseEmitter):
         cpp_file.close()
         hpp_file.close()
 
-    def emit_module_body_stmt(self, c: "CppFile", h: "CppFile", stmt: ast1.BaseStatement, is_top_level: bool):
+    def emit_module_body_stmt(self, c: "CppFileWriter", h: "CppFileWriter", stmt: ast1.BaseStatement, is_top_level: bool):
         assert c.type == CppFileType.MainSource
         assert h.type == CppFileType.MainHeader
         
@@ -259,8 +288,8 @@ class Emitter(base_emitter.BaseEmitter):
             _, def_type = def_obj.scheme.instantiate()
             if def_type in self.pub_type_to_header_name_map:
                 # public type => it has its own header pair => include this in the header
-                type_def_extension = CppFile.file_type_suffix[CppFileType.TypeDefHeader]
-                h.include_paths.append((False, f"types/{stmt.name}{type_def_extension}"))
+                type_def_extension = CppFileWriter.file_type_suffix[CppFileType.TypeDefHeader]
+                h.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"types/{stmt.name}{type_def_extension}"))
             else:
                 # private type => define in 'c' file
                 assert isinstance(def_type, types.BaseType)
@@ -299,10 +328,10 @@ class Emitter(base_emitter.BaseEmitter):
         else:
             raise NotImplementedError(f"emit_declarations_for_stmt: {stmt}")
 
-    def emit_expression(self, f: "CppFile", exp: ast1.BaseExpression):
+    def emit_expression(self, f: "CppFileWriter", exp: ast1.BaseExpression):
         f.print(self.translate_expression(exp))
 
-    def emit_block(self, c: "CppFile", h: "CppFile", block: t.List[ast1.BaseStatement]):
+    def emit_block(self, c: "CppFileWriter", h: "CppFileWriter", block: t.List[ast1.BaseStatement]):
         for stmt in block:
             self.emit_module_body_stmt(c, h, stmt, is_top_level=False)
 
@@ -574,8 +603,8 @@ class Emitter(base_emitter.BaseEmitter):
                 else:
                     cml_print(f"add_library({qyp_name} SHARED")
                 
-                cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainHeader]}")
-                cml_print(f"\tmodules/{qyp_name}{CppFile.file_type_suffix[CppFileType.MainSource]}")
+                cml_print(f"\tmodules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
+                cml_print(f"\tmodules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
                 
                 cml_print(")")
 
@@ -588,6 +617,12 @@ class Emitter(base_emitter.BaseEmitter):
 # CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
 CodeFragment = t.Union[str, t.List[str]]
 
+@dataclasses.dataclass
+class IncludeSpec:
+    include_path: str
+    use_angle_brackets: bool
+    extern_str: t.Optional[str] = None
+
 
 class CppFileType(enum.Enum):
     MainSource = enum.auto()
@@ -596,33 +631,30 @@ class CppFileType(enum.Enum):
     TypeDeclHeader = enum.auto()
 
 
-class CppFile(object):
+class CppFileWriter(object):
     file_type_suffix = {
         CppFileType.MainHeader: ".hpp",
         CppFileType.MainSource: ".cpp",
-        CppFileType.TypeDefHeader: ".def.hpp",
-        CppFileType.TypeDeclHeader: ".decl.hpp"
+        CppFileType.TypeDefHeader: ".hpp",
+        CppFileType.TypeDeclHeader: ".hpp"
     }
 
     def __init__(
         self, 
         file_type: CppFileType,
-        file_stem: str,
+        file_stem: str
         # indent_str: str='\t'
     ) -> None:
         super().__init__()
         self._type = file_type
         self.stem = file_stem
         self.stem_base = os.path.basename(self.stem)
-        self.path = f"{self.stem}{CppFile.file_type_suffix[self._type]}"
+        self.path = f"{self.stem}{CppFileWriter.file_type_suffix[self._type]}"
         self.os_file_handle = open(self.path, 'w', buffering=4*1024)
         self.indent_count = 0
         self.indent_str = '\t'
-        self.include_paths: t.List[bool, str] = []
-        self.document_sections = {
-            "prefix": [],
-            "body": []
-        }
+        self.include_specs: t.List[IncludeSpec] = []
+        self.document_sections = {"prefix": [], "body": []}
         
         #
         # Post-constructor, but constructor-time:
@@ -634,7 +666,10 @@ class CppFile(object):
             self.print(target='prefix')
             self.add_common_stdlib_header_includes()
         elif self.type == CppFileType.MainSource:
-            self.include_paths.append((False, self.stem_base + CppFile.file_type_suffix[CppFileType.MainHeader]))
+            # including the header file, as is customary for implementation files:
+            include_spec = IncludeSpec(use_angle_brackets=False, include_path=self.stem_base + CppFileWriter.file_type_suffix[CppFileType.MainHeader])
+            self.include_specs.append(include_spec)
+            self.add_common_stdlib_header_includes()
         elif self.type == CppFileType.TypeDeclHeader:
             self.print("#pragma once", target='prefix')
             self.print(target='prefix')
@@ -664,16 +699,22 @@ class CppFile(object):
             print(prefix_line, file=self.os_file_handle)
 
         # includes:
-        abs_include_paths = [path for is_abs, path in self.include_paths if is_abs]
-        rel_include_paths = [path for is_abs, path in self.include_paths if not is_abs]
-        if abs_include_paths:
-            for include_path in abs_include_paths:
-                print(f"#include <{include_path}>", file=self.os_file_handle)
-            print(file=self.os_file_handle)
-        if rel_include_paths:
-            for include_path in rel_include_paths:
-                print(f"#include \"{include_path}\"", file=self.os_file_handle)
-            print(file=self.os_file_handle)
+        cpp_include_specs = [include_spec for include_spec in self.include_specs if include_spec.extern_str is None]
+        c_include_specs = [include_spec for include_spec in self.include_specs if include_spec.extern_str == "C"]
+        assert len(cpp_include_specs) + len(c_include_specs) == len(self.include_specs)
+        abs_cpp_include_specs = [it.include_path for it in cpp_include_specs if it.use_angle_brackets]
+        rel_cpp_include_specs = [it.include_path for it in cpp_include_specs if not it.use_angle_brackets]
+        abs_extern_c_include_specs = [it.include_path for it in c_include_specs if it.use_angle_brackets]
+        rel_extern_c_include_specs = [it.include_path for it in c_include_specs if not it.use_angle_brackets]
+
+        if abs_cpp_include_specs:
+            self.print_includes(abs_cpp_include_specs, True)
+        if rel_cpp_include_specs:
+            self.print_includes(rel_cpp_include_specs, False)
+        if abs_extern_c_include_specs:
+            self.print_includes(abs_extern_c_include_specs, True, "C")
+        if rel_extern_c_include_specs:
+            self.print_includes(rel_extern_c_include_specs, False, "C")
 
         # body lines:
         body_lines = self.document_sections['body']
@@ -682,6 +723,25 @@ class CppFile(object):
 
         self.os_file_handle.close()
         self.os_file_handle = None
+
+    def print_includes(self, include_specs, use_angle_brackets, opt_extern_str=None):
+        open_quote, close_quote = ('<', '>') if use_angle_brackets else ('"', '"')
+        
+        if opt_extern_str:
+            indent_str = '\t'
+            print(f"extern \"{opt_extern_str}\" {{", file=self.os_file_handle)
+        else:
+            indent_str = ''
+
+        for include_path in include_specs:
+            sep_normalized_include_path = include_path.replace(os.sep, '/') if os.sep != '/' else include_path
+            clean_include_path = sep_normalized_include_path
+            print(f"{indent_str}#include {open_quote}{clean_include_path}{close_quote}", file=self.os_file_handle)
+        
+        if opt_extern_str:
+            print(f"}}", file=self.os_file_handle)
+        
+        print(file=self.os_file_handle)
 
     def print(self, code_fragment: CodeFragment = "", target="body"):
         if isinstance(code_fragment, str):
@@ -701,8 +761,8 @@ class CppFile(object):
         # print(file=self.os_file_handle)
     
     def add_common_stdlib_header_includes(self):
-        self.include_paths.append((True, "cstdint"))
-        self.include_paths.append((True, "string"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
         
     def inc_indent(self):
         self.indent_count += 1
@@ -714,7 +774,7 @@ class CppFile(object):
 class Block(object):
     def __init__(
         self, 
-        cpp_file: "CppFile", 
+        cpp_file: "CppFileWriter", 
         prefix: str = "", 
         suffix: str = "", 
         opening_brace: str = "{",
@@ -722,7 +782,7 @@ class Block(object):
         close_with_semicolon: bool = False
 ) -> None:
         super().__init__()
-        self.cpp_file: "CppFile" = cpp_file
+        self.cpp_file: "CppFileWriter" = cpp_file
         self.prefix: str = prefix
         self.suffix: str = suffix
         self.opening_brace = opening_brace

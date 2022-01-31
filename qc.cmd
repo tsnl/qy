@@ -1,1 +1,1 @@
-python3 qc.py %*
+python qc.py %*

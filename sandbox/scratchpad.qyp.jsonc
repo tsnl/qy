@@ -1,0 +1,7 @@
+{
+    "name": "scratchpad",
+    "author": "https://github.com/tsnl",
+    "help": "A file whose contents are irrelevant, but whose existence lets us keep this file immutable.",
+    "src": ["scratchpad.qy"],
+    "deps": ["extern-c-1/extern-c-1-ss1.qyx.jsonc"]
+}

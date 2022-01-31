@@ -58,7 +58,7 @@ class QyErrorListener(antlr.ANTLR4ErrorListener):
     def syntaxError(self, recognizer, offending_symbol, line, column, message, e):
         panic.because(
             panic.ExitCode.SyntaxError,
-            opt_msg=message,
+            opt_msg=f"Parser error: {message}",
             opt_file_path=self.source_file_path,
             opt_file_region=fb.FilePos(line-1, column)
         )

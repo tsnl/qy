@@ -1,4 +1,4 @@
-let main() {
+let main() = {
     let v = Vec2f(2.0f, 3.0f);
     // return i32(v.x);
     return 0;

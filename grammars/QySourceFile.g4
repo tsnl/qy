@@ -54,13 +54,13 @@ bind1vStatement
     ;
 bind1fStatement
     : 'let' name=ID '(' args=csIdList ')' '=' body_exp=expression
-    | 'let' name=ID '(' args=csIdList ')' '{' body_block=unwrappedBlock '}'
+    | 'let' name=ID '(' args=csIdList ')' '=' body_block=block
     ;
 bind1tStatement
     : 'let' name=ID '=' initializer=typeSpec
     ;
 type1vStatement
-    : ((is_pub='pub')|'val') name=ID ':' ts=typeSpec
+    : ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec
     ;
 constStatement
     : 'const' type_spec=typeSpec b=block
@@ -80,7 +80,7 @@ primaryExpression
     | litInteger                    #litIntPrimaryExpression
     | litFloat                      #litFloatPrimaryExpression
     | litString                     #litStringPrimaryExpression
-    | '$.prevConst'                 #prevConstPrimaryExpression
+    | '$predecessor'                #prevConstPrimaryExpression
     | id_tok=ID                     #idPrimaryExpression
     | '(' through=expression ')'    #parenPrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */

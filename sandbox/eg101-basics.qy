@@ -16,15 +16,15 @@ pub v3f_scale: (Vec3f, f32) => Vec3f;
 
 // enums provided using 'const', which translates into preprocessor declarations
 const i32 {
-    let errorCode_allOK = 0;
-    let errorCode_badCliArgs = 1 + $.prevConst;
-    let errorCode_badFilePath = 1 + $.prevConst;
-    let errorCode_detectedRuntimeError = 1 + $.prevConst;
+    let EC_ALL_OK = 0;
+    let EC_BAD_CLI_ARGS = 1 + $predecessor;
+    let EC_BAD_FILE_PATH = 1 + $predecessor;
+    let EC_DETECTED_RUNTIME_ERROR = 1 + $predecessor;
 };
 const u32 {
-    let windowFlag_fullScreen = 0x1u;
-    let windowFlag_fixedSize = 2u * $.prevConst;
-    let windowFlag_hwAccelerated = 2u * $.prevConst;
+    let WINDOW_FLAG_FULLSCREEN = 0x1u;
+    let WINDOW_FLAG_FIXED_SIZE = 2u * $predecessor;
+    let WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $predecessor;
 };
 
 // struct definitions: (enum, union are similar)
@@ -39,16 +39,17 @@ let Vec3f = struct {
 
 // function definitions:
 // NOTE: type inference fills in holes.
-let vec3f (x, y, z) = 
-    new Vec3f(x, y, z);
+let vec3f (x, y, z) = {
+    return new Vec3f(x, y, z);
+};
 
-let v3f_add (v1, v2) {
+let v3f_add (v1, v2) = {
     let vx = v1.x + v2.x;
     let vy = v1.y + v2.y;
     let vz = v1.z + v2.z;
     return vec3f(vx, vy, vz);
 };
-let v3f_scale (v, s) {
+let v3f_scale (v, s) = {
     let sx = v.x * s;
     let sy = v.y * s;
     let sz = v.z * s;
