@@ -88,7 +88,7 @@ primaryExpression
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression
     | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
-    | 'new' made_ts=typeSpec '(' args=csExpressionList ')'  #constructorExpression
+    | made_ts=typeSpec '{' args=csExpressionList '}'        #constructorExpression
     | container=postfixExpression '.' key=ID                #dotIdExpression
     ;
 unaryExpression

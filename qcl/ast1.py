@@ -7,8 +7,7 @@ import typing as t
 import enum
 from collections import defaultdict
 
-from qcl import common
-
+from . import common
 from . import feedback as fb
 
 #
@@ -156,10 +155,11 @@ class Bind1vStatement(BaseIdQualifierStatement):
 
 
 class Bind1fStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional[t.List[BaseStatement]]):
+    def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional[t.List[BaseStatement]], is_variadic: bool = False):
         super().__init__(loc, name)
         self.args = args
         self.body = body
+        self.is_variadic = is_variadic
 
     def is_extern(self):
         if isinstance(self, Bind1fStatement):

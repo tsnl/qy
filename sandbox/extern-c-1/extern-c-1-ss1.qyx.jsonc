@@ -7,7 +7,7 @@
         "*": {
             "c-flags": ["-Wall"],
             "sources": ["./print-v1.c"],
-            "headers": [{"path": "print-v1.h", "provides": ["File", "stdout", "printUtf8Char", "openFile", "closeFile"]}]
+            "headers": [{"path": "print-v1.h", "provides": ["File", "fh1", "printUtf8Char", "openFile", "closeFile"]}]
         }
     }
 }

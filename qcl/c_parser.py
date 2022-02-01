@@ -42,11 +42,13 @@ def parse_one_file(source_file_path, rem_provided_symbols: t.Set[str], is_header
         # options=clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
     )
     print(f"INFO: Parsed C TranslationUnit (TU): {tu.spelling}")
-    dbg_print_visit(tu, tu.cursor)
+    # dbg_print_visit(tu, tu.cursor)
 
     all_provided_symbols = set(rem_provided_symbols)
     if rem_provided_symbols:
         stmt_list = translate_tu(tu, rem_provided_symbols)
+    else:
+        stmt_list = []
     exposed_symbols = all_provided_symbols - rem_provided_symbols
 
     return stmt_list, exposed_symbols

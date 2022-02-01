@@ -42,20 +42,33 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
         extern_tag = None
         if isinstance(stmt, ast1.Extern1vStatement):
             extern_tag = "c"
+            var_type = stmt.var_type_spec.opt_externally_forced_type
+            assert var_type is not None
+        else:
+            var_type = types.VarType(f"bind1v_{stmt.name}")
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name, 
-            Scheme([], types.VarType(f"bind1v_{stmt.name}")),
+            Scheme([], var_type),
             extern_tag=extern_tag
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
         extern_tag = None
         if isinstance(stmt, ast1.Extern1fStatement):
             extern_tag = "c"
+            fn_arg_types = []
+            for arg_ts in stmt.arg_typespecs:
+                arg_type = arg_ts.opt_externally_forced_type
+                assert arg_type is not None
+                fn_arg_types.append(arg_type)
+            fn_ret_type = stmt.ret_typespec.opt_externally_forced_type
+            fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, is_c_variadic=stmt.is_variadic)
+        else:
+            fn_type = types.VarType(f"bind1f_{stmt.name}")
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
-            Scheme([], types.VarType(f"bind1f_{stmt.name}")),
+            Scheme([], fn_type),
             extern_tag=extern_tag
         )
     elif isinstance(stmt, ast1.Bind1tStatement):

@@ -14,10 +14,10 @@
             "headers": [
                 {"path": "print-v1.h", "provides": [
                     "File", "FileAccess", "FileType",
-                    "printUtf8Char",
+                    "printInt",
                     "openFile", "closeFile",
                     "readCharFromFile",
-                    "stdout", "stderr"
+                    "fh1", "fh2"
                 ]}
             ]
         },

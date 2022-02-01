@@ -4,9 +4,8 @@
 
 #include <stdint.h>
 
-// #define QY_PRINT_V1_MAX_OPEN_FILE_COUNT (42)
-
-// int x;
+// FIXME: move this to 'qyl' library
+// #define QY_FUNC __declspec(dllexport)
 
 struct File;
 
@@ -19,10 +18,10 @@ enum FileType {
     FILE_TYPE__BINARY
 };
 
-File* stdout;
-File* stderr;
+extern struct File* fh1;
+extern struct File* fh2;
 
-void printUtf8Char(char c);
-File* openFile(char const* path, FileAccess access, FileType file_type);
-void closeFile(File* handle);
-int readCharFromFile(File* f);
+void printInt(int v);
+struct File* openFile(char const* path, enum FileAccess access, enum FileType file_type);
+void closeFile(struct File* handle);
+int readCharFromFile(struct File* f);

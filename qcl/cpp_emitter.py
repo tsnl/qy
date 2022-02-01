@@ -5,7 +5,7 @@ import typing as t
 import enum
 import json
 
-from qcl import feedback
+from . import feedback
 from . import ast1
 from . import ast2
 from . import types
@@ -45,9 +45,10 @@ class Emitter(base_emitter.BaseEmitter):
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.CQyxV1):
                 for c_source_file in qyp.c_source_files:
-                    path = c_source_file.file_path
-                    assert os.path.isabs(path)
-                    extern_header_source_file_paths.append(c_source_file.file_path)
+                    if c_source_file.is_header:
+                        path = c_source_file.file_path
+                        assert os.path.isabs(path)
+                        extern_header_source_file_paths.append(c_source_file.file_path)
 
         # emitting the 'types' subdirectory of build:
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
@@ -232,15 +233,20 @@ class Emitter(base_emitter.BaseEmitter):
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
         
-            bind_cpp_fragments = []
-            if not def_obj.is_public:
-                bind_cpp_fragments.append('static')
-            bind_cpp_fragments.append(self.translate_type(def_type))
-            bind_cpp_fragments.append(def_obj.name)
-            bind_cpp_fragments.append("=")
-        
             c.print(f"// bind {stmt.name} = {stmt.initializer.desc}")
-            c.print(' '.join(bind_cpp_fragments))
+            if def_type is types.VoidType.singleton:
+                c.print("// binding elided for 'void' type variable.")
+            else:
+                bind_cpp_fragments = []
+                if not def_obj.is_public:
+                    bind_cpp_fragments.append('static')
+                bind_cpp_fragments.append(self.translate_type(def_type))
+                bind_cpp_fragments.append(def_obj.name)
+                bind_cpp_fragments.append("=")
+            
+                c.print(' '.join(bind_cpp_fragments))
+            
+            # regardless of return-type, evaluating the RHS in case there are any side-effects:
             with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True) as b:
                 self.emit_expression(c, stmt.initializer)
             c.print()
@@ -411,6 +417,7 @@ class Emitter(base_emitter.BaseEmitter):
 
     def translate_expression_with_type(self, exp: ast1.BaseExpression) -> t.Tuple[str, types.BaseConcreteType]:
         if isinstance(exp, ast1.IdRefExpression):
+            # FIXME: what if lookup type is 'void'? Must elide/default somehow.
             def_obj = exp.lookup_def_obj()
             assert isinstance(def_obj, typer.BaseDefinition)
             s, def_type = def_obj.scheme.instantiate()
@@ -582,31 +589,53 @@ class Emitter(base_emitter.BaseEmitter):
 
     def emit_cmake_lists(self, qyp_set: ast2.QypSet):
         cml_file_path = f"{self.root_abs_output_dir_path}/CMakeLists.txt"
+        output_path = normalize_backslash_path(self.root_abs_output_dir_path)
+            
         with open(cml_file_path, 'w') as cml_file:
             def cml_print(*args, **kwargs):
                 assert 'file' not in kwargs
                 print(*args, **kwargs, file=cml_file)
             
+            # configuring CMake:
             cml_print(f"cmake_minimum_required(VERSION 3.0.0)")
             cml_print(f"project({qyp_set.root_qyp.js_name})")
             cml_print()
-            cml_print(f"include_directories({self.root_abs_output_dir_path})")
+            cml_print(f"include_directories({output_path})")
             cml_print()
             cml_print(f"set(CMAKE_CXX_STANDARD 17)")
             cml_print()
             cml_print(f"set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
             cml_print()
 
+            # all source files go into one 'add_executable' for now.
+            # more granular package-by-package control will require inter-package dependency analysis, which can get hairy.
+            
+            # first, visiting all qyps and gathering a list of files:
+            main_target_name = None
+            source_file_paths = []
             for qyp_name, qyp in qyp_set.qyp_name_map.items():
-                if qyp is qyp_set.root_qyp:
-                    cml_print(f"add_executable({qyp_name}")
+                if isinstance(qyp, ast2.NativeQyp):
+                    if qyp is qyp_set.root_qyp:
+                        # expect only one root per project:
+                        assert main_target_name is None
+                        main_target_name = qyp_name
+
+                    source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
+                    source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
+                elif isinstance(qyp, ast2.CQyxV1):
+                    for c_source_file in qyp.c_source_files:
+                        if not c_source_file.is_header:
+                            file_path = normalize_backslash_path(c_source_file.file_path)
+                            source_file_paths.append(file_path)
                 else:
-                    cml_print(f"add_library({qyp_name} SHARED")
-                
-                cml_print(f"\tmodules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
-                cml_print(f"\tmodules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
-                
-                cml_print(")")
+                    raise NotImplementedError(f"emit_cmake_lists: Unknown Qyp of type {qyp.__class__.__name__}")
+
+            # emitting 'add_executable' call to tie everything together:
+            assert main_target_name is not None
+            cml_print(f"add_executable({main_target_name}")
+            for source_file_path in source_file_paths:
+                cml_print(f"\t{source_file_path}")
+            cml_print(")")
 
 
 #
@@ -734,7 +763,7 @@ class CppFileWriter(object):
             indent_str = ''
 
         for include_path in include_specs:
-            sep_normalized_include_path = include_path.replace(os.sep, '/') if os.sep != '/' else include_path
+            sep_normalized_include_path = normalize_backslash_path(include_path)
             clean_include_path = sep_normalized_include_path
             print(f"{indent_str}#include {open_quote}{clean_include_path}{close_quote}", file=self.os_file_handle)
         
@@ -807,6 +836,13 @@ class Block(object):
             self.cpp_file.print(self.closing_brace)
         if self.suffix:
             self.cpp_file.print(self.suffix)
+
+
+def normalize_backslash_path(raw_path):
+    if os.sep == '/':
+        return raw_path
+    else:
+        return raw_path.replace(os.sep, '/') 
 
 
 # Ooh; is this file-level hiding in Python?		

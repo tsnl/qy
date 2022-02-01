@@ -379,37 +379,53 @@ class CQyxV1(BaseQyx):
         c_compiler_args_obj = js_map["cc-args"]
         CQyxV1.check_args_obj("cc-args", c_compiler_args_obj, {"*"}, platform.core_platform_names)
         raw_common_args = c_compiler_args_obj["*"]
-        common_args = CQyx_v1_CompilerArgs.from_json_obj(path_to_root_qyx_file, target_platform, raw_common_args)
+        common_args = CQyxV1_CompilerArgs.from_json_obj(path_to_root_qyx_file, target_platform, raw_common_args)
 
         platform_args_map = {}
         for platform_name in platform.core_platform_names:
             raw_platform_args = c_compiler_args_obj.get(platform_name, None)
             if raw_platform_args is not None:
-                platform_args = CQyx_v1_CompilerArgs.from_json_obj(path_to_root_qyx_file, target_platform, raw_platform_args)
+                platform_args = CQyxV1_CompilerArgs.from_json_obj(path_to_root_qyx_file, target_platform, raw_platform_args)
                 platform_args_map[platform.Platform.name_map[platform_name].core_platform_type] = platform_args
 
-        selected_platform_args = platform_args_map.get(target_platform.core_platform_type, CQyx_v1_CompilerArgs.default)
-        include_objs = common_args.headers + selected_platform_args.headers
+        selected_platform_args = platform_args_map.get(target_platform.core_platform_type, CQyxV1_CompilerArgs.default)
+        headers_objs = common_args.headers + selected_platform_args.headers
+        sources_objs = common_args.sources + selected_platform_args.sources
 
-        # loading headers:
-        c_source_files = []
-        src_path_list = []
-        other_abs_file_paths = []   # TODO: all '.c', '.a' files here.
-        for index, include_obj in enumerate(include_objs):
+        # loading headers in 2 parallel lists:
+        header_c_source_files = []
+        header_src_path_list = []
+        for index, include_obj in enumerate(headers_objs):
             include_path = include_obj.path
-            CQyxV1.check_obj_is_str_else_panic(f"binder-includes[{index}].path", include_path, path_to_root_qyx_file)
+            CQyxV1.check_obj_is_str_else_panic(f"includes[{index}].path", include_path, path_to_root_qyx_file)
             provided_symbol_list = include_obj.provides
-            CQyxV1.check_obj_is_all_str_list_else_panic(f"binder-includes[{index}].path", provided_symbol_list, path_to_root_qyx_file)
+            CQyxV1.check_obj_is_all_str_list_else_panic(f"includes[{index}].path", provided_symbol_list, path_to_root_qyx_file)
             abs_include_path = include_path if os.path.isabs(include_path) else os.path.join(qyx_dir_path, include_path)
-            c_source_file = CSourceFile.load(abs_include_path, provided_symbol_list, True)
+            c_source_file = CSourceFile.load(abs_include_path, provided_symbol_list, is_header=True)
 
-            c_source_files.append(c_source_file)
-            src_path_list.append(abs_include_path)
+            header_c_source_files.append(c_source_file)
+            header_src_path_list.append(abs_include_path)
+
+        # loading implementation sources (just referenced, never read) in 2 parallel lists:
+        impl_c_source_files = []
+        impl_src_path_list = []
+        for index, src_obj in enumerate(sources_objs):
+            src_path = src_obj
+            CQyxV1.check_obj_is_str_else_panic(f"sources[{index}]", src_path, path_to_root_qyx_file)
+            abs_src_path = src_path if os.path.isabs(src_path) else os.path.join(qyx_dir_path, src_path)
+            c_source_file = CSourceFile.load(abs_src_path, [], is_header=False)
+
+            impl_c_source_files.append(c_source_file)
+            impl_src_path_list.append(abs_src_path)
+
+        # combining headers and sources:
+        c_source_files = header_c_source_files + impl_c_source_files
+        src_path_list = header_src_path_list + impl_src_path_list
 
         # checking that all symbols claimed to be provided in the JSON were found:
         all_provided_symbols = functools.reduce(
             lambda a, b: a | b, 
-            (set(csf.this_file_provided_symbol_set) for csf in c_source_files)
+            (set(csf.this_file_provided_symbol_set) for csf in header_c_source_files)
         )
         missing_symbols = set(provided_symbol_list) - all_provided_symbols
         if missing_symbols:
@@ -482,7 +498,7 @@ class CQyxV1(BaseQyx):
             )
 
 
-class CQyx_v1_CompilerArgs(object):
+class CQyxV1_CompilerArgs(object):
     default = None
     
     @staticmethod
@@ -520,18 +536,18 @@ class CQyx_v1_CompilerArgs(object):
         opt_headers_obj = json_obj.get("headers", None)
         if opt_headers_obj is not None:
             headers = [
-                CQyx_v1_CompilerArgs_Header.from_json_obj(path_to_root_qyx_file, target_platform, json_header_obj, header_obj_index)
+                CQyxV1_CompilerArgs_Header.from_json_obj(path_to_root_qyx_file, target_platform, json_header_obj, header_obj_index)
                 for header_obj_index, json_header_obj in enumerate(opt_headers_obj)
             ]
         
         # tying it together:
-        return CQyx_v1_CompilerArgs(c_flags, sources, headers)
+        return CQyxV1_CompilerArgs(c_flags, sources, headers)
         
     def __init__(
         self, 
         c_flags: t.List[str],
         sources: t.List[str],
-        headers: "CQyx_v1_CompilerArgs_Header"
+        headers: "CQyxV1_CompilerArgs_Header"
     ) -> None:
         """
         WARNING: do not invoke this constructor directly: instead, use `from_json_obj`
@@ -541,10 +557,10 @@ class CQyx_v1_CompilerArgs(object):
         self.sources = sources
         self.headers = headers
 
-CQyx_v1_CompilerArgs.default = CQyx_v1_CompilerArgs([], [], [])
+CQyxV1_CompilerArgs.default = CQyxV1_CompilerArgs([], [], [])
 
 
-class CQyx_v1_CompilerArgs_Header(object):
+class CQyxV1_CompilerArgs_Header(object):
     @staticmethod
     def from_json_obj(path_to_root_qyx_file, target_platform, json_obj, header_index: int):
         usage_prefix = f"cc-args.{target_platform.name}.headers[{header_index}]"
@@ -561,7 +577,7 @@ class CQyx_v1_CompilerArgs_Header(object):
         if opt_provides_obj is not None:
             CQyxV1.check_obj_is_all_str_list_else_panic(f"{usage_prefix}.provides", opt_provides_obj, path_to_root_qyx_file)
         
-        return CQyx_v1_CompilerArgs_Header(json_obj["path"], json_obj["provides"])
+        return CQyxV1_CompilerArgs_Header(json_obj["path"], json_obj["provides"])
 
     def __init__(self, path: str, provides: t.List[str]):
         super().__init__()
@@ -637,12 +653,23 @@ class CSourceFile(BaseSourceFile):
 
     @staticmethod
     def load(source_file_path: str, provided_symbol_list: t.List[str], is_header) -> "CSourceFile":
-        if not source_file_path.endswith(config.C_HEADER_FILE_EXTENSION):
-            panic.because(
-                panic.ExitCode.BadProjectFile,
-                f"expected C header file path to end with '{config.C_HEADER_FILE_EXTENSION}', got:",
-                source_file_path
-            )
+        if is_header:
+            if not source_file_path.endswith(config.C_HEADER_FILE_EXTENSION):
+                panic.because(
+                    panic.ExitCode.BadProjectFile,
+                    f"expected C header file path to end with '{config.C_HEADER_FILE_EXTENSION}', but got:",
+                    source_file_path
+                )
+        else:
+            for ext in config.C_SOURCE_FILE_EXTENSIONS:
+                if source_file_path.endswith(ext):
+                    break
+            else:
+                panic.because(
+                    panic.ExitCode.BadProjectFile,
+                    f"expected C source file path to end with any of '{config.C_SOURCE_FILE_EXTENSIONS}', but got:",
+                    source_file_path
+                )
         if not os.path.isfile(source_file_path):
             panic.because(
                 panic.ExitCode.BadProjectFile,
