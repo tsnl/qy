@@ -4,6 +4,7 @@ import os.path
 import typing as t
 import enum
 import json
+import itertools
 
 from . import feedback
 from . import ast1
@@ -41,26 +42,25 @@ class Emitter(base_emitter.BaseEmitter):
         os.makedirs(self.modules_abs_output_dir_path, exist_ok=True)
 
         # collecting all extern headers:
-        extern_header_source_file_paths = []
+        extern_header_source_files = []
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.CQyxV1):
                 for c_source_file in qyp.c_source_files:
                     if c_source_file.is_header:
-                        path = c_source_file.file_path
-                        assert os.path.isabs(path)
-                        extern_header_source_file_paths.append(c_source_file.file_path)
+                        assert os.path.isabs(c_source_file.file_path)
+                        extern_header_source_files.append(c_source_file)
 
         # emitting the 'types' subdirectory of build:
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.NativeQyp):
-                self.emit_native_qyp_per_type_headers(qyp_name, qyp, extern_header_source_file_paths)
+                self.emit_native_qyp_per_type_headers(qyp_name, qyp, extern_header_source_files)
             # else:
             #     raise NotImplementedError(f"'emit_per_type_headers' for Qyp of type '{qyp.__class__.__name__}'")
 
         # emitting the 'modules' subdirectory of build:
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.NativeQyp):
-                self.emit_native_qyp_module_body(qyp_name, qyp, extern_header_source_file_paths)
+                self.emit_native_qyp_module_body(qyp_name, qyp, extern_header_source_files)
             # else:
             #     raise NotImplementedError(f"'emit_module_body' for Qyp of type '{qyp.__class__.__name__}'")
         
@@ -71,7 +71,7 @@ class Emitter(base_emitter.BaseEmitter):
     # part 1: emitting type headers.
     #
 
-    def emit_native_qyp_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_file_paths: t.List[str]):
+    def emit_native_qyp_per_type_headers(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_files: t.List[ast2.BaseSourceFile]):
         for src_file_path, src_obj in qyp.src_map.items():
             self.collect_pub_named_types(src_obj.stmt_list)
 
@@ -85,9 +85,10 @@ class Emitter(base_emitter.BaseEmitter):
             type_files_stem = f"{self.types_abs_output_dir_path}/{type_name}"
             type_decl_file = CppFileWriter(CppFileType.TypeDeclHeader, type_files_stem)
             type_def_file = CppFileWriter(CppFileType.TypeDefHeader, type_files_stem)
-            for abs_extern_header_path in extern_header_source_file_paths:
-                type_decl_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False))
-                type_def_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False))
+            for source_file in extern_header_source_files:
+                abs_extern_header_path = source_file.file_path
+                type_decl_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
+                type_def_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
             
             # emitting:
             self.emit_one_per_type_header_pair(qy_type, type_name, type_decl_file, type_def_file)
@@ -201,14 +202,15 @@ class Emitter(base_emitter.BaseEmitter):
     # part 2: emitting module body
     #
 
-    def emit_native_qyp_module_body(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_file_paths: t.List[str]):
+    def emit_native_qyp_module_body(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_files: t.List[ast2.BaseSourceFile]):
         # creating output files, adding external project headers to all includes:
         output_file_stem = os.path.join(self.modules_abs_output_dir_path, qyp_name)
         hpp_file = CppFileWriter(CppFileType.MainHeader, output_file_stem)
         cpp_file = CppFileWriter(CppFileType.MainSource, output_file_stem)
-        for abs_extern_header_path in extern_header_source_file_paths:
-            hpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str="C"))
-            cpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str="C"))
+        for source_file in extern_header_source_files:
+            abs_extern_header_path = source_file.file_path
+            hpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
+            cpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
         
         print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
         
@@ -612,7 +614,8 @@ class Emitter(base_emitter.BaseEmitter):
             
             # first, visiting all qyps and gathering a list of files:
             main_target_name = None
-            source_file_paths = []
+            extern_source_file_paths = []
+            native_source_file_paths = []
             for qyp_name, qyp in qyp_set.qyp_name_map.items():
                 if isinstance(qyp, ast2.NativeQyp):
                     if qyp is qyp_set.root_qyp:
@@ -620,22 +623,25 @@ class Emitter(base_emitter.BaseEmitter):
                         assert main_target_name is None
                         main_target_name = qyp_name
 
-                    source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
-                    source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
+                    native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
+                    native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
                 elif isinstance(qyp, ast2.CQyxV1):
                     for c_source_file in qyp.c_source_files:
                         if not c_source_file.is_header:
-                            file_path = normalize_backslash_path(c_source_file.file_path)
-                            source_file_paths.append(file_path)
+                            file_path = self.relpath(c_source_file.file_path)
+                            extern_source_file_paths.append(file_path)
                 else:
                     raise NotImplementedError(f"emit_cmake_lists: Unknown Qyp of type {qyp.__class__.__name__}")
 
             # emitting 'add_executable' call to tie everything together:
             assert main_target_name is not None
             cml_print(f"add_executable({main_target_name}")
-            for source_file_path in source_file_paths:
+            for source_file_path in itertools.chain(extern_source_file_paths, native_source_file_paths):
                 cml_print(f"\t{source_file_path}")
             cml_print(")")
+
+    def relpath(self, input_path):
+        return normalize_backslash_path(os.path.relpath(input_path, self.root_abs_output_dir_path))
 
 
 #
@@ -838,11 +844,16 @@ class Block(object):
             self.cpp_file.print(self.suffix)
 
 
+#
+# Helpers
+#
+
 def normalize_backslash_path(raw_path):
+    clean_path = os.path.normpath(raw_path)
     if os.sep == '/':
-        return raw_path
+        return clean_path
     else:
-        return raw_path.replace(os.sep, '/') 
+        return clean_path.replace(os.sep, '/') 
 
 
 # Ooh; is this file-level hiding in Python?		

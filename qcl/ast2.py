@@ -619,6 +619,13 @@ class BaseSourceFile(object, metaclass=abc.ABCMeta):
         # writeback properties: properties computed over the course of evaluation and 'written back' for later:
         self.wb_typer_ctx = None
 
+        self.extern_str = self.get_extern_str()
+
+    @classmethod
+    @abc.abstractmethod
+    def get_extern_str(cls) -> t.Optional[str]:
+        return None
+
 
 class QySourceFile(BaseSourceFile):
     @staticmethod
@@ -637,6 +644,10 @@ class QySourceFile(BaseSourceFile):
             )
         stmt_list = qy_parser.parse_one_file(source_file_path)
         return QySourceFile(source_file_path, stmt_list)
+
+    @classmethod
+    def get_extern_str(cls) -> t.Optional[str]:
+        return None
 
 
 class CSourceFile(BaseSourceFile):
@@ -679,3 +690,7 @@ class CSourceFile(BaseSourceFile):
         stmt_list, this_provided_symbol_set = c_parser.parse_one_file(source_file_path, set(provided_symbol_list), is_header)
         assert isinstance(stmt_list, list)
         return CSourceFile(source_file_path, stmt_list, this_provided_symbol_set, is_header)
+
+    @classmethod
+    def get_extern_str(cls) -> t.Optional[str]:
+        return "C"

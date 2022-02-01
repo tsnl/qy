@@ -22,6 +22,6 @@ extern struct File* fh1;
 extern struct File* fh2;
 
 void printInt(int v);
-struct File* openFile(char const* path, enum FileAccess access, enum FileType file_type);
-void closeFile(struct File* handle);
-int readCharFromFile(struct File* f);
+// struct File* openFile(char const* path, enum FileAccess access, enum FileType file_type);
+// void closeFile(struct File* handle);
+// int readCharFromFile(struct File* f);

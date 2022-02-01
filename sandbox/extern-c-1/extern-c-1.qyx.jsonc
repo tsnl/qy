@@ -15,8 +15,8 @@
                 {"path": "print-v1.h", "provides": [
                     "File", "FileAccess", "FileType",
                     "printInt",
-                    "openFile", "closeFile",
-                    "readCharFromFile",
+                    // "openFile", "closeFile",
+                    // "readCharFromFile",
                     "fh1", "fh2"
                 ]}
             ]
