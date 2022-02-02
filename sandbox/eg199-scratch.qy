@@ -80,7 +80,7 @@ let main () = {
     let w = make Vec2f(13, 0);
     let f = fibonacci(make I32(w.x));
     // discard printInt(f);
-    let short_run = true;
+    let short_run = false;
     discard printFibUntil(mux(short_run, 10, 42));
     // let _ = printFibUntil(20);
 

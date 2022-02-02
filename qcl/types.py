@@ -9,8 +9,6 @@ import enum
 import math
 import typing as t
 
-from sympy import Point
-
 from . import feedback as fb
 
 
