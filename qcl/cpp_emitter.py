@@ -41,7 +41,8 @@ class Emitter(base_emitter.BaseEmitter):
         # cleaning old directories:
         # on macOS, Windows, with case-insensitive paths, renaming symbols with different case 
         # results in stale files being used instead.
-        shutil.rmtree(self.root_abs_output_dir_path)
+        if os.path.isdir(self.root_abs_output_dir_path):
+            shutil.rmtree(self.root_abs_output_dir_path)
 
         # creating fresh directories:
         os.makedirs(self.root_abs_output_dir_path, exist_ok=False)
