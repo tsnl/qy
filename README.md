@@ -1,6 +1,10 @@
 # `Q4` - Version 4 of the Qy Programming Language
 
-(WIP)
+> (WIP)
+
+> (May be renamed to 'Backus', while Qy-v2.1 retains the 'Qy' name).
+> see:
+> https://en.wikipedia.org/wiki/FP_(programming_language)
 
 Q4 is a verified systems programming language that is designed to enable 
 -   safety, for any program you could write in assembly
