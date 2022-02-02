@@ -9,6 +9,8 @@ import enum
 import math
 import typing as t
 
+from sympy import Point
+
 from . import feedback as fb
 
 
@@ -32,6 +34,12 @@ class BaseType(object, metaclass=abc.ABCMeta):
         super().__init__()
         self.id = BaseType.id_counter
         BaseType.id_counter += 1
+        
+        # optimization cache: computed and cached properties
+        self.oc_free_vars = None
+
+    def init_optimization_cache(self):
+        self.oc_free_vars = set(self.iter_free_vars())
     
     @abc.abstractmethod
     def __str__(self) -> str:
@@ -80,6 +88,7 @@ class VarType(BaseType):
         super().__init__()
         self.name = name
         self.opt_loc = opt_loc
+        self.init_optimization_cache()
 
     def __str__(self) -> str:
         return '\'' + self.name + '#' + get_id_str_suffix(self)
@@ -105,31 +114,38 @@ class AtomicConcreteType(BaseConcreteType):
     pass
 
 
-class VoidType(AtomicConcreteType):
+class SingletonAtomicConcreteType(AtomicConcreteType):
+    def __init__(self) -> None:
+        super().__init__()
+        self.init_optimization_cache()
+        
+        # cannot construct a new instance if the singleton slot is already populated.
+        assert self.__class__.singleton is None
+
+
+class VoidType(SingletonAtomicConcreteType):
     singleton = None
 
     def __str__(self) -> str:
-        return "void"
+        return "Void"
 
     @classmethod
     def kind(cls):
         return TypeKind.Void
 
 
-VoidType.singleton = VoidType()
-
-
-class StringType(AtomicConcreteType):
+class StringType(SingletonAtomicConcreteType):
     singleton = None
 
     def __str__(self) -> str:
-        return "str"
+        return "String"
     
     @classmethod
     def kind(cls):
         return TypeKind.String
 
 
+VoidType.singleton = VoidType()
 StringType.singleton = StringType()
 
 
@@ -144,12 +160,13 @@ class IntType(AtomicConcreteType):
         super().__init__()
         self.width_in_bits = width_in_bits
         self.is_signed = is_signed
+        self.init_optimization_cache()
 
     def __str__(self) -> str:
         if self.width_in_bits == 1 and not self.is_signed:
-            return 'bool'
+            return 'Bool'
         else:
-            return ('i' if self.is_signed else 'u') + str(self.width_in_bits)
+            return ('I' if self.is_signed else 'U') + str(self.width_in_bits)
 
     @staticmethod
     def get(width_in_bits: int, is_signed: bool) -> "IntType":
@@ -174,9 +191,10 @@ class FloatType(AtomicConcreteType):
         assert width_in_bits in (32, 64)
         super().__init__()
         self.width_in_bits = width_in_bits
+        self.init_optimization_cache()
 
     def __str__(self) -> str:
-        return 'f' + str(self.width_in_bits)
+        return 'F' + str(self.width_in_bits)
 
     @staticmethod
     def get(width_in_bits: int) -> "FloatType":
@@ -219,9 +237,24 @@ class BaseCompositeType(BaseConcreteType):
         assert all((isinstance(n, str) for n in self.field_names))
         self.opt_name = opt_name
         self.contents_is_mut = contents_is_mut
+        self.init_optimization_cache()
 
     def copy_with_elements(self, new_elements: t.List[BaseType]) -> "BaseCompositeType":
-        return self.__class__(new_elements)
+        # constructing a base type with the same fields:
+        copy = self.__class__(new_elements)
+
+        # copying details:
+        if isinstance(copy, ProcedureType):
+            assert isinstance(self, ProcedureType)
+            copy.has_closure_slot = self.has_closure_slot
+            copy.is_c_variadic = self.is_c_variadic
+        elif isinstance(copy, UnsafeCPointerType):
+            assert isinstance(self, UnsafeCPointerType)
+            copy.contents_is_mut = self.contents_is_mut
+        else:
+            pass
+
+        return copy
 
     @classmethod
     def has_user_defined_field_names(cls) -> bool:
@@ -230,7 +263,7 @@ class BaseCompositeType(BaseConcreteType):
     def iter_free_vars(self):
         for field_type in self.field_types:
             yield from field_type.iter_free_vars()
-
+    
     def __hash__(self) -> int:
         return hash((self.kind().value, *self.field_types))
 
@@ -239,18 +272,18 @@ class BaseCompositeType(BaseConcreteType):
 
 
 
-class PointerType(BaseCompositeType):
+class UnsafeCPointerType(BaseCompositeType):
     @property
     def pointee_type(self) -> "BaseType":
         return self.field_types[0]
 
     def __str__(self) -> str:
-        ptr_char = '&' if self.contents_is_mut else '^'
-        return ptr_char + str(self.pointee_type)
+        ptr_name = 'MutUnsafeCPtr' if self.contents_is_mut else 'UnsafeCPtr'
+        return f"{ptr_name}[{str(self.pointee_type)}]"
 
     @staticmethod
     def new(pointee_type: BaseConcreteType, is_mut: bool):
-        return PointerType([('pointee', pointee_type)], contents_is_mut=is_mut)
+        return UnsafeCPointerType([('pointee', pointee_type)], contents_is_mut=is_mut)
 
     @classmethod
     def kind(cls):
@@ -258,9 +291,10 @@ class PointerType(BaseCompositeType):
 
 
 class ProcedureType(BaseCompositeType):
-    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None, contents_is_mut=None) -> None:
+    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None, has_closure_slot=None, is_c_variadic=None, contents_is_mut=None) -> None:
         super().__init__(fields, opt_name=opt_name, contents_is_mut=contents_is_mut)
-        self.is_c_variadic = None
+        self.has_closure_slot = has_closure_slot
+        self.is_c_variadic = is_c_variadic
     
     @property
     def ret_type(self):
@@ -283,19 +317,22 @@ class ProcedureType(BaseCompositeType):
         )
 
     def __str__(self) -> str:
-        return f"({','.join(map(str, self.arg_types))})=>{self.ret_type}"
+        arrow = '=>' if self.has_closure_slot else '->'
+        return f"({','.join(map(str, self.arg_types))}){arrow}{self.ret_type}"
 
     @staticmethod
     def new(
         arg_types: t.Iterable[BaseConcreteType], 
         ret_type: BaseConcreteType, 
-        is_c_variadic=False
+        has_closure_slot: bool = False,
+        is_c_variadic: bool = False
     ) -> "ProcedureType":
         pt = ProcedureType(
             [('ret_type', ret_type)] +
-            [(f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types)]
+            [(f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types)],
+            has_closure_slot=has_closure_slot,
+            is_c_variadic=is_c_variadic,
         )
-        pt.is_c_variadic = is_c_variadic
         return pt
 
     @classmethod

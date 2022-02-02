@@ -7,4 +7,4 @@ WRONG_QYP_LIKE_EXTENSIONS = [
 QY_SOURCE_FILE_EXTENSION = ".qy"
 C_HEADER_FILE_EXTENSION = ".h"
 C_SOURCE_FILE_EXTENSIONS = [".c", ".a", ".lib", ".so", ".dylib", ".dll"]
-DEBUG_MODE = True and __debug__
+COMPILER_IN_DEBUG_MODE = False

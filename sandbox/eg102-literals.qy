@@ -9,4 +9,5 @@ let s2 = """
     Where are you
 """;
 
-pub s2: str;
+pub s2: String;
+

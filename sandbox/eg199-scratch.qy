@@ -1,9 +1,9 @@
-pub hello: (i32)=>i32;
+pub hello: (I32) -> I32;
 let hello (x) = {
     return x;
 };
 
-pub wrongPhi: (bool,i32,i32)=>i32;
+pub wrongPhi: (Bool, I32, I32) -> I32;
 let wrongPhi (b, x, y) = {
     if b {
         return x;
@@ -49,8 +49,9 @@ let Point = struct {
 };
 */
 
-/* FIXME: this example should produce a unification error
-pub main: () => i32;
+/* FIXME: this example should produce a unification error because 
+ * no implicit int->float conversion
+pub main: () -> i32;
 let main () = {
     let v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
     return v.x;
@@ -58,15 +59,34 @@ let main () = {
 */
 
 let Vec2f = struct {
-    x: f32,
-    y: f32
+    x: F32,
+    y: F32
+};
+
+pub printFibUntil: (I32) -> Void;
+let printFibUntil (n) = {
+    if (n > 0) {
+        discard printFibUntil(n - 1);
+        discard printInt(n);
+        discard printTab();
+        discard printInt(fibonacci(n));
+        discard printLine();
+    };
 };
 
 let main () = {
-    // let v = Vec3f (1.0f, 2.0f, 3.0f);
+    // let v = Vec3F (1.0f, 2.0f, 3.0f);
     // let w = v3f_add(v, v);
-    let w = Vec2f{13, 0};
-    let f = fibonacci(i32{w.x});
-    let _ = printInt(f);
+    let w = make Vec2f(13, 0);
+    let f = fibonacci(make I32(w.x));
+    // discard printInt(f);
+    let short_run = true;
+    discard printFibUntil(mux(short_run, 10, 42));
+    // let _ = printFibUntil(20);
+
+    for {
+        break;
+    };
+
     return 0;
 };

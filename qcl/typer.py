@@ -5,7 +5,6 @@ import enum
 import textwrap
 
 from . import panic
-from . import config
 from . import pair
 from . import feedback as fb
 from . import types
@@ -62,7 +61,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
                 assert arg_type is not None
                 fn_arg_types.append(arg_type)
             fn_ret_type = stmt.ret_typespec.opt_externally_forced_type
-            fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, is_c_variadic=stmt.is_variadic)
+            fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, has_closure_slot=False, is_c_variadic=stmt.is_variadic)
         else:
             fn_type = types.VarType(f"bind1f_{stmt.name}")
         new_definition = ValueDefinition(
@@ -85,7 +84,13 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             Scheme([], bound_type),
             extern_tag=extern_tag
         )
-    
+    elif not isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
+        panic.because(
+            panic.ExitCode.ScopingError,
+            "Invalid statement found in top-level scope: please move this into a function.",
+            opt_loc=stmt.loc
+        )
+        
     if new_definition is not None:
         old_definition = bind_in_ctx.try_define(new_definition)    
         if old_definition is not None:
@@ -310,6 +315,13 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         then_sub = model_one_block(ctx, stmt.then_block, dto_list)
         else_sub = model_one_block(ctx, stmt.else_block, dto_list) if stmt.else_block else Substitution.empty
         return else_sub.compose(then_sub).compose(cond_dto_sub).compose(condition_sub)
+    elif isinstance(stmt, ast1.DiscardStatement):
+        sub, _ = model_one_exp(ctx, stmt.discarded_exp, dto_list)
+        return sub
+    elif isinstance(stmt, ast1.ForStatement):
+        return model_one_block(ctx, stmt.body, dto_list)
+    elif isinstance(stmt, ast1.BaseLoopControlStatement):
+        return Substitution.empty
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
@@ -403,9 +415,22 @@ def help_model_one_exp(
         container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
         proxy_ret_type = types.VarType(f"dot_{exp.key}")
         add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_ret_type, exp.key))
-        return container_sub.compose(add_dto_sub), proxy_ret_type
+        return add_dto_sub.compose(container_sub), proxy_ret_type
     elif isinstance(exp, ast1.BuiltinConPrevExpression):
         return Substitution.empty, ctx.return_type
+    elif isinstance(exp, ast1.MuxExpression):
+        # first, modelling the 'cond', 'then', and 'else' branch expressions:
+        cond_sub, cond_type = model_one_exp(ctx, exp.cond_exp, dto_list)
+        then_sub, then_type = model_one_exp(ctx, exp.then_exp, dto_list)
+        then_sub, then_type = then_sub.compose(cond_sub), cond_sub.rewrite_type(then_type)
+        else_sub, else_type = model_one_exp(ctx, exp.else_exp, dto_list)
+        else_sub, else_type = else_sub.compose(then_sub), then_sub.rewrite_type(else_type)
+        sub = else_sub
+        # next, unifying types to type-check.
+        bool_type = types.IntType.get(1, is_signed=False)
+        sub = unify(cond_type, bool_type, exp.loc).compose(sub)     # ensuring 'cond' is a boolean
+        sub = unify(then_type, else_type, exp.loc).compose(sub)     # ensuring branches return the same type
+        return sub, sub.rewrite_type(then_type)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
@@ -471,7 +496,7 @@ def help_model_one_type_spec(
             all_arg_types.append(arg_type)
         ret_sub, ret_type = model_one_type_spec(ctx, ts.ret_ts, dto_list)
         sub = ret_sub.compose(all_args_sub)
-        return sub, types.ProcedureType.new(all_arg_types, ret_type)
+        return sub, types.ProcedureType.new(all_arg_types, ret_type, ts.takes_closure)
     elif isinstance(ts, ast1.AdtTypeSpec):
         sub = Substitution.empty
         fields = []
@@ -488,7 +513,7 @@ def help_model_one_type_spec(
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
     elif isinstance(ts, ast1.PtrTypeSpec):
         pointee_sub, pointee_type = model_one_type_spec(ctx, ts.pointee_type_spec, dto_list)
-        return pointee_sub, types.PointerType.new(pointee_type, ts.is_mut)
+        return pointee_sub, types.UnsafeCPointerType.new(pointee_type, ts.is_mut)
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
 
@@ -886,6 +911,14 @@ def unify(
             if len(t1.field_names) != len(t2.field_names):
                 raise_unification_error(t1, t2)
 
+        # checking that other type properties match:
+        if t1.kind() == types.TypeKind.Procedure:
+            assert isinstance(t1, types.ProcedureType)
+            assert isinstance(t2, types.ProcedureType)
+            closure_slots_ok = t1.has_closure_slot == t2.has_closure_slot
+            if not closure_slots_ok:
+                raise_unification_error(t1, t2, opt_more="Cannot unify a procedure type with a closure slot with a procedure type without one", opt_loc=opt_loc)
+
         # generate a substitution by unifying matching fields:
         s = Substitution.empty
         for ft1, ft2 in zip(t1.field_types, t2.field_types):
@@ -908,14 +941,7 @@ def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None,
         assert isinstance(opt_more, str)
         msg_chunks.append(textwrap.indent(opt_more, ' '*tab_w))
     
-    # if isinstance(t, types.StructType) and isinstance(u, types.ProcedureType):
-    #     msg_chunks.append(textwrap.indent("HINT: did you miss the keyword 'new' when constructing a type?", ' '*tab_w))
-
-    panic.because(
-        panic.ExitCode.TyperUnificationError,
-        '\n'.join(msg_chunks),
-        opt_loc=opt_loc
-    )
+    panic.because(panic.ExitCode.TyperUnificationError, '\n'.join(msg_chunks), opt_loc=opt_loc)
 
 
 #
@@ -1083,15 +1109,13 @@ class Substitution(object):
         assert all((isinstance(key, types.BaseType) and key.is_var for key, _ in sub_map.items()))
         super().__init__()
         self.sub_map = sub_map
+        self.oc_sub_map_keys = set(sub_map.keys())
 
     def compose(self, applied_first: "Substitution") -> "Substitution":
         # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1
 
         s1 = self
         s2 = applied_first
-
-        # s2 = applied_first
-        # s1 = self
 
         if s1 is Substitution.empty:
             return s2
@@ -1135,7 +1159,14 @@ class Substitution(object):
         return str(self)
 
     def rewrite_type(self, t: types.BaseType) -> types.BaseType:
-        return self._rewrite_type(t, None)
+        # optimization: a substitution must map free variables to some type.
+        # we can check if 't' contains any of the free variables mapped by this substitution.
+        # if not, we just return the type as is.
+        assert isinstance(t.oc_free_vars, set)
+        if self.oc_sub_map_keys & t.oc_free_vars:
+            return self._rewrite_type(t, None)
+        else:
+            return t
 
     def _rewrite_type(self, t: types.BaseType, rw_in_progress_pair_list: pair.List) -> types.BaseType:
         assert isinstance(t, types.BaseType)
@@ -1154,6 +1185,7 @@ class Substitution(object):
             return opt_replacement_t
         
         # Composite types: map rewrite on each component
+        # FIXME: must pass more attributes for types like 'Procedure'
         if isinstance(t, types.BaseCompositeType):
             rt_is_t = False
             new_fields = []
@@ -1164,7 +1196,7 @@ class Substitution(object):
                 rt_is_t |= rt_field_type is not element_type
             if rt_is_t:
                 rt = t.copy_with_elements(new_fields)
-                if isinstance(t, types.PointerType):
+                if isinstance(t, types.UnsafeCPointerType):
                     rt.contents_is_mut = t.contents_is_mut
                 elif isinstance(t, types.ProcedureType):
                     rt.is_c_variadic = t.is_c_variadic

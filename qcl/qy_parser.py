@@ -14,7 +14,7 @@ def parse_one_file(abs_file_path: str) -> t.List[ast1.BaseStatement]:
     """
     (lazily) parses the contents of a source file.
     """
-    if config.DEBUG_MODE:
+    if config.COMPILER_IN_DEBUG_MODE:
         assert abs_file_path == os.path.abspath(abs_file_path)
 
     opt_cached_result = file_parse_cache.get(abs_file_path, None)
@@ -30,7 +30,7 @@ file_parse_cache: t.Dict[str, t.List[ast1.BaseStatement]] = {}
 
 
 def parse_one_file_without_caching(abs_file_path: str) -> t.List[ast1.BaseStatement]:
-    if config.DEBUG_MODE:
+    if config.COMPILER_IN_DEBUG_MODE:
         assert os.path.isfile(abs_file_path)
 
     error_listener = QyErrorListener(abs_file_path)
@@ -174,7 +174,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             self.visit(statement_ctx)
             for statement_ctx in ctx.statements
         ]
-
+    
     #
     # statement:
     #
@@ -194,8 +194,16 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.ite)
         elif ctx.ret is not None:
             return self.visit(ctx.ret)
+        elif ctx.discard is not None:
+            return self.visit(ctx.discard)
+        elif ctx.for_ is not None:
+            return self.visit(ctx.for_)
+        elif ctx.break_ is not None:
+            return self.visit(ctx.break_)
+        elif ctx.continue_ is not None:
+            return self.visit(ctx.continue_)
         else:
-            raise NotImplementedError(f"Unknown 'statement' kind in parser: {ctx.getText()}")
+            raise NotImplementedError(f"Unknown statement kind in parser: {ctx.getText()}")
 
     def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
         return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
@@ -236,6 +244,18 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
     def visitReturnStatement(self, ctx: antlr.QySourceFileParser.ReturnStatementContext) -> ast1.ReturnStatement:
         return ast1.ReturnStatement(self.loc(ctx), self.visit(ctx.ret_exp))
+
+    def visitDiscardStatement(self, ctx: antlr.QySourceFileParser.DiscardStatementContext) -> t.List[ast1.BaseStatement]:
+        return ast1.DiscardStatement(self.loc(ctx), self.visit(ctx.discarded_exp))
+
+    def visitForStatement(self, ctx: antlr.QySourceFileParser.ForStatementContext) -> ast1.ForStatement:
+        return ast1.ForStatement(self.loc(ctx), self.visit(ctx.body))
+
+    def visitBreakStatement(self, ctx: antlr.QySourceFileParser.BreakStatementContext) -> ast1.BreakStatement:
+        return ast1.BreakStatement(self.loc(ctx))
+
+    def visitContinueStatement(self, ctx: antlr.QySourceFileParser.ContinueStatementContext) -> ast1.ContinueStatement:
+        return ast1.ContinueStatement(self.loc(ctx))
 
     #
     # expressions:
@@ -293,6 +313,12 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
     def visitParenPrimaryExpression(self, ctx: antlr.QySourceFileParser.ParenPrimaryExpressionContext):
         return self.visit(ctx.through)
+
+    def visitMuxPrimaryExpression(self, ctx: antlr.QySourceFileParser.MuxPrimaryExpressionContext):
+        cond_exp = self.visit(ctx.cond)
+        then_exp = self.visit(ctx.then)
+        else_exp = self.visit(ctx.else_)
+        return ast1.MuxExpression(self.loc(ctx), cond_exp, then_exp, else_exp)
 
     def visitThroughPostfixExpression(self, ctx: antlr.QySourceFileParser.ThroughPostfixExpressionContext):
         return self.visit(ctx.through)
@@ -470,19 +496,19 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         else:
             return ast1.BuiltinPrimitiveTypeSpec(
                 self.loc(ctx), {
-                    'f32': ast1.BuiltinPrimitiveTypeIdentity.Float32,
-                    'f64': ast1.BuiltinPrimitiveTypeIdentity.Float64,
-                    'i64': ast1.BuiltinPrimitiveTypeIdentity.Int64,
-                    'i32': ast1.BuiltinPrimitiveTypeIdentity.Int32,
-                    'i16': ast1.BuiltinPrimitiveTypeIdentity.Int16,
-                    'i8': ast1.BuiltinPrimitiveTypeIdentity.Int8,
-                    'u64': ast1.BuiltinPrimitiveTypeIdentity.UInt64,
-                    'u32': ast1.BuiltinPrimitiveTypeIdentity.UInt32,
-                    'u16': ast1.BuiltinPrimitiveTypeIdentity.UInt16,
-                    'u8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
-                    'bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
-                    'void': ast1.BuiltinPrimitiveTypeIdentity.Void,
-                    'str': ast1.BuiltinPrimitiveTypeIdentity.String
+                    'F32': ast1.BuiltinPrimitiveTypeIdentity.Float32,
+                    'F64': ast1.BuiltinPrimitiveTypeIdentity.Float64,
+                    'I64': ast1.BuiltinPrimitiveTypeIdentity.Int64,
+                    'I32': ast1.BuiltinPrimitiveTypeIdentity.Int32,
+                    'I16': ast1.BuiltinPrimitiveTypeIdentity.Int16,
+                    'I8': ast1.BuiltinPrimitiveTypeIdentity.Int8,
+                    'U64': ast1.BuiltinPrimitiveTypeIdentity.UInt64,
+                    'U32': ast1.BuiltinPrimitiveTypeIdentity.UInt32,
+                    'U16': ast1.BuiltinPrimitiveTypeIdentity.UInt16,
+                    'U8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
+                    'Bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
+                    'Void': ast1.BuiltinPrimitiveTypeIdentity.Void,
+                    'String': ast1.BuiltinPrimitiveTypeIdentity.String
                 }[ctx.tok.text]
             )
 
@@ -505,9 +531,9 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.through)
         else:
             is_mut = {
-                "^": False,
-                "&": True
-            }[ctx.ptrChar]
+                "&": False,
+                "&mut": True
+            }[ctx.ptrName]
             return ast1.PtrTypeSpec(self.loc(ctx), self.visit(ctx.pointee), is_mut)
 
     def visitSignatureTypeSpec(self, ctx: antlr.QySourceFileParser.SignatureTypeSpecContext):
@@ -517,7 +543,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return ast1.ProcSignatureTypeSpec(
                 self.loc(ctx),
                 self.visit(ctx.args),
-                self.visit(ctx.ret)
+                self.visit(ctx.ret),
+                ctx.has_closure_slot is not None
             )
 
     #

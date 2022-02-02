@@ -5,6 +5,7 @@ import typing as t
 import enum
 import json
 import itertools
+import shutil
 
 from . import feedback
 from . import ast1
@@ -37,9 +38,15 @@ class Emitter(base_emitter.BaseEmitter):
         self.global_symbol_loc_map = {}
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
-        os.makedirs(self.root_abs_output_dir_path, exist_ok=True)
-        os.makedirs(self.types_abs_output_dir_path, exist_ok=True)
-        os.makedirs(self.modules_abs_output_dir_path, exist_ok=True)
+        # cleaning old directories:
+        # on macOS, Windows, with case-insensitive paths, renaming symbols with different case 
+        # results in stale files being used instead.
+        shutil.rmtree(self.root_abs_output_dir_path)
+
+        # creating fresh directories:
+        os.makedirs(self.root_abs_output_dir_path, exist_ok=False)
+        os.makedirs(self.types_abs_output_dir_path, exist_ok=False)
+        os.makedirs(self.modules_abs_output_dir_path, exist_ok=False)
 
         # collecting all extern headers:
         extern_header_source_files = []
@@ -125,8 +132,12 @@ class Emitter(base_emitter.BaseEmitter):
                 type_decl_file.print(f"union {type_name};")
             elif qy_type.kind() == types.TypeKind.Procedure:
                 assert isinstance(qy_type, types.ProcedureType)
+                ret_type = self.translate_type(qy_type.ret_type)
                 cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
-                type_decl_file.print(f"typedef {qy_type.ret_type}(*{type_name})({cs_arg_str})")
+                if qy_type.has_closure_slot:
+                    type_decl_file.print(f"using {type_name} = std::function<{ret_type}({cs_arg_str})>")
+                else:
+                    type_decl_file.print(f"typedef {ret_type}(*{type_name})({cs_arg_str})")
             else:
                 raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {qy_type}")
         else:
@@ -176,7 +187,7 @@ class Emitter(base_emitter.BaseEmitter):
             # do nothing-- all atomic types are built-in.
             pass
         elif qy_type.is_composite:
-            if isinstance(qy_type, types.PointerType):
+            if isinstance(qy_type, types.UnsafeCPointerType):
                 self.insert_type_ref_includes(print_file, qy_type.pointee_type, direct_ref=False)
             else:
                 for field_type in qy_type.field_types:
@@ -249,8 +260,13 @@ class Emitter(base_emitter.BaseEmitter):
                 c.print(' '.join(bind_cpp_fragments))
             
             # regardless of return-type, evaluating the RHS in case there are any side-effects:
-            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True) as b:
+            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True):
                 self.emit_expression(c, stmt.initializer)
+            c.print()
+        
+        elif isinstance(stmt, ast1.DiscardStatement):
+            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True):
+                self.emit_expression(c, stmt.discarded_exp)
             c.print()
         
         elif isinstance(stmt, ast1.Bind1fStatement):
@@ -333,6 +349,17 @@ class Emitter(base_emitter.BaseEmitter):
             with Block(c):
                 self.emit_block(c, h, stmt.else_block)
 
+        elif isinstance(stmt, ast1.ForStatement):
+            c.print("for (;;)")
+            with Block(c):
+                self.emit_block(c, h, stmt.body)
+
+        elif isinstance(stmt, ast1.BreakStatement):
+            c.print("break;")
+
+        elif isinstance(stmt, ast1.ContinueStatement):
+            c.print("continue;")
+
         else:
             raise NotImplementedError(f"emit_declarations_for_stmt: {stmt}")
 
@@ -401,14 +428,14 @@ class Emitter(base_emitter.BaseEmitter):
                         for arg_type in qy_type.arg_types
                     ))
                     return f"{self.translate_type(qy_type.ret_type)}(*)({args_str})"
-                elif isinstance(qy_type, (types.PointerType)):
+                elif isinstance(qy_type, (types.UnsafeCPointerType)):
                     return f"{self.translate_type(qy_type.pointee_type)}*"
                 else:
                     raise NotImplementedError("Unknown compound type in 'translate_type'")
         else:
-            # raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
-            print(f"WARNING: Don't know how to translate type to C++: {qy_type}")
-            return f"<NotImplemented:{qy_type}>"
+            raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
+            # print(f"WARNING: Don't know how to translate type to C++: {qy_type}")
+            # return f"<NotImplemented:{qy_type}>"
 
     def translate_expression(self, exp: ast1.BaseExpression) -> str:
         ret_str, ret_type = self.translate_expression_with_type(exp)
@@ -482,7 +509,7 @@ class Emitter(base_emitter.BaseEmitter):
             # for now, Qy's builtin unary operators are a subset of C++'s builtin unary operators.            
             if exp.operator == ast1.UnaryOperator.DeRef:
                 operand_ptr_type = operand_type
-                assert isinstance(operand_ptr_type, types.PointerType)
+                assert isinstance(operand_ptr_type, types.UnsafeCPointerType)
                 ret_type = operand_ptr_type.pointee_type
                 assert isinstance(ret_type, types.BaseConcreteType)
             elif exp.operator == ast1.UnaryOperator.LogicalNot:
@@ -517,7 +544,11 @@ class Emitter(base_emitter.BaseEmitter):
                 ast1.BinaryOperator.Eq: "==",
                 ast1.BinaryOperator.NEq: "!=",
                 ast1.BinaryOperator.LSh: "<<",
-                ast1.BinaryOperator.RSh: ">>"
+                ast1.BinaryOperator.RSh: ">>",
+                ast1.BinaryOperator.LThan: "<",
+                ast1.BinaryOperator.GThan: ">",
+                ast1.BinaryOperator.LThan: "<=",
+                ast1.BinaryOperator.GThan: ">=",
             }[exp.operator]
             lt_operand_str, lt_operand_type = self.translate_expression_with_type(exp.lt_operand)
             rt_operand_str, rt_operand_type = self.translate_expression_with_type(exp.rt_operand)
@@ -581,9 +612,17 @@ class Emitter(base_emitter.BaseEmitter):
                 constructor_str = f"{constructor_ts}{{{','.join(initializer_exps)}}}"
                 return constructor_str, exp.made_ts.wb_type
         
+        elif isinstance(exp, ast1.MuxExpression):
+            cond_str = self.translate_expression(exp.cond_exp)
+            then_str = self.translate_expression(exp.then_exp)
+            else_str = self.translate_expression(exp.else_exp)
+            mux_str = f"({cond_str} ? ({then_str}) : ({else_str}))"
+            return mux_str, exp.wb_type
+
         else:
-            print(f"WARNING: Don't know how to translate expression to C++: {exp}")
-            return f"<NotImplemented:{exp.desc}>", None
+            raise NotImplementedError(f"Don't know how to translate expression to C++: {exp}")
+            # print(f"WARNING: Don't know how to translate expression to C++: {exp}")
+            # return f"<NotImplemented:{exp.desc}>", None
 
     #
     # part 3: generating CMakeLists.txt files
@@ -670,8 +709,8 @@ class CppFileWriter(object):
     file_type_suffix = {
         CppFileType.MainHeader: ".hpp",
         CppFileType.MainSource: ".cpp",
-        CppFileType.TypeDefHeader: ".hpp",
-        CppFileType.TypeDeclHeader: ".hpp"
+        CppFileType.TypeDefHeader: ".def.hpp",
+        CppFileType.TypeDeclHeader: ".decl.hpp"
     }
 
     def __init__(
@@ -798,6 +837,7 @@ class CppFileWriter(object):
     def add_common_stdlib_header_includes(self):
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="functional"))
         
     def inc_indent(self):
         self.indent_count += 1

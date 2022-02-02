@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 
 from . import config
@@ -12,7 +13,13 @@ from . import platform
 from . import main
 
 
-def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter):
+@dataclass
+class TranspileOptions:
+    print_summary_after_run: bool = False
+    run_debug_routine_after_compilation: bool = False
+
+
+def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter, transpile_opts: TranspileOptions):
     assert isinstance(path_to_input_root_qyp_file, str)
     assert isinstance(emitter, base_emitter.BaseEmitter)
 
@@ -30,6 +37,7 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     #       - 'return', 'ite' not allowed except inside a function
     #       - 'const', 'bind1f' only globally allowed
     #   - `iota` expression only allowed inside a 'const' initializer
+    # NOTE: this is happening during 'seeding' instead... clean up if this changes.
 
     # typing native source files:
     # TODO: expand this to also handle 'Qyx'-es
@@ -45,13 +53,18 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     # emitting:
     emitter.emit_qyp_set(qyp_set)
 
-    # debug routine:
-    debug_routine_after_compilation(qyp_set)
+    # (post-compilation) print types:
+    if transpile_opts.print_summary_after_run:
+        print_qyp_set_summary(qyp_set)
+        print_contexts(qyp_set)
+
+    # (post-compilation) debug routine:
+    if transpile_opts.run_debug_routine_after_compilation:
+        debug_routine_after_compilation(qyp_set)
 
 
 def debug_routine_after_compilation(qyp_set):
     print("INFO: Post-compilation Debug Dump")
-    print_qyp_set_summary(qyp_set)
     # print_types_test()
     # print_schemes_test()
     # print_unification_subs_test()
@@ -121,8 +134,8 @@ def print_unification_subs_test():
 
     # unifying procedures:
     # attempting to unify one var to two matching types:
-    t6 = types.ProcedureType.new([t2, t2, t5], t2)
-    t7 = types.ProcedureType.new([t2, t3, t4], t1)
+    t6 = types.ProcedureType.new([t2, t2, t5], t2, True)
+    t7 = types.ProcedureType.new([t2, t3, t4], t1, True)
     verbose_unify(t6, t7)
 
     # attempting to unify one var to two conflicting types:

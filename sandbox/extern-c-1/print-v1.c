@@ -2,8 +2,14 @@
 
 #include <stdio.h>
 
+void printLine(void) {
+    printf("\n");
+}
+void printTab(void) {
+    printf("\t");
+}
 void printInt(int v) {
-    printf("%d\n", v);
+    printf("%d", v);
 }
 
 struct File* fh1 = NULL;

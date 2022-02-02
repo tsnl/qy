@@ -1,12 +1,13 @@
-let main() = {
-    let v = Vec2f(2.0f, 3.0f);
+let main () = {
+    let v = make Vec2F(2.0f, 3.0f);
+    let w = make Vec3F(2.0f, 3.0f, 4.0f);
     // return i32(v.x);
     return 0;
 };
 
-let Vec2f = struct {x: f32, y: f32};
+let Vec2F = struct {x: f32, y: f32};
 
-// pub vec2f: (f32, f32) => Vec2f;
-// let vec2f (a, b) = Vec2f(a, b);
+// pub vec2f: (f32, f32) -> Vec2F;
+// let vec2f (a, b) = make Vec2F(a, b);
 
 // let x = vec2f(0.0f, 0.0f);

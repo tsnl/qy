@@ -48,6 +48,10 @@ statement
     | con=constStatement
     | ite=iteStatement
     | ret=returnStatement
+    | discard=discardStatement
+    | for_=forStatement
+    | break_=breakStatement
+    | continue_=continueStatement
     ;
 bind1vStatement
     : 'let' name=ID '=' initializer=expression
@@ -71,24 +75,33 @@ iteStatement
 returnStatement
     : 'return' ret_exp=expression
     ;
+discardStatement
+    : 'discard' discarded_exp=expression
+    ;
+forStatement
+    : 'for' body=block
+    ;
+breakStatement: 'break' ;
+continueStatement: 'continue' ;
 
 expression
     : through=binaryExpression
     ;
 primaryExpression
-    : litBoolean                    #litBoolPrimaryExpression
-    | litInteger                    #litIntPrimaryExpression
-    | litFloat                      #litFloatPrimaryExpression
-    | litString                     #litStringPrimaryExpression
-    | '$predecessor'                #prevConstPrimaryExpression
-    | id_tok=ID                     #idPrimaryExpression
-    | '(' through=expression ')'    #parenPrimaryExpression
+    : litBoolean                                                                #litBoolPrimaryExpression
+    | litInteger                                                                #litIntPrimaryExpression
+    | litFloat                                                                  #litFloatPrimaryExpression
+    | litString                                                                 #litStringPrimaryExpression
+    | '$predecessor'                                                            #prevConstPrimaryExpression
+    | id_tok=ID                                                                 #idPrimaryExpression
+    | '(' through=expression ')'                                                #parenPrimaryExpression
+    | 'mux' '(' cond=expression ',' then=expression ',' else_=expression ')'    #muxPrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
     ;
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression
     | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
-    | made_ts=typeSpec '{' args=csExpressionList '}'        #constructorExpression
+    | 'make' made_ts=typeSpec '(' args=csExpressionList ')' #constructorExpression
     | container=postfixExpression '.' key=ID                #dotIdExpression
     ;
 unaryExpression
@@ -150,19 +163,19 @@ typeSpec
     ;
 primaryTypeSpec
     : id_tok=ID
-    | tok='f32'
-    | tok='f64'
-    | tok='i64'
-    | tok='i32'
-    | tok='i16'
-    | tok='i8'
-    | tok='u64'
-    | tok='u32'
-    | tok='u16'
-    | tok='u8'
-    | tok='bool'
-    | tok='void'
-    | tok='str'
+    | tok='F32'
+    | tok='F64'
+    | tok='I64'
+    | tok='I32'
+    | tok='I16'
+    | tok='I8'
+    | tok='U64'
+    | tok='U32'
+    | tok='U16'
+    | tok='U8'
+    | tok='Bool'
+    | tok='Void'
+    | tok='String'
     ;
 adtTypeSpec
     : through=primaryTypeSpec
@@ -170,12 +183,12 @@ adtTypeSpec
     ;
 ptrTypeSpec
     : through=adtTypeSpec
-    | ptrChar='^' pointee=ptrTypeSpec
-    | ptrChar='&' pointee=ptrTypeSpec
+    | ptrName='UnsafePtr' '[' pointee=ptrTypeSpec ']'
+    | ptrName='MutUnsafePtr' '[' pointee=ptrTypeSpec ']'
     ;
 signatureTypeSpec
     : through=ptrTypeSpec
-    | '(' args=csFormalArgSpecList ')' '=>' ret=signatureTypeSpec
+    | '(' args=csFormalArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
 formalArgSpec
     : ts=typeSpec

@@ -93,18 +93,42 @@ class BaseFileNode(object, metaclass=abc.ABCMeta):
 
 class WbTypeMixin(common.Mixin):
     all = []
+
+    # sub_index is an index of free variables to expressions in which they occur.
+    # it is updated and used by 'apply_sub_everywhere'
+    sub_index = defaultdict(list)
     
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.wb_type = None
+        self._wb_type = None
 
         WbTypeMixin.all.append(self)
+        
+    @property
+    def wb_type(self):
+        return self._wb_type
+    
+    @wb_type.setter
+    def wb_type(self, new_type):
+        self._wb_type = new_type
+        WbTypeMixin.index_ast_node(WbTypeMixin.sub_index, self)
+
+    @staticmethod
+    def index_ast_node(new_index, ast_node):
+        assert ast_node._wb_type is not None
+        for t in ast_node._wb_type.oc_free_vars:
+            new_index[t].append(ast_node)
 
     @staticmethod
     def apply_sub_everywhere(sub):
+        new_index = defaultdict(list)
+        
         for ast_node in WbTypeMixin.all:
-            if ast_node.wb_type is not None:
-                ast_node.wb_type = sub.rewrite_type(ast_node.wb_type)
+            if ast_node._wb_type is not None:
+                ast_node._wb_type = sub.rewrite_type(ast_node._wb_type)
+                WbTypeMixin.index_ast_node(new_index, ast_node)
+
+        WbTypeMixin.sub_index = new_index
 
 
 class BaseTypeSpec(WbTypeMixin, BaseFileNode):
@@ -236,6 +260,30 @@ class ReturnStatement(BaseStatement):
         self.returned_exp = returned_exp
 
 
+class DiscardStatement(BaseStatement):
+    def __init__(self, loc: fb.ILoc, discarded_exp: BaseExpression):
+        super().__init__(loc)
+        self.discarded_exp = discarded_exp
+
+
+class ForStatement(BaseStatement):
+    def __init__(self, loc: fb.ILoc, body: BaseExpression):
+        super().__init__(loc)
+        self.body = body
+
+
+class BaseLoopControlStatement(BaseStatement, metaclass=abc.ABCMeta):
+    pass
+
+
+class BreakStatement(BaseLoopControlStatement):
+    pass
+
+
+class ContinueStatement(BaseLoopControlStatement):
+    pass
+
+
 #
 #
 # Expressions:
@@ -289,6 +337,14 @@ class BuiltinConPrevExpression(BaseExpression):
 class IdRefExpression(MIdQualifierNode, BaseExpression):
     def __init__(self, loc: fb.ILoc, name: str):
         super().__init__(name, loc)
+
+
+class MuxExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, cond_exp: "BaseExpression", then_exp: "BaseExpression", else_exp: "BaseExpression"):
+        super().__init__(loc)
+        self.cond_exp = cond_exp
+        self.then_exp = then_exp
+        self.else_exp = else_exp
 
 
 class ProcCallExpression(BaseExpression):
@@ -391,9 +447,11 @@ class ProcSignatureTypeSpec(BaseTypeSpec):
         loc: fb.ILoc, 
         args: t.List[t.Tuple[OptStr, BaseTypeSpec]], 
         ret_ts: BaseTypeSpec,
+        takes_closure: bool,
         is_c_variadic: bool = False
     ):
         super().__init__(loc)
         self.args_list = args
         self.ret_ts = ret_ts
+        self.takes_closure = takes_closure
         self.is_c_variadic = is_c_variadic

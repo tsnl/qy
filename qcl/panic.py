@@ -41,6 +41,16 @@ def because(
     opt_file_region: t.Optional[fb.BaseFileRegion] = None,
     opt_loc: t.Optional[fb.ILoc] = None
 ):
+    """
+    Halts program execution after printing a helpful error message with a reference to the error.
+    NOTE: you can either supply 'opt_file_path', 'opt_file_path, opt_file_region', or 'opt_loc': do not mix otherwise.
+    """
+
+    if opt_file_path is not None:
+        assert opt_loc is None
+    elif opt_loc is not None:
+        assert opt_file_path is None and opt_file_region is None
+
     if opt_msg:
         msg = f"PANIC: {opt_msg}"
     else:
@@ -48,8 +58,6 @@ def because(
     print(msg, file=sys.stderr)
     
     if opt_file_path:
-        assert opt_loc is None  # only either can be specifier
-
         custom_end = '\n'
         if opt_file_region is not None:
             custom_end = f":{str(opt_file_region)}\n"
@@ -62,10 +70,7 @@ def because(
             print(f"relpath: {rel_path}", end=custom_end, file=sys.stderr)
             print(f"abspath: {abs_path}", end=custom_end, file=sys.stderr)
     else:
-        # file region must accompany file path
-        assert opt_file_region is None
-
-    if opt_loc is not None:
+        assert opt_loc is not None
         print(f"abspath: {str(opt_loc)}", file=sys.stderr)
 
     raise PanicException(exit_code, msg)

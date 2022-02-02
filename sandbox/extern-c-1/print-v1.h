@@ -21,6 +21,8 @@ enum FileType {
 extern struct File* fh1;
 extern struct File* fh2;
 
+void printLine(void);
+void printTab(void);
 void printInt(int v);
 // struct File* openFile(char const* path, enum FileAccess access, enum FileType file_type);
 // void closeFile(struct File* handle);

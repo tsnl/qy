@@ -1,10 +1,6 @@
 # Qy v2.1
 
-Qy is a systems programming language that compiles to C++.
-
-In particular, it will support consuming C++ APIs.
-
-In terms of features, it is like Go with manual memory management and C++-style templates.
+Qy is a systems programming language that compiles to C++ and consumes C.
 
 ## Setup
 
@@ -23,9 +19,4 @@ In terms of features, it is like Go with manual memory management and C++-style 
 
 ## Usage
 
-Run `./qc` to print help, and go from there (WIP).
-
-## TODO
-
-Updated grammar with...
-- changing 'const' lists
+Run `./qc --help` to print help, and go from there (WIP).
