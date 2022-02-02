@@ -14,11 +14,9 @@ BaseQyp is a base qy package: it includes...
 
 import abc
 import functools
-import itertools
 from os import stat
 import os.path
 import json
-from posixpath import isabs
 import typing as t
 from collections import OrderedDict
 
@@ -242,7 +240,7 @@ class NativeQyp(BaseQyp):
             if not os.path.isfile(abs_src_file_path):
                 panic.because(
                     panic.ExitCode.BadProjectFile,
-                    f"Source file reference does not exist: {repr(rel_src_file_path)}",
+                    f"Source file reference does not exist or is not a file: {repr(rel_src_file_path)}",
                     opt_file_path=abs_src_file_path
                 )
 
