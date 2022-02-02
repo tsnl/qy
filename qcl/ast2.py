@@ -219,7 +219,8 @@ class NativeQyp(BaseQyp):
             extra_keys_str = ', '.join(map(repr, extra_keys))
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"project file has {len(extra_keys)} extra key(s): {extra_keys_str}"
+                f"project file has {len(extra_keys)} extra key(s): {extra_keys_str}",
+                opt_file_path=path_to_root_qyp_file
             )
 
         # args look OK!
