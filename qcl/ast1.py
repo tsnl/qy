@@ -134,7 +134,6 @@ class WbTypeMixin(common.Mixin):
 class BaseTypeSpec(WbTypeMixin, BaseFileNode):
     def __init__(self, loc: fb.ILoc):
         super().__init__(loc)
-        self.opt_externally_forced_type = None
 
 
 class BaseExpression(WbTypeMixin, BaseFileNode):
@@ -173,9 +172,10 @@ class BaseIdQualifierStatement(MIdQualifierNode, BaseStatement):
 
 
 class Bind1vStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression]):
+    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression], is_mut: bool):
         super().__init__(loc, name)
         self.initializer = initializer
+        self.is_mut = is_mut
 
 
 class Bind1fStatement(BaseIdQualifierStatement):
@@ -194,8 +194,8 @@ class Bind1fStatement(BaseIdQualifierStatement):
 
 
 class Extern1vStatement(Bind1vStatement):
-    def __init__(self, loc, var_name: str, var_ts, var_str):
-        super().__init__(loc, var_name, None)
+    def __init__(self, loc, var_name: str, var_ts: "BaseTypeSpec", var_str, is_mut):
+        super().__init__(loc, var_name, None, is_mut)
         self.var_type_spec = var_ts
         self.extern_notation = var_str
 
@@ -255,9 +255,10 @@ class IteStatement(BaseStatement):
 
 
 class ReturnStatement(BaseStatement):
-    def __init__(self, loc, returned_exp: BaseExpression):
+    def __init__(self, loc, returned_exp: BaseExpression, is_shallow=True):
         super().__init__(loc)
         self.returned_exp = returned_exp
+        self.is_shallow = is_shallow
 
 
 class DiscardStatement(BaseStatement):
@@ -340,11 +341,17 @@ class IdRefExpression(MIdQualifierNode, BaseExpression):
 
 
 class MuxExpression(BaseExpression):
-    def __init__(self, loc: fb.ILoc, cond_exp: "BaseExpression", then_exp: "BaseExpression", else_exp: "BaseExpression"):
+    def __init__(
+        self, 
+        loc: fb.ILoc, 
+        cond_exp: "BaseExpression", 
+        then_block: t.List["BaseStatement"], 
+        else_block: t.List["BaseStatement"]
+    ):
         super().__init__(loc)
         self.cond_exp = cond_exp
-        self.then_exp = then_exp
-        self.else_exp = else_exp
+        self.then_block = then_block
+        self.else_block = else_block
 
 
 class ProcCallExpression(BaseExpression):
@@ -445,13 +452,13 @@ class ProcSignatureTypeSpec(BaseTypeSpec):
     def __init__(
         self, 
         loc: fb.ILoc, 
-        args: t.List[t.Tuple[OptStr, BaseTypeSpec]], 
+        opt_args: t.Optional[t.List[t.Tuple[OptStr, BaseTypeSpec]]], 
         ret_ts: BaseTypeSpec,
         takes_closure: bool,
         is_c_variadic: bool = False
     ):
         super().__init__(loc)
-        self.args_list = args
+        self.opt_args_list = opt_args
         self.ret_ts = ret_ts
         self.takes_closure = takes_closure
         self.is_c_variadic = is_c_variadic

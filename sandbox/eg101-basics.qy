@@ -14,34 +14,36 @@ pub v3f_scale: (Vec3F, F32) -> Vec3F;
 
 // enums provided using 'const', which translates into preprocessor declarations
 const I32 {
-    let EC_ALL_OK = 0;
-    let EC_BAD_CLI_ARGS = 1 + $predecessor;
-    let EC_BAD_FILE_PATH = 1 + $predecessor;
-    let EC_DETECTED_RUNTIME_ERROR = 1 + $predecessor;
+    val EC_ALL_OK = 0;
+    val EC_BAD_CLI_ARGS = 1 + $predecessor;
+    val EC_BAD_FILE_PATH = 1 + $predecessor;
+    val EC_DETECTED_RUNTIME_ERROR = 1 + $predecessor;
 };
 const U32 {
-    let WINDOW_FLAG_FULLSCREEN = 0x1u;
-    let WINDOW_FLAG_FIXED_SIZE = 2u * $predecessor;
-    let WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $predecessor;
+    val WINDOW_FLAG_FULLSCREEN = 0x1u;
+    val WINDOW_FLAG_FIXED_SIZE = 2u * $predecessor;
+    val WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $predecessor;
 };
 
 // struct definitions: (enum, union are similar)
-let Point = struct { pos: Vec3F };
-let Vec3F = struct { x: F32, y: F32, z: F32 };
+typ Point = (pos: Vec3F);
+typ Vec3F = (x: F32, y: F32, z: F32);
 
 // function definitions:
 // NOTE: type inference fills in holes.
-let vec3f (x, y, z) = make Vec3F(x, y, z);
+def vec3f (x, y, z) = {
+    return make Vec3F(x, y, z);
+};
 
-let v3f_add (v1, v2) = {
-    let vx = v1.x + v2.x;
-    let vy = v1.y + v2.y;
-    let vz = v1.z + v2.z;
+def v3f_add (v1, v2) = {
+    val vx = v1.x + v2.x;
+    val vy = v1.y + v2.y;
+    val vz = v1.z + v2.z;
     return vec3f(vx, vy, vz);
 };
-let v3f_scale (v, s) = {
-    let sx = v.x * s;
-    let sy = v.y * s;
-    let sz = v.z * s;
+def v3f_scale (v, s) = {
+    val sx = v.x * s;
+    val sy = v.y * s;
+    val sz = v.z * s;
     return vec3f(sx, sy, sz);
 };

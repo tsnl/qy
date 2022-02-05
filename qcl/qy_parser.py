@@ -170,11 +170,15 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return self.visit(ctx.unwrapped_block)
 
     def visitUnwrappedBlock(self, ctx: antlr.QySourceFileParser.UnwrappedBlockContext) -> t.List[ast1.BaseStatement]:
-        return [
+        statements = [
             self.visit(statement_ctx)
-            for statement_ctx in ctx.statements
+            for statement_ctx in ctx.prefix_statements
         ]
-    
+        if ctx.tail is not None:
+            shallow_return_stmt = ast1.ReturnStatement(self.loc(ctx), self.visitExpression(ctx.tail), is_shallow=True)
+            statements.append(shallow_return_stmt)
+        return statements
+
     #
     # statement:
     #
@@ -206,7 +210,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             raise NotImplementedError(f"Unknown statement kind in parser: {ctx.getText()}")
 
     def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
-        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
+        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer), ctx.is_mut is not None)
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
         arg_name_list = self.visit(ctx.args)
@@ -508,23 +512,18 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                     'U8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
                     'Bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
                     'Void': ast1.BuiltinPrimitiveTypeIdentity.Void,
-                    'String': ast1.BuiltinPrimitiveTypeIdentity.String
+                    'Str': ast1.BuiltinPrimitiveTypeIdentity.String
                 }[ctx.tok.text]
             )
 
-    def visitAdtTypeSpec(self, ctx: antlr.QySourceFileParser.AdtTypeSpecContext):
-        if ctx.through is not None:
-            return self.visit(ctx.through)
-        else:
-            linear_type_operator = {
-                'struct': ast1.LinearTypeOp.Product,
-                'union': ast1.LinearTypeOp.Sum
-            }[ctx.kw.text]
-            return ast1.AdtTypeSpec(
-                self.loc(ctx),
-                linear_type_operator,
-                self.visit(ctx.args)
-            )
+    def visitThroughAdtTypeSpec(self, ctx: antlr.QySourceFileParser.ThroughAdtTypeSpecContext):
+        return self.visit(ctx.through)
+    
+    def visitUnionAdtTypeSpec(self, ctx: antlr.QySourceFileParser.UnionAdtTypeSpecContext):
+        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Sum, self.visit(ctx.args))
+
+    def visitTupleAdtTypeSpec(self, ctx: antlr.QySourceFileParser.TupleAdtTypeSpecContext):
+        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Product, self.visit(ctx.args))
 
     def visitPtrTypeSpec(self, ctx: antlr.QySourceFileParser.PtrTypeSpecContext):
         if ctx.through is not None:
@@ -542,7 +541,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         else:
             return ast1.ProcSignatureTypeSpec(
                 self.loc(ctx),
-                self.visit(ctx.args),
+                self.visit(ctx.args) if ctx.args is not None else None,
                 self.visit(ctx.ret),
                 ctx.has_closure_slot is not None
             )

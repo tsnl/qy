@@ -37,7 +37,7 @@ block
     : '{' unwrapped_block=unwrappedBlock '}'
     ;
 unwrappedBlock
-    : (statements+=statement ';')*
+    : (prefix_statements+=statement ';')* (tail=expression)?
     ;
 
 statement
@@ -54,48 +54,34 @@ statement
     | continue_=continueStatement
     ;
 bind1vStatement
-    : 'let' name=ID '=' initializer=expression
+    : ('val'|is_mut='var') name=ID '=' initializer=expression
     ;
 bind1fStatement
-    : 'let' name=ID '(' args=csIdList ')' '=' body_exp=expression
-    | 'let' name=ID '(' args=csIdList ')' '=' body_block=block
+    : 'def' name=ID '(' args=csIdList ')' '=' body_exp=expression
+    | 'def' name=ID '(' args=csIdList ')' '=' body_block=block
     ;
-bind1tStatement
-    : 'let' name=ID '=' initializer=typeSpec
-    ;
-type1vStatement
-    : ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec
-    ;
-constStatement
-    : 'const' type_spec=typeSpec b=block
-    ;
+bind1tStatement: 'typ' name=ID '=' initializer=typeSpec ;
+type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
+constStatement: 'const' type_spec=typeSpec b=block ;
 iteStatement
     : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=block))?
     ;
-returnStatement
-    : 'return' ret_exp=expression
-    ;
-discardStatement
-    : 'discard' discarded_exp=expression
-    ;
-forStatement
-    : 'for' body=block
-    ;
+returnStatement: 'return' ret_exp=expression ;
+discardStatement: 'discard' discarded_exp=expression ;
+forStatement: 'for' body=block ;
 breakStatement: 'break' ;
 continueStatement: 'continue' ;
 
-expression
-    : through=binaryExpression
-    ;
+expression: through=binaryExpression ;
 primaryExpression
-    : litBoolean                                                                #litBoolPrimaryExpression
-    | litInteger                                                                #litIntPrimaryExpression
-    | litFloat                                                                  #litFloatPrimaryExpression
-    | litString                                                                 #litStringPrimaryExpression
-    | '$predecessor'                                                            #prevConstPrimaryExpression
-    | id_tok=ID                                                                 #idPrimaryExpression
-    | '(' through=expression ')'                                                #parenPrimaryExpression
-    | 'mux' '(' cond=expression ',' then=expression ',' else_=expression ')'    #muxPrimaryExpression
+    : litBoolean                                                        #litBoolPrimaryExpression
+    | litInteger                                                        #litIntPrimaryExpression
+    | litFloat                                                          #litFloatPrimaryExpression
+    | litString                                                         #litStringPrimaryExpression
+    | '$predecessor'                                                    #prevConstPrimaryExpression
+    | id_tok=ID                                                         #idPrimaryExpression
+    | '(' through=expression ')'                                        #parenPrimaryExpression
+    | 'mux' '(' cond=expression ')' then=block 'else' else_=block       #muxPrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
     ;
 postfixExpression
@@ -175,11 +161,12 @@ primaryTypeSpec
     | tok='U8'
     | tok='Bool'
     | tok='Void'
-    | tok='String'
+    | tok='Str'
     ;
 adtTypeSpec
-    : through=primaryTypeSpec
-    | kw=('struct'|'union') '{' args=csFormalArgSpecList '}'
+    : through=primaryTypeSpec               #throughAdtTypeSpec
+    | '{' args=csFormalArgSpecList '}'      #unionAdtTypeSpec
+    | '(' args=csFormalArgSpecList ')'      #tupleAdtTypeSpec
     ;
 ptrTypeSpec
     : through=adtTypeSpec
@@ -188,7 +175,9 @@ ptrTypeSpec
     ;
 signatureTypeSpec
     : through=ptrTypeSpec
-    | '(' args=csFormalArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
+    // TODO: enable optional args list with 0-arg closure: need typer overhaul!
+    // | ('(' args=csFormalArgSpecList ')')? ('->'|has_closure_slot='=>') ret=signatureTypeSpec
+    | ('(' args=csFormalArgSpecList ')') ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
 formalArgSpec
     : ts=typeSpec

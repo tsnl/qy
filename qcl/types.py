@@ -33,6 +33,9 @@ class BaseType(object, metaclass=abc.ABCMeta):
         self.id = BaseType.id_counter
         BaseType.id_counter += 1
         
+        # common type properties:
+        self.is_mut = False
+
         # optimization cache: computed and cached properties
         self.oc_free_vars = None
 
@@ -215,12 +218,12 @@ class BaseCompositeType(BaseConcreteType):
     IMPORTANT: subclasses must preserve the same '__init__' signature.
     """
 
-    def __init__(self, fields: t.List[t.Tuple[str, BaseType]], opt_name=None, contents_is_mut=None) -> None:
+    def __init__(self, fields: t.List[t.Tuple[t.Optional[str], BaseType]], opt_name=None, contents_is_mut=None) -> None:
         assert isinstance(fields, list)
-        assert ((isinstance(field_name, str) and isinstance(field_type, BaseType) for field_name, field_type in fields))
+        assert ((isinstance(field_name, (str, type(None))) and isinstance(field_type, BaseType) for field_name, field_type in fields))
 
         super().__init__()
-        self.fields: t.List[t.Tuple[str, BaseType]] = fields
+        self.fields: t.List[t.Tuple[t.Optional[str], BaseType]] = fields
         if len(self.fields) == 1:
             singleton_field_name, singleton_field_type = self.fields[0]
             self.field_names = [singleton_field_name]
@@ -232,7 +235,7 @@ class BaseCompositeType(BaseConcreteType):
                 self.field_names = []
                 self.field_types = []
         assert all((isinstance(t, BaseType) for t in self.field_types))
-        assert all((isinstance(n, str) for n in self.field_names))
+        assert all((isinstance(n, (str, type(None))) for n in self.field_names))
         self.opt_name = opt_name
         self.contents_is_mut = contents_is_mut
         self.init_optimization_cache()

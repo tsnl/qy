@@ -107,7 +107,7 @@ def translate_adt_decl(tu, node, rem_provided_symbols):
     if adt_name in rem_provided_symbols:
         rem_provided_symbols.remove(adt_name)
         adt_ts = translate_clang_type_to_ts(node.type, is_direct_use=False)
-        assert adt_ts.opt_externally_forced_type is not None
+        assert adt_ts.wb_type is not None
         yield ast1.Bind1tStatement(loc(node), adt_name, adt_ts)
 
 
@@ -128,7 +128,7 @@ def translate_enum_decl(tu, node, rem_provided_symbols):
                 is_unsigned=const_ts.is_unsigned_int,
                 width_in_bits=const_ts.int_width_in_bits
             )
-            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp)
+            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp, is_mut=False)
             body.append(bind1v_stmt)
         yield ast1.ConstStatement(loc(node), body, const_ts)
 
@@ -165,7 +165,8 @@ def translate_variable_decl(tu, node, rem_provided_symbols):
         rem_provided_symbols.remove(var_name)
         var_ts = translate_clang_type_to_ts(node.type, True)
         var_str = node.type.spelling + " " + node.spelling
-        yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str)
+        is_mut = var_ts.wb_type.is_mut
+        yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str, is_mut=is_mut)
 
 
 def loc(node):
@@ -228,7 +229,12 @@ def dbg_print_visit(tu, node, indent_count=1, tab_w=2):
 
 
 def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
-    c_type = c_type.get_canonical()
+    ts = help_translate_clang_type_to_ts(c_type.get_canonical(), is_direct_use=is_direct_use)
+    ts.wb_type.is_mut = not c_type.is_const_qualified()
+    return ts
+
+
+def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
     size_in_bytes = c_type.get_size()
     if is_direct_use and size_in_bytes <= 0 and c_type.kind != TypeKind.VOID:
         # error: indirect type def used directly
@@ -240,11 +246,11 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
 
     if c_type.kind == TypeKind.VOID:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Void)
-        ts.opt_externally_forced_type = types.VoidType.singleton
+        ts.wb_type = types.VoidType.singleton
         return ts
     elif c_type.kind == TypeKind.BOOL:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Bool)
-        ts.opt_externally_forced_type = types.IntType.get(8, is_signed=False)
+        ts.wb_type = types.IntType.get(8, is_signed=False)
         return ts
     elif c_type.kind in (TypeKind.CHAR_S, TypeKind.INT, TypeKind.LONG, TypeKind.LONGLONG):
         builtin_primitive_type_id = {
@@ -254,7 +260,7 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
             8: ast1.BuiltinPrimitiveTypeIdentity.Int64
         }[size_in_bytes]
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
-        ts.opt_externally_forced_type = types.IntType.get(8 * size_in_bytes, is_signed=True)
+        ts.wb_type = types.IntType.get(8 * size_in_bytes, is_signed=True)
         return ts
     elif c_type.kind in (TypeKind.UCHAR, TypeKind.UINT, TypeKind.ULONG, TypeKind.ULONGLONG):
         builtin_primitive_type_id = {
@@ -264,7 +270,7 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
             8: ast1.BuiltinPrimitiveTypeIdentity.UInt64
         }[size_in_bytes]
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
-        ts.opt_externally_forced_type = types.IntType.get(8 * size_in_bytes, is_signed=False)
+        ts.wb_type = types.IntType.get(8 * size_in_bytes, is_signed=False)
         return ts
     elif c_type.kind in (TypeKind.FLOAT, TypeKind.DOUBLE):
         builtin_primitive_type_id = {
@@ -272,7 +278,7 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
             8: ast1.BuiltinPrimitiveTypeIdentity.Float64
         }[size_in_bytes]
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
-        ts.opt_externally_forced_type = types.FloatType(8 * size_in_bytes)
+        ts.wb_type = types.FloatType(8 * size_in_bytes)
         return ts
     elif c_type.kind == TypeKind.RECORD:
         # struct or union: must recurse
@@ -284,16 +290,16 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
             ast1.LinearTypeOp.Sum: types.UnionType
         }[lto_map[declaration.kind]]
         if opt_cached_ts is not None:
-            assert opt_cached_ts.opt_externally_forced_type is not None
+            assert opt_cached_ts.wb_type is not None
             ts = ast1.IdRefTypeSpec(c_type_loc(c_type), type_name)
-            ts.opt_externally_forced_type = opt_cached_ts.opt_externally_forced_type
+            ts.wb_type = opt_cached_ts.wb_type
             return ts
         else:
             fields = [(it.spelling, translate_clang_type_to_ts(it.type)) for it in c_type.get_fields()]
             ts = ast1.AdtTypeSpec(c_type_loc(c_type), lto_map[declaration.kind], fields)
-            ts.opt_externally_forced_type = type_ctor(
+            ts.wb_type = type_ctor(
                 [
-                    (field_name, field_ts.opt_externally_forced_type)
+                    (field_name, field_ts.wb_type)
                     for field_name, field_ts in fields
                 ],
                 opt_name=type_name
@@ -305,11 +311,11 @@ def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
         pointee_ts = translate_clang_type_to_ts(clang_pointee_ts, False)
         contents_is_mut = not clang_pointee_ts.is_const_qualified()
         ts = ast1.PtrTypeSpec(c_type_loc(c_type), pointee_ts, contents_is_mut)
-        ts.opt_externally_forced_type = types.UnsafeCPointerType.new(pointee_ts.opt_externally_forced_type, contents_is_mut)
+        ts.wb_type = types.UnsafeCPointerType.new(pointee_ts.wb_type, contents_is_mut)
         return ts
     elif c_type.kind == TypeKind.ENUM:
         ts = translate_clang_type_to_ts(c_type.get_declaration().enum_type)
-        assert ts.opt_externally_forced_type is not None
+        assert ts.wb_type is not None
         return ts
     elif c_type.kind == TypeKind.FUNCTIONPROTO:
         args = [(None, translate_clang_type_to_ts(arg_type)) for arg_type in c_type.argument_types()]

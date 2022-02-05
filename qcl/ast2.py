@@ -14,7 +14,6 @@ BaseQyp is a base qy package: it includes...
 
 import abc
 import functools
-from os import stat
 import os.path
 import json
 import typing as t
@@ -70,7 +69,7 @@ class QypSet(object):
             # loading the qyp:
             loader_map = {
                 config.QYP_FILE_EXTENSION: NativeQyp.load,
-                config.QYX_FILE_EXTENSION: CQyxV1.load
+                config.QYX_FILE_EXTENSION: CQyx.load
             }
             for loader_ext, loader_fun in loader_map.items():
                 if qyp_path_to_load.endswith(loader_ext):
@@ -346,7 +345,7 @@ class BaseQyx(BaseQyp, metaclass=abc.ABCMeta):
 
 
 
-class CQyxV1(BaseQyx):
+class CQyx(BaseQyx):
     required_keys = {"cc-args"}
 
     def __init__(
@@ -368,15 +367,15 @@ class CQyxV1(BaseQyx):
         assert binder_name == 'C-V1'
         assert isinstance(target_platform, platform.Platform)
 
-        missing_keys = CQyxV1.required_keys - set(js_map.keys())
+        missing_keys = CQyx.required_keys - set(js_map.keys())
         if missing_keys:
-            CQyxV1.panic_because_bad_keys(path_to_root_qyx_file, missing_keys)
+            CQyx.panic_because_bad_keys(path_to_root_qyx_file, missing_keys)
 
         # extracting args from cc-args object:
         # NOTE: only a few core platforms are supported right now. This can be expanded in the future.
 
         c_compiler_args_obj = js_map["cc-args"]
-        CQyxV1.check_args_obj("cc-args", c_compiler_args_obj, {"*"}, platform.core_platform_names)
+        CQyx.check_args_obj("cc-args", c_compiler_args_obj, {"*"}, platform.core_platform_names)
         raw_common_args = c_compiler_args_obj["*"]
         common_args = CQyxV1_CompilerArgs.from_json_obj(path_to_root_qyx_file, target_platform, raw_common_args)
 
@@ -396,12 +395,12 @@ class CQyxV1(BaseQyx):
         header_src_path_list = []
         for index, include_obj in enumerate(headers_objs):
             include_path = include_obj.path
-            CQyxV1.check_obj_is_str_else_panic(f"includes[{index}].path", include_path, path_to_root_qyx_file)
+            CQyx.check_obj_is_str_else_panic(f"includes[{index}].path", include_path, path_to_root_qyx_file)
             provided_symbol_list = include_obj.provides
-            CQyxV1.check_obj_is_all_str_list_else_panic(f"includes[{index}].path", provided_symbol_list, path_to_root_qyx_file)
+            CQyx.check_obj_is_all_str_list_else_panic(f"includes[{index}].path", provided_symbol_list, path_to_root_qyx_file)
             abs_include_path = include_path if os.path.isabs(include_path) else os.path.join(qyx_dir_path, include_path)
+            abs_include_path = os.path.normpath(abs_include_path)
             c_source_file = CSourceFile.load(abs_include_path, provided_symbol_list, is_header=True)
-
             header_c_source_files.append(c_source_file)
             header_src_path_list.append(abs_include_path)
 
@@ -410,10 +409,10 @@ class CQyxV1(BaseQyx):
         impl_src_path_list = []
         for index, src_obj in enumerate(sources_objs):
             src_path = src_obj
-            CQyxV1.check_obj_is_str_else_panic(f"sources[{index}]", src_path, path_to_root_qyx_file)
+            CQyx.check_obj_is_str_else_panic(f"sources[{index}]", src_path, path_to_root_qyx_file)
             abs_src_path = src_path if os.path.isabs(src_path) else os.path.join(qyx_dir_path, src_path)
+            abs_src_path = os.path.normpath(abs_src_path)
             c_source_file = CSourceFile.load(abs_src_path, [], is_header=False)
-
             impl_c_source_files.append(c_source_file)
             impl_src_path_list.append(abs_src_path)
 
@@ -436,7 +435,7 @@ class CQyxV1(BaseQyx):
             )
         
         # returning:
-        return CQyxV1(
+        return CQyx(
             path_to_root_qyx_file,
             qyx_dir_path,
             js_map["name"],
@@ -457,7 +456,7 @@ class CQyxV1(BaseQyx):
             )
         
         for index, include_obj in enumerate(arg_obj):
-            CQyxV1.check_args_obj(f"{top_level_key}[{index}]", include_obj, required_per_obj_keys, set())
+            CQyx.check_args_obj(f"{top_level_key}[{index}]", include_obj, required_per_obj_keys, set())
 
     @staticmethod
     def check_args_obj(top_level_key, args_obj, required_keys, optional_keys):
@@ -503,7 +502,7 @@ class CQyxV1_CompilerArgs(object):
     @staticmethod
     def from_json_obj(path_to_root_qyx_file, target_platform, json_obj):
         usage_prefix = f"cc-args[{repr(target_platform.name)}]"
-        CQyxV1.check_args_obj(
+        CQyx.check_args_obj(
             usage_prefix, json_obj, set(), 
             {"c-flags", "sources", "headers"}
         )
@@ -512,7 +511,7 @@ class CQyxV1_CompilerArgs(object):
         c_flags = []
         opt_c_flags_obj = json_obj.get("c-flags", None)
         if opt_c_flags_obj is not None:
-            CQyxV1.check_obj_is_all_str_list_else_panic(
+            CQyx.check_obj_is_all_str_list_else_panic(
                 f"{usage_prefix}.c-flags",
                 opt_c_flags_obj,
                 path_to_root_qyx_file
@@ -523,7 +522,7 @@ class CQyxV1_CompilerArgs(object):
         sources = []
         opt_sources_obj = json_obj.get("sources", None)
         if opt_sources_obj is not None:
-            CQyxV1.check_obj_is_all_str_list_else_panic(
+            CQyx.check_obj_is_all_str_list_else_panic(
                 f"{usage_prefix}.sources",
                 opt_sources_obj,
                 path_to_root_qyx_file
@@ -563,18 +562,18 @@ class CQyxV1_CompilerArgs_Header(object):
     @staticmethod
     def from_json_obj(path_to_root_qyx_file, target_platform, json_obj, header_index: int):
         usage_prefix = f"cc-args.{target_platform.name}.headers[{header_index}]"
-        CQyxV1.check_args_obj(
+        CQyx.check_args_obj(
             usage_prefix, json_obj, set(), 
             {"path", "provides"}
         )
         
         opt_path_obj = json_obj.get("path", None)
         if opt_path_obj is not None:
-            CQyxV1.check_obj_is_str_else_panic(f"{usage_prefix}.path", opt_path_obj, path_to_root_qyx_file)
+            CQyx.check_obj_is_str_else_panic(f"{usage_prefix}.path", opt_path_obj, path_to_root_qyx_file)
         
         opt_provides_obj = json_obj.get("provides", None)
         if opt_provides_obj is not None:
-            CQyxV1.check_obj_is_all_str_list_else_panic(f"{usage_prefix}.provides", opt_provides_obj, path_to_root_qyx_file)
+            CQyx.check_obj_is_all_str_list_else_panic(f"{usage_prefix}.provides", opt_provides_obj, path_to_root_qyx_file)
         
         return CQyxV1_CompilerArgs_Header(json_obj["path"], json_obj["provides"])
 

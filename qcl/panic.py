@@ -69,8 +69,10 @@ def because(
         else:
             print(f"relpath: {rel_path}", end=custom_end, file=sys.stderr)
             print(f"abspath: {abs_path}", end=custom_end, file=sys.stderr)
-    else:
-        assert opt_loc is not None
+    elif opt_loc is not None:
         print(f"abspath: {str(opt_loc)}", file=sys.stderr)
+    else:
+        # this is OK! sometimes, we have a global error: just ensure message includes locations.
+        pass
 
     raise PanicException(exit_code, msg)

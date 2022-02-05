@@ -1,3 +1,8 @@
+"""
+FIXME: make all emitter writers uniformly write to a stream that can be string or file.
+- then, fix MuxExpression, IIFEs, lambdas.
+"""
+
 import dataclasses
 import os
 import os.path
@@ -52,7 +57,7 @@ class Emitter(base_emitter.BaseEmitter):
         # collecting all extern headers:
         extern_header_source_files = []
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
-            if isinstance(qyp, ast2.CQyxV1):
+            if isinstance(qyp, ast2.CQyx):
                 for c_source_file in qyp.c_source_files:
                     if c_source_file.is_header:
                         assert os.path.isabs(c_source_file.file_path)
@@ -615,8 +620,8 @@ class Emitter(base_emitter.BaseEmitter):
         
         elif isinstance(exp, ast1.MuxExpression):
             cond_str = self.translate_expression(exp.cond_exp)
-            then_str = self.translate_expression(exp.then_exp)
-            else_str = self.translate_expression(exp.else_exp)
+            then_str = self.translate_expression(exp.then_block)
+            else_str = self.translate_expression(exp.else_block)
             mux_str = f"({cond_str} ? ({then_str}) : ({else_str}))"
             return mux_str, exp.wb_type
 
@@ -665,7 +670,7 @@ class Emitter(base_emitter.BaseEmitter):
 
                     native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
                     native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
-                elif isinstance(qyp, ast2.CQyxV1):
+                elif isinstance(qyp, ast2.CQyx):
                     for c_source_file in qyp.c_source_files:
                         if not c_source_file.is_header:
                             file_path = self.relpath(c_source_file.file_path)

@@ -41,7 +41,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
         extern_tag = None
         if isinstance(stmt, ast1.Extern1vStatement):
             extern_tag = "c"
-            var_type = stmt.var_type_spec.opt_externally_forced_type
+            var_type = stmt.var_type_spec.wb_type
             assert var_type is not None
         else:
             var_type = types.VarType(f"bind1v_{stmt.name}")
@@ -57,10 +57,10 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             extern_tag = "c"
             fn_arg_types = []
             for arg_ts in stmt.arg_typespecs:
-                arg_type = arg_ts.opt_externally_forced_type
+                arg_type = arg_ts.wb_type
                 assert arg_type is not None
                 fn_arg_types.append(arg_type)
-            fn_ret_type = stmt.ret_typespec.opt_externally_forced_type
+            fn_ret_type = stmt.ret_typespec.wb_type
             fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, has_closure_slot=False, is_c_variadic=stmt.is_variadic)
         else:
             fn_type = types.VarType(f"bind1f_{stmt.name}")
@@ -71,9 +71,9 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             extern_tag=extern_tag
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
-        if stmt.initializer is not None and stmt.initializer.opt_externally_forced_type is not None:
+        if stmt.initializer is not None and stmt.initializer.wb_type is not None:
             extern_tag = "c"
-            bound_type = stmt.initializer.opt_externally_forced_type
+            bound_type = stmt.initializer.wb_type
         else:
             extern_tag = None
             bound_type = types.VarType(f"bind1t_{stmt.name}")
@@ -159,7 +159,18 @@ def model_one_block(
     dto_list: "DTOList", 
     init_sub: t.Optional["Substitution"] = None,
     is_top_level=False
-) -> "Substitution":
+) -> t.Tuple["Substitution", types.BaseType]:
+    sub, _ = model_one_block_with_type(ctx, stmt_list, dto_list, init_sub, is_top_level)
+    return sub
+
+
+def model_one_block_with_type(
+    ctx: "Context", 
+    stmt_list: t.List[ast1.BaseStatement], 
+    dto_list: "DTOList", 
+    init_sub: t.Optional["Substitution"] = None,
+    is_top_level=False
+) -> t.Tuple["Substitution", types.BaseType]:
     if init_sub is None:
         init_sub = Substitution.empty
 
@@ -168,13 +179,19 @@ def model_one_block(
     
     for stmt in stmt_list:
         stmt_sub = model_one_statement(ctx, stmt, dto_list)
-        sub = stmt_sub.compose(sub)
+        sub = stmt_sub.compose(sub, stmt.loc)
         if is_top_level:
             Context.apply_sub_everywhere(sub)
             dto_list.update(sub)
             ast1.WbTypeMixin.apply_sub_everywhere(sub)
     
-    return sub
+    shallow_return_type = types.VoidType.singleton
+    if stmt_list:
+        last_stmt = stmt_list[-1]
+        if isinstance(last_stmt, ast1.ReturnStatement) and last_stmt.is_shallow:
+            shallow_return_type = last_stmt.returned_exp.wb_type
+    
+    return sub, shallow_return_type
 
 
 def model_one_block_in_function(
@@ -211,12 +228,12 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             # definition is already seeded-- just retrieve and unify.
             definition = ctx.symbol_table[stmt.name]
             def_sub, def_type = definition.scheme.instantiate()
-            last_sub = def_sub.compose(exp_sub)
+            last_sub = def_sub.compose(exp_sub, stmt.loc)
             return unify(
                 last_sub.rewrite_type(def_type), 
                 last_sub.rewrite_type(exp_type),
                 opt_loc=stmt.loc
-            ).compose(last_sub)
+            ).compose(last_sub, stmt.loc)
         else:
             # try to create a local definition using the expression type.
             definition = ValueDefinition(stmt.loc, stmt.name, Scheme([], exp_type))
@@ -234,14 +251,14 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
     elif isinstance(stmt, ast1.Bind1fStatement):
         args_sub = Substitution.empty
         if isinstance(stmt, ast1.Extern1fStatement):
-            assert stmt.ret_typespec.opt_externally_forced_type is not None
+            assert stmt.ret_typespec.wb_type is not None
             ret_sub, ret_type = model_one_type_spec(ctx, stmt.ret_typespec, dto_list)
             arg_type_list = []
             for arg_ts in stmt.arg_typespecs:
-                assert arg_ts.opt_externally_forced_type is not None
+                assert arg_ts.wb_type is not None
                 arg_ts_sub, arg_type = model_one_type_spec(ctx, arg_ts, dto_list)
 
-                args_sub = arg_ts_sub.compose(args_sub)
+                args_sub = arg_ts_sub.compose(args_sub, arg_ts.loc)
                 arg_type_list.append(arg_type)
         else:
             arg_type_list = [
@@ -252,33 +269,40 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             ret_sub, ret_type = model_one_block_in_function(ctx, arg_name_type_list, stmt.body, dto_list)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
-        last_sub = def_sub.compose(ret_sub)
+        last_sub = def_sub.compose(ret_sub, stmt.loc)
         return unify(
             last_sub.rewrite_type(proc_type), 
             last_sub.rewrite_type(def_type),
             opt_loc=stmt.loc
-        ).compose(last_sub)
+        ).compose(last_sub, stmt.loc)
     elif isinstance(stmt, ast1.Bind1tStatement):
         definition = ctx.try_lookup(stmt.name)
         assert definition is not None
         def_sub, def_type = definition.scheme.instantiate()
         ts_sub, ts_type = model_one_type_spec(ctx, stmt.initializer, dto_list)
-        last_sub = ts_sub.compose(def_sub)
+        last_sub = ts_sub.compose(def_sub, stmt.initializer.loc)
         return unify(
             last_sub.rewrite_type(def_type), 
             last_sub.rewrite_type(ts_type),
             opt_loc=stmt.loc
-        ).compose(last_sub)
+        ).compose(last_sub, stmt.loc)
     elif isinstance(stmt, ast1.Type1vStatement):
         definition = ctx.try_lookup(stmt.name)
+        if definition is None:
+            panic.because(
+                panic.ExitCode.TyperModelerUndefinedIdError,
+                f"Identifier '{stmt.name}' declared, but not defined.",
+                opt_loc=stmt.loc
+            )
+        assert definition is not None and definition.is_value_definition
         def_sub, def_type = definition.scheme.instantiate()
         ts_sub, ts_type = model_one_type_spec(ctx, stmt.ts, dto_list)
-        last_sub = ts_sub.compose(def_sub)
+        last_sub = ts_sub.compose(def_sub, stmt.ts.loc)
         return unify(
             last_sub.rewrite_type(def_type), 
             last_sub.rewrite_type(ts_type),
             opt_loc=stmt.loc
-        ).compose(last_sub)
+        ).compose(last_sub, stmt.loc)
     elif isinstance(stmt, ast1.ConstStatement):
         sub, enum_type = model_one_type_spec(ctx, stmt.const_type_spec, dto_list)
         iota_ctx = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx)
@@ -297,7 +321,8 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             common_u_sub = unify(const_type, enum_type)
 
             # updating accumulator 'sub'
-            sub = common_u_sub.compose(rhs_u_sub).compose(rhs_sub).compose(const_sub).compose(sub)
+            l = const_bind_stmt.loc
+            sub = common_u_sub.compose(rhs_u_sub,l).compose(rhs_sub,l).compose(const_sub,l).compose(sub,l)
 
         return sub
     elif isinstance(stmt, ast1.ReturnStatement):
@@ -308,13 +333,15 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
                 opt_loc=stmt.loc
             )
         ret_exp_sub, ret_exp_type = model_one_exp(ctx, stmt.returned_exp, dto_list)
-        return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type), opt_loc=stmt.loc).compose(ret_exp_sub)
+        l = stmt.loc
+        return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type),l).compose(ret_exp_sub,l)
     elif isinstance(stmt, ast1.IteStatement):
         condition_sub, condition_type = model_one_exp(ctx, stmt.cond, dto_list)
         cond_dto_sub = dto_list.add_dto(IteCondTypeCheckDTO(stmt.loc, condition_type))
         then_sub = model_one_block(ctx, stmt.then_block, dto_list)
         else_sub = model_one_block(ctx, stmt.else_block, dto_list) if stmt.else_block else Substitution.empty
-        return else_sub.compose(then_sub).compose(cond_dto_sub).compose(condition_sub)
+        l = stmt.loc
+        return else_sub.compose(then_sub,l).compose(cond_dto_sub,l).compose(condition_sub,l)
     elif isinstance(stmt, ast1.DiscardStatement):
         sub, _ = model_one_exp(ctx, stmt.discarded_exp, dto_list)
         return sub
@@ -370,22 +397,22 @@ def help_model_one_exp(
         initializer_type_list = []
         for initializer_arg_exp in exp.initializer_list:
             initializer_arg_sub, initializer_arg_type = model_one_exp(ctx, initializer_arg_exp, dto_list)
-            args_sub = initializer_arg_sub.compose(args_sub)
+            args_sub = initializer_arg_sub.compose(args_sub, exp.loc)
             initializer_type_list.append(initializer_arg_type)
         # TODO: check the arguments against the made type, maybe using a deferred query or unification?
-        sub = args_sub.compose(made_ts_sub)
+        sub = args_sub.compose(made_ts_sub, exp.loc)
         return sub, made_type
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
         operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
         operation_dto_sub = dto_list.add_dto(UnaryOpDTO(exp.loc, exp.operator, res_type, operand_type))
-        return operand_sub.compose(operation_dto_sub), res_type
+        return operand_sub.compose(operation_dto_sub, exp.loc), res_type
     elif isinstance(exp, ast1.BinaryOpExpression):
         res_type = types.VarType(f"binary_op_{exp.operator.name.lower()}_res")
         lt_operand_sub, lt_operand_type = model_one_exp(ctx, exp.lt_operand, dto_list)
         rt_operand_sub, rt_operand_type = model_one_exp(ctx, exp.rt_operand, dto_list)
         operation_dto_sub = dto_list.add_dto(BinaryOpDTO(exp.loc, exp.operator, res_type, lt_operand_type, rt_operand_type))
-        sub = operation_dto_sub.compose(rt_operand_sub).compose(lt_operand_sub)
+        sub = operation_dto_sub.compose(rt_operand_sub, exp.loc).compose(lt_operand_sub, exp.loc)
         return sub, res_type
     elif isinstance(exp, ast1.ProcCallExpression):
         # collecting actual procedure type information:
@@ -395,41 +422,41 @@ def help_model_one_exp(
         for arg_exp in exp.arg_exps:
             arg_sub, arg_type = model_one_exp(ctx, arg_exp, dto_list)
             arg_type_list.append(all_arg_sub.rewrite_type(arg_type))
-            all_arg_sub = arg_sub.compose(all_arg_sub)
+            all_arg_sub = arg_sub.compose(all_arg_sub, exp.loc)
         proxy_ret_type = types.VarType(f"proc_call_ret")
         actual_proc_type = types.ProcedureType.new(arg_type_list, proxy_ret_type)
         
         # collecting formal procedure type information:
         # type based on how the procedure was defined in this context:
         formal_proc_sub, formal_proc_type = model_one_exp(ctx, exp.proc, dto_list)
-        last_sub = formal_proc_sub.compose(all_arg_sub)
+        last_sub = formal_proc_sub.compose(all_arg_sub, exp.loc)
 
         # unifying, returning:
         sub = unify(
             last_sub.rewrite_type(formal_proc_type), 
             last_sub.rewrite_type(actual_proc_type),
             opt_loc=exp.loc
-        ).compose(last_sub)
+        ).compose(last_sub, exp.loc)
         return sub, sub.rewrite_type(proxy_ret_type)
     elif isinstance(exp, ast1.DotIdExpression):
         container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
         proxy_ret_type = types.VarType(f"dot_{exp.key}")
         add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_ret_type, exp.key))
-        return add_dto_sub.compose(container_sub), proxy_ret_type
+        return add_dto_sub.compose(container_sub, exp.loc), proxy_ret_type
     elif isinstance(exp, ast1.BuiltinConPrevExpression):
         return Substitution.empty, ctx.return_type
     elif isinstance(exp, ast1.MuxExpression):
         # first, modelling the 'cond', 'then', and 'else' branch expressions:
         cond_sub, cond_type = model_one_exp(ctx, exp.cond_exp, dto_list)
-        then_sub, then_type = model_one_exp(ctx, exp.then_exp, dto_list)
-        then_sub, then_type = then_sub.compose(cond_sub), cond_sub.rewrite_type(then_type)
-        else_sub, else_type = model_one_exp(ctx, exp.else_exp, dto_list)
-        else_sub, else_type = else_sub.compose(then_sub), then_sub.rewrite_type(else_type)
+        then_sub, then_type = model_one_block_with_type(ctx, exp.then_block, dto_list)
+        then_sub, then_type = then_sub.compose(cond_sub, exp.loc), then_sub.rewrite_type(then_type)
+        else_sub, else_type = model_one_block_with_type(ctx, exp.else_block, dto_list)
+        else_sub, else_type = else_sub.compose(then_sub, exp.loc), else_sub.rewrite_type(else_type)
         sub = else_sub
         # next, unifying types to type-check.
         bool_type = types.IntType.get(1, is_signed=False)
-        sub = unify(cond_type, bool_type, exp.loc).compose(sub)     # ensuring 'cond' is a boolean
-        sub = unify(then_type, else_type, exp.loc).compose(sub)     # ensuring branches return the same type
+        sub = unify(cond_type, bool_type, exp.loc).compose(sub, exp.loc)     # ensuring 'cond' is a boolean
+        sub = unify(then_type, else_type, exp.loc).compose(sub, exp.loc)     # ensuring branches return the same type
         return sub, sub.rewrite_type(then_type)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
@@ -440,9 +467,9 @@ def model_one_type_spec(
     ts: "ast1.BaseTypeSpec", 
     dto_list: "DTOList"
 ) -> t.Tuple["Substitution", types.BaseType]:
-    if ts.opt_externally_forced_type is not None:
-        assert isinstance(ts.opt_externally_forced_type, types.BaseType)
-        return Substitution.empty, ts.opt_externally_forced_type
+    if ts.wb_type is not None:
+        assert isinstance(ts.wb_type, types.BaseType)
+        return Substitution.empty, ts.wb_type
     else:
         ts.wb_ctx = ctx
         ts_sub, ts_type = help_model_one_type_spec(ctx, ts, dto_list)
@@ -490,20 +517,20 @@ def help_model_one_type_spec(
     elif isinstance(ts, ast1.ProcSignatureTypeSpec):
         all_args_sub = Substitution.empty
         all_arg_types = []
-        for opt_arg_name, arg_type in ts.args_list:
-            arg_sub, arg_type = model_one_type_spec(ctx, arg_type, dto_list)
-            all_args_sub = arg_sub.compose(all_args_sub)
-            all_arg_types.append(arg_type)
+        if ts.opt_args_list:
+            for opt_arg_name, arg_type in ts.opt_args_list:
+                arg_sub, arg_type = model_one_type_spec(ctx, arg_type, dto_list)
+                all_args_sub = arg_sub.compose(all_args_sub, ts.loc)
+                all_arg_types.append(arg_type)
         ret_sub, ret_type = model_one_type_spec(ctx, ts.ret_ts, dto_list)
-        sub = ret_sub.compose(all_args_sub)
+        sub = ret_sub.compose(all_args_sub, ts.loc)
         return sub, types.ProcedureType.new(all_arg_types, ret_type, ts.takes_closure)
     elif isinstance(ts, ast1.AdtTypeSpec):
         sub = Substitution.empty
         fields = []
         for field_name, field_ts in ts.fields_list:
-            assert field_name is not None
-            field_sub, field_type  = model_one_type_spec(ctx, field_ts, dto_list)
-            sub = field_sub.compose(sub)
+            field_sub, field_type = model_one_type_spec(ctx, field_ts, dto_list)
+            sub = field_sub.compose(sub, ts.loc)
             fields.append((field_name, field_type))
         if ts.linear_op == ast1.LinearTypeOp.Product:
             return sub, types.StructType(fields)
@@ -581,7 +608,7 @@ class DTOList(object):
             if not dto_finished:
                 new_dto_list.append(dto)
                 all_finished = False
-            sub = sub.compose(dto_sub)
+            sub = sub.compose(dto_sub, dto.loc)
         return all_finished, new_dto_list, sub
 
 
@@ -746,7 +773,7 @@ class BinaryOpDTO(BaseDTO):
             if lt_operand_type.is_atomic:
                 if isinstance(lt_operand_type, (types.IntType, types.FloatType)):
                     ret_sub = unify(lt_operand_type, self.return_type, opt_loc=self.loc)
-                    return True, ret_sub.compose(symmetric_args_sub)
+                    return True, ret_sub.compose(symmetric_args_sub, self.loc)
                 else:
                     panic.because(
                         panic.ExitCode.TyperDtoSolverFailedError,
@@ -778,7 +805,7 @@ class BinaryOpDTO(BaseDTO):
             )
             if builtin_operation_is_defined:
                 ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
-                return True, ret_sub.compose(symmetric_args_sub)
+                return True, ret_sub.compose(symmetric_args_sub, self.loc)
             elif not lt_operand_type.is_atomic:
                 panic.because(
                     panic.ExitCode.TyperDtoSolverFailedError,
@@ -800,8 +827,9 @@ class BinaryOpDTO(BaseDTO):
             symmetric_args_sub = unify(self.lt_operand_type, self.rt_operand_type, opt_loc=self.loc)
             bool_type = types.IntType.get(1, is_signed=False)
             args_check_sub = unify(symmetric_args_sub.rewrite_type(self.lt_operand_type), bool_type, opt_loc=self.loc)
-            ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=self.loc)
-            return True, ret_sub.compose(args_check_sub).compose(symmetric_args_sub)
+            l = self.loc
+            ret_sub = unify(self.return_type, types.IntType.get(1, is_signed=False), opt_loc=l)
+            return True, ret_sub.compose(args_check_sub,l).compose(symmetric_args_sub,l)
         
         else:
             raise NotImplementedError(f"Solving one iter for BinaryOpDTO for binary op: {self.binary_op.name}")
@@ -926,7 +954,7 @@ def unify(
                 s.rewrite_type(ft1), 
                 s.rewrite_type(ft2),
                 opt_loc=opt_loc
-            ).compose(s)
+            ).compose(s, opt_loc)
         return s
 
     # any other case: raise a unification error.
@@ -1111,7 +1139,7 @@ class Substitution(object):
         self.sub_map = sub_map
         self.oc_sub_map_keys = set(sub_map.keys())
 
-    def compose(self, applied_first: "Substitution") -> "Substitution":
+    def compose(self, applied_first: "Substitution", src_loc: fb.ILoc) -> "Substitution":
         # composeSubst s1 s2 = Map.union (Map.map (applySubst s1) s2) s1
 
         s1 = self
@@ -1136,18 +1164,31 @@ class Substitution(object):
                     for key in intersecting_key_set
                     if s1_sub_map[key] != s2_sub_map[key]
                 }
-                can_overwrite = all((
-                    Substitution.can_overwrite_t1_with_t2(s1_sub_map[key], s2_sub_map[key])
-                    for key in offending_intersecting_key_set
-                ))
-                if offending_intersecting_key_set and not can_overwrite:
+                if offending_intersecting_key_set:
+                    can_overwrite_lr = all((
+                        Substitution.can_overwrite_t1_with_t2(s1_sub_map[key], s2_sub_map[key])
+                        for key in offending_intersecting_key_set
+                    ))
+                    if can_overwrite_lr:
+                        return Substitution.get(sub_map=(s1_sub_map | s2_sub_map))
+                    
+                    # NOTE: this is hacky, and breaks the 'order of propagation' (albeit conservatively)
+                    #   (will have to rewrite typer anyway...)
+                    can_overwrite_rl = all((
+                        Substitution.can_overwrite_t1_with_t2(s2_sub_map[key], s1_sub_map[key])
+                        for key in offending_intersecting_key_set
+                    ))
+                    if can_overwrite_rl:
+                        return Substitution.get(sub_map=(s2_sub_map | s1_sub_map))
+                    
                     s1_intersect_map = {key: s1_sub_map[key] for key in offending_intersecting_key_set}
                     s2_intersect_map = {key: s2_sub_map[key] for key in offending_intersecting_key_set}
                     panic.because(
                         panic.ExitCode.TyperUnificationError,
                         f"Unification error: conflicting substitutions composed:\n"
                         f"first: {Substitution.get(s1_intersect_map)}\n"
-                        f"later: {Substitution.get(s2_intersect_map)}"
+                        f"later: {Substitution.get(s2_intersect_map)}",
+                        opt_loc=src_loc
                     )
 
             return Substitution.get(sub_map=(s1_sub_map | s2_sub_map))
