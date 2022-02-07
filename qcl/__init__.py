@@ -23,52 +23,64 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     assert isinstance(path_to_input_root_qyp_file, str)
     assert isinstance(emitter, base_emitter.BaseEmitter)
 
-    # TODO: auto-detect target platform
+    # FIXME: auto-detect target platform
     target_platform = platform.core_linux_amd64
     target_platform = platform.core_windows_amd64
     target_platform = platform.core_macos_amd64
 
     qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file, target_platform)
-    
-    # basic checks
 
-    # TODO: perform basic checks on AST structure
-    #   - only certain statements allowed in top-level, function bodies, etc.
-    #       - 'return', 'ite' not allowed except inside a function
-    #       - 'const', 'bind1f' only globally allowed
-    #   - `iota` expression only allowed inside a 'const' initializer
-    # NOTE: this is happening during 'seeding' instead... clean up if this changes.
+    caught_exc = None
 
-    # typing native source files:
-    # TODO: expand this to also handle 'Qyx'-es
-    dto_list = typer.DTOList()
-    new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
-    sub = typer.Substitution.empty
-    for _, _, source_file in qyp_set.iter_src_paths():
-        typer.seed_one_source_file(source_file, new_ctx)
-    for _, _, source_file in qyp_set.iter_src_paths():
-        sub = typer.model_one_source_file(source_file, dto_list, sub)
-    dto_list.solve()
+    # compilation:
+    try:    
+        # basic checks
 
-    # emitting:
-    emitter.emit_qyp_set(qyp_set)
+        # TODO: perform basic checks on AST structure
+        #   - only certain statements allowed in top-level, function bodies, etc.
+        #       - 'return', 'ite' not allowed except inside a function
+        #       - 'const', 'bind1f' only globally allowed
+        #   - `iota` expression only allowed inside a 'const' initializer
+        # NOTE: this is happening during 'seeding' in the typer instead... clean up typer if this changes.
 
-    # (post-compilation) print types:
-    if transpile_opts.print_summary_after_run:
-        print_qyp_set_summary(qyp_set)
-        print_contexts(qyp_set)
+        # typing native source files:
+        dto_list = typer.DTOList()
+        new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
+        sub = typer.Substitution.empty
+        for _, _, source_file in qyp_set.iter_src_paths():
+            typer.seed_one_source_file(source_file, new_ctx)
+        for _, _, source_file in qyp_set.iter_src_paths():
+            sub = typer.model_one_source_file(source_file, dto_list, sub)
+        dto_list.solve()
 
-    # (post-compilation) debug routine:
-    if transpile_opts.run_debug_routine_after_compilation:
-        debug_routine_after_compilation(qyp_set)
+        # TODO: run post-typing checks
+        # - e.g. check that 'main' has the correct signature.
+
+        # emitting:
+        emitter.emit_qyp_set(qyp_set)
+    except panic.PanicException as exc:
+        caught_exc = exc
+    finally:
+        # (post-compilation) print types:
+        if transpile_opts.print_summary_after_run:
+            print("(POST-MORTEM)")
+            print_qyp_set_summary(qyp_set)
+            print_contexts(qyp_set)
+
+        # (post-compilation) debug routine:
+        if transpile_opts.run_debug_routine_after_compilation:
+            print("(POST-MORTEM)")
+            debug_routine_after_compilation(qyp_set)
+
+    if caught_exc is not None:
+        raise caught_exc
 
 
 def debug_routine_after_compilation(qyp_set):
     print("INFO: Post-compilation Debug Dump")
-    # print_types_test()
-    # print_schemes_test()
-    # print_unification_subs_test()
-    print_contexts(qyp_set)
+    print_types_test()
+    print_schemes_test()
+    print_unification_subs_test()
 
 
 def print_qyp_set_summary(qyp_set):

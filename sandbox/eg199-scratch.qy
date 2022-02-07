@@ -1,16 +1,16 @@
 pub hello: (I32) -> I32;
 def hello (x) = do {
-    return x;
+    x
 };
 
 pub wrongPhi: (Bool, I32, I32) -> I32;
 def wrongPhi (b, x, y) = do {
-    return if (b) {x} else {y};
+    if (b) {x} else {y}
 };
 
 pub rightPhi: (Bool, I32, I32) -> I32;
 def rightPhi (b, x, y) = do {
-    return if (b) {x} else {y};
+    if (b) {x} else {y}
 };
 
 val j = wrongPhi(true, 15, 32);
@@ -65,7 +65,7 @@ val Point = (
 pub main: () -> i32;
 def main () = do {
     val v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
-    return v.x;
+    v.x
 };
 */
 
@@ -96,5 +96,5 @@ def main () = do {
         break;
     };
 
-    return 0;
+    0
 };

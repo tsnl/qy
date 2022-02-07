@@ -1,7 +1,4 @@
-"""
-FIXME: need to update this backend to deal with lambdas, 'do' expressions.
-"""
-
+import abc
 import dataclasses
 import os
 import os.path
@@ -35,12 +32,16 @@ class Emitter(base_emitter.BaseEmitter):
         self.root_rel_output_dir_path = rel_output_dir_path
         self.root_abs_output_dir_path = os.path.abspath(rel_output_dir_path)
         self.types_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "types")
-        self.modules_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "modules")
+        self.impl_abs_output_dir_path = os.path.join(self.root_abs_output_dir_path, "impl")
         self.pub_type_to_header_name_map = {}
         
         # v-- used by 'check_global_definition'
         self.global_symbol_loc_map = {}
 
+        # v-- used by emit_statement
+        self.active_c_file = None
+        self.active_h_file = None
+    
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         # cleaning old directories:
         # on macOS, Windows, with case-insensitive paths, renaming symbols with different case 
@@ -51,7 +52,7 @@ class Emitter(base_emitter.BaseEmitter):
         # creating fresh directories:
         os.makedirs(self.root_abs_output_dir_path, exist_ok=False)
         os.makedirs(self.types_abs_output_dir_path, exist_ok=False)
-        os.makedirs(self.modules_abs_output_dir_path, exist_ok=False)
+        os.makedirs(self.impl_abs_output_dir_path, exist_ok=False)
 
         # collecting all extern headers:
         extern_header_source_files = []
@@ -69,10 +70,10 @@ class Emitter(base_emitter.BaseEmitter):
             # else:
             #     raise NotImplementedError(f"'emit_per_type_headers' for Qyp of type '{qyp.__class__.__name__}'")
 
-        # emitting the 'modules' subdirectory of build:
+        # emitting the 'impl' subdirectory of build:
         for qyp_name, qyp in qyp_set.qyp_name_map.items():
             if isinstance(qyp, ast2.NativeQyp):
-                self.emit_native_qyp_module_body(qyp_name, qyp, extern_header_source_files)
+                self.emit_native_qyp_impl(qyp_name, qyp, extern_header_source_files)
             # else:
             #     raise NotImplementedError(f"'emit_module_body' for Qyp of type '{qyp.__class__.__name__}'")
         
@@ -95,8 +96,8 @@ class Emitter(base_emitter.BaseEmitter):
         for qy_type, type_name in self.pub_type_to_header_name_map.items():
             # creating file writers, adding all extern source paths as headers:
             type_files_stem = f"{self.types_abs_output_dir_path}/{type_name}"
-            type_decl_file = CppFileWriter(CppFileType.TypeDeclHeader, type_files_stem)
-            type_def_file = CppFileWriter(CppFileType.TypeDefHeader, type_files_stem)
+            type_decl_file = CppFileWriter(DocType.TypeDeclHeader, type_files_stem)
+            type_def_file = CppFileWriter(DocType.TypeDefHeader, type_files_stem)
             for source_file in extern_header_source_files:
                 abs_extern_header_path = source_file.file_path
                 type_decl_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
@@ -136,13 +137,7 @@ class Emitter(base_emitter.BaseEmitter):
             elif qy_type.kind() == types.TypeKind.Union:
                 type_decl_file.print(f"union {type_name};")
             elif qy_type.kind() == types.TypeKind.Procedure:
-                assert isinstance(qy_type, types.ProcedureType)
-                ret_type = self.translate_type(qy_type.ret_type)
-                cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
-                if qy_type.has_closure_slot:
-                    type_decl_file.print(f"using {type_name} = std::function<{ret_type}({cs_arg_str})>")
-                else:
-                    type_decl_file.print(f"typedef {ret_type}(*{type_name})({cs_arg_str})")
+                type_decl_file.print(f"using {type_name} = {self.translate_type(qy_type)};")
             else:
                 raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {qy_type}")
         else:
@@ -166,12 +161,7 @@ class Emitter(base_emitter.BaseEmitter):
                         # adding an 'include' to all used types:
                         self.insert_type_ref_includes(type_def_file, field_type, direct_ref=True)
             elif qy_type.kind() == types.TypeKind.Procedure:
-                return_type = qy_type.ret_type
-                args_str = ', '.join((
-                    f"{self.translate_type(arg_type)}"
-                    for arg_type in qy_type.arg_types()
-                ))
-                type_def_file.print(f"using {type_name} = {return_type}(*)({args_str});")
+                type_def_file.print(f"using {type_name} = {self.translate_type(qy_type)};")
 
     def insert_type_ref_includes(self, print_file: "CppFileWriter", qy_type: types.BaseType, direct_ref: bool):
         # NOTE: every compound just includes dependencies required to write the type.
@@ -180,10 +170,10 @@ class Emitter(base_emitter.BaseEmitter):
         opt_existing_name = self.pub_type_to_header_name_map.get(qy_type, None)
         if opt_existing_name:
             if direct_ref:
-                extension = CppFileWriter.file_type_suffix[CppFileType.TypeDefHeader]
+                extension = CppFileWriter.doc_file_path_suffix[DocType.TypeDefHeader]
             else:
-                extension = CppFileWriter.file_type_suffix[CppFileType.TypeDeclHeader]
-            print_file.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"{opt_existing_name}{extension}"))
+                extension = CppFileWriter.doc_file_path_suffix[DocType.TypeDeclHeader]
+            print_file.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"{opt_existing_name}.{extension}"))
 
         # otherwise, this is an anonymous type.
         # we must include all types used to write this type.
@@ -192,7 +182,7 @@ class Emitter(base_emitter.BaseEmitter):
             # do nothing-- all atomic types are built-in.
             pass
         elif qy_type.is_composite:
-            if isinstance(qy_type, types.UnsafeCPointerType):
+            if isinstance(qy_type, types.PointerType):
                 self.insert_type_ref_includes(print_file, qy_type.pointee_type, direct_ref=False)
             else:
                 for field_type in qy_type.field_types:
@@ -201,48 +191,59 @@ class Emitter(base_emitter.BaseEmitter):
     def check_global_definition(self, name: str, loc: feedback.ILoc, is_public: bool):
         opt_existing_loc = self.global_symbol_loc_map.get(name, None)
         if opt_existing_loc is not None:
-            headline = (
-                f"Public global symbol `{name}` found in two or more `Qyp`s. Cannot resolve ambiguity."
-                if is_public else
-                f"Private global symbol `{name}` reused across different modules. Cannot generate C++ code."
-            )
-            panic.because(
-                panic.ExitCode.EmitterError,
-                f"{headline}\n"
-                f"\tfirst: {opt_existing_loc}\n"
-                f"\tlater: {loc}"
-            )
-        self.global_symbol_loc_map[name] = loc
+            if opt_existing_loc != loc:
+                headline = (
+                    f"Public global symbol `{name}` found in two or more `Qyp`s. Cannot resolve ambiguity."
+                    if is_public else
+                    f"Private global symbol `{name}` reused across different modules. Cannot generate C++ code."
+                )
+                panic.because(
+                    panic.ExitCode.EmitterError,
+                    f"{headline}\n"
+                    f"\tfirst: {opt_existing_loc}\n"
+                    f"\tlater: {loc}"
+                )
+            else:
+                self.global_symbol_loc_map[name] = loc
 
     #
     # part 2: emitting module body
     #
 
-    def emit_native_qyp_module_body(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_files: t.List[ast2.BaseSourceFile]):
+    def emit_native_qyp_impl(self, qyp_name: str, qyp: ast2.NativeQyp, extern_header_source_files: t.List[ast2.BaseSourceFile]):
         # creating output files, adding external project headers to all includes:
-        output_file_stem = os.path.join(self.modules_abs_output_dir_path, qyp_name)
-        hpp_file = CppFileWriter(CppFileType.MainHeader, output_file_stem)
-        cpp_file = CppFileWriter(CppFileType.MainSource, output_file_stem)
+        output_file_stem = os.path.join(self.impl_abs_output_dir_path, qyp_name)
+        self.active_h_file = CppFileWriter(DocType.MainHeader, output_file_stem)
+        self.active_c_file = CppFileWriter(DocType.MainSource, output_file_stem)
+
         for source_file in extern_header_source_files:
             abs_extern_header_path = source_file.file_path
-            hpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
-            cpp_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
+            self.active_h_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
+            self.active_h_file.include_specs.append(IncludeSpec(abs_extern_header_path, use_angle_brackets=False, extern_str=source_file.extern_str))
         
-        print(f"INFO: Generating C/C++ file pair:\n\t{cpp_file.path}\n\t{hpp_file.path}")
+        print(f"INFO: Generating C/C++ file pair:\n\t{self.active_c_file.path}\n\t{self.active_h_file.path}")
         
         for src_file_path, src_obj in qyp.src_map.items():
             assert isinstance(src_obj, ast2.QySourceFile)
             for stmt in src_obj.stmt_list:
-                self.emit_module_body_stmt(cpp_file, hpp_file, stmt, is_top_level=True)
+                self.emit_statement_impl(self.active_c_file, stmt, is_top_level=True, decl_print_pass=True)
+                self.emit_statement_impl(self.active_h_file, stmt, is_top_level=True, decl_print_pass=True)
+                self.emit_statement_impl(self.active_c_file, stmt, is_top_level=True, decl_print_pass=False)
+                self.emit_statement_impl(self.active_h_file, stmt, is_top_level=True, decl_print_pass=False)
 
-        cpp_file.close()
-        hpp_file.close()
+        self.active_c_file.close()
+        self.active_h_file.close()
+        self.active_c_file = None
+        self.active_h_file = None
 
-    def emit_module_body_stmt(self, c: "CppFileWriter", h: "CppFileWriter", stmt: ast1.BaseStatement, is_top_level: bool):
-        assert c.type == CppFileType.MainSource
-        assert h.type == CppFileType.MainHeader
+    def emit_statement_impl(self, s, stmt: ast1.BaseStatement, is_top_level: bool, decl_print_pass: bool = False):
+        self.translate_statement_impl(s, stmt, is_top_level, decl_print_pass)
         
-        if isinstance(stmt, ast1.Bind1vStatement):
+    def translate_statement_impl(self, s: "StringWriter", stmt: ast1.BaseStatement, is_top_level: bool, decl_print_pass: bool):
+        target = s.doc_type
+        assert target in (DocType.MainSource, DocType.MainHeader, DocType.ChainFragment)
+        
+        if isinstance(stmt, ast1.Bind1vStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             def_obj = stmt.lookup_def_obj()
             if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
                 self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
@@ -251,9 +252,9 @@ class Emitter(base_emitter.BaseEmitter):
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
         
-            c.print(f"// bind {stmt.name} = {stmt.initializer.desc}")
+            s.print(f"// bind {stmt.name} = {stmt.initializer.desc}")
             if def_type is types.VoidType.singleton:
-                c.print("// binding elided for 'void' type variable.")
+                s.print("// binding elided for 'void' type variable.")
             else:
                 bind_cpp_fragments = []
                 if not def_obj.is_public:
@@ -262,19 +263,19 @@ class Emitter(base_emitter.BaseEmitter):
                 bind_cpp_fragments.append(def_obj.name)
                 bind_cpp_fragments.append("=")
             
-                c.print(' '.join(bind_cpp_fragments))
+                s.print(' '.join(bind_cpp_fragments))
             
             # regardless of return-type, evaluating the RHS in case there are any side-effects:
-            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True):
-                self.emit_expression(c, stmt.initializer)
-            c.print()
+            with Block(s, opening_brace='(', closing_brace=")", close_with_semicolon=True):
+                self.emit_expression(s, stmt.initializer)
+            s.print()
         
-        elif isinstance(stmt, ast1.DiscardStatement):
-            with Block(c, opening_brace='(', closing_brace=")", close_with_semicolon=True):
-                self.emit_expression(c, stmt.discarded_exp)
-            c.print()
+        elif isinstance(stmt, ast1.DiscardStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            with Block(s, opening_brace='(', closing_brace=")", close_with_semicolon=True):
+                self.emit_expression(s, stmt.discarded_exp)
+            s.print()
         
-        elif isinstance(stmt, ast1.Bind1fStatement):
+        elif isinstance(stmt, ast1.Bind1fStatement) and target == DocType.MainSource and not decl_print_pass:
             assert is_top_level
 
             def_obj = stmt.lookup_def_obj()
@@ -286,94 +287,97 @@ class Emitter(base_emitter.BaseEmitter):
             _, def_type = def_obj.scheme.instantiate()
             assert isinstance(def_type, types.ProcedureType)
             
-            c.print(f"// bind {stmt.name} = {{...}}")
+            s.print(f"// bind {stmt.name} = {{...}}")
             if not def_obj.is_public and stmt.name != 'main':
-                c.print('static')
-            c.print(self.translate_type(def_type.ret_type))
-            if not stmt.args:
-                c.print(f"{def_obj.name}()")
+                s.print('static')
+            s.print(self.translate_type(def_type.ret_type))
+            if not stmt.args_names:
+                s.print(f"{def_obj.name}()")
             else:
-                c.print(def_obj.name)
-                with Block(c, opening_brace='(', closing_brace=')') as b:
-                    c.print(',\n'.join((
+                s.print(def_obj.name)
+                with Block(s, opening_brace='(', closing_brace=')'):
+                    s.print(',\n'.join((
                         f"{self.translate_type(arg_type)} {arg_name}"
-                        for arg_type, arg_name in zip(def_type.arg_types, stmt.args)
+                        for arg_type, arg_name in zip(def_type.arg_types, stmt.args_names)
                     )))
-            with Block(c) as b:
-                self.emit_expression(c, stmt.body_exp)
-            c.print()
+            with Block(s):
+                s.print("return")
+                with Block(s, opening_brace='(', closing_brace=');'):
+                    self.emit_expression(s, stmt.body_exp)
+            s.print()
         
-        elif isinstance(stmt, ast1.Bind1tStatement):
+        elif isinstance(stmt, ast1.Bind1tStatement) and not decl_print_pass:    # branch based on target below...
             assert is_top_level
             
-            c.print(f"// bind {stmt.name} = {{...}}")
+            s.print(f"// bind {stmt.name} = {{...}}")
 
+            # pulling up this definition's info:
             def_obj = stmt.lookup_def_obj()
             if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
                 self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
-        
             assert def_obj is not None
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
-            if def_type in self.pub_type_to_header_name_map:
-                # public type => it has its own header pair => include this in the header
-                type_def_extension = CppFileWriter.file_type_suffix[CppFileType.TypeDefHeader]
-                h.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"types/{stmt.name}{type_def_extension}"))
-            else:
-                # private type => define in 'c' file
-                assert isinstance(def_type, types.BaseType)
-                c.print(f"using {stmt.name} = {self.translate_type(def_type)}")
             
-            c.print()
-        elif isinstance(stmt, ast1.Type1vStatement):
+            # public type => it has its own header pair => include this in the main header here
+            if target == DocType.MainHeader and def_type in self.pub_type_to_header_name_map:
+                type_def_extension = CppFileWriter.doc_file_path_suffix[DocType.TypeDefHeader]
+                s.include_specs.append(IncludeSpec(use_angle_brackets=False, include_path=f"types/{stmt.name}.{type_def_extension}"))
+            
+            # private type => define in 'c' file
+            if target in (DocType.MainSource, DocType.ChainFragment):
+                assert isinstance(def_type, types.BaseType)
+                s.print(f"using {stmt.name} = {self.translate_type(def_type)};")
+            
+            s.print()
+
+        elif isinstance(stmt, ast1.Type1vStatement) and target in (DocType.MainHeader, DocType.MainSource) and decl_print_pass:
             def_obj = stmt.lookup_def_obj()
-            if def_obj.is_public:
+            write_pub = def_obj.is_public and target == DocType.MainHeader
+            write_pvt = not def_obj.is_public and target == DocType.MainSource
+            if write_pub or write_pvt:
+                qy_visibility_prefix, decl_prefix = ("pub", "extern") if def_obj.is_public else ("pvt", "static")
                 _, def_type = def_obj.scheme.instantiate()
-                h.print(f"// pub {stmt.name}")
-                if isinstance(def_type, types.ProcedureType):
+                s.print(f"// {qy_visibility_prefix} {stmt.name}")
+                if isinstance(def_type, types.ProcedureType) and not def_type.has_closure_slot:
                     if is_top_level:
                         args_list = ', '.join(map(self.translate_type, def_type.arg_types))
-                        h.print(f"extern {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
+                        s.print(f"{decl_prefix} {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
                     else:
                         raise NotImplementedError("Cannot type a function in a non-global context")
                 else:
-                    h.print(f"extern {self.translate_type(def_type)} {stmt.name};")
-                h.print()
+                    s.print(f"{decl_prefix} {self.translate_type(def_type)} {stmt.name};", target_section=DocumentSectionId.Prefix)
+                s.print()
 
-        elif isinstance(stmt, ast1.ConstStatement):
+        elif isinstance(stmt, ast1.ConstStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            # for stmt in stmt.body:
+            #     self.emit_statement_impl(s, stmt, is_top_level=is_top_level)
+            # FIXME: I added this block and it broke compilation... but are constants emitted?
             pass
 
-        elif isinstance(stmt, ast1.ReturnStatement):
-            c.print(f"return {self.translate_expression(stmt.returned_exp)};")
+        elif isinstance(stmt, ast1.ReturnStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            s.print(f"return {self.translate_expression(stmt.returned_exp)};")
 
-        elif isinstance(stmt, ast1.IteStatement):
-            c.print(f"if ({self.translate_expression(stmt.cond)})")
-            with Block(c):
-                self.emit_block(c, h, stmt.then_block)
-            c.print("else")
-            with Block(c):
-                self.emit_block(c, h, stmt.else_block)
+        elif isinstance(stmt, ast1.ForStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            s.print("for (;;)")
+            with Block(s):
+                self.emit_block(s, stmt.body)
 
-        elif isinstance(stmt, ast1.ForStatement):
-            c.print("for (;;)")
-            with Block(c):
-                self.emit_block(c, h, stmt.body)
+        elif isinstance(stmt, ast1.BreakStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            s.print("break;")
 
-        elif isinstance(stmt, ast1.BreakStatement):
-            c.print("break;")
-
-        elif isinstance(stmt, ast1.ContinueStatement):
-            c.print("continue;")
+        elif isinstance(stmt, ast1.ContinueStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+            s.print("continue;")
 
         else:
-            raise NotImplementedError(f"emit_declarations_for_stmt: {stmt}")
+            pass
 
-    def emit_expression(self, f: "CppFileWriter", exp: ast1.BaseExpression):
+    def emit_expression(self, f: "StringWriter", exp: ast1.BaseExpression):
         f.print(self.translate_expression(exp))
 
-    def emit_block(self, c: "CppFileWriter", h: "CppFileWriter", block: t.List[ast1.BaseStatement]):
+    def emit_block(self, s: "StringWriter", block: t.List[ast1.BaseStatement]):
         for stmt in block:
-            self.emit_module_body_stmt(c, h, stmt, is_top_level=False)
+            self.emit_statement_impl(s, stmt, is_top_level=False)
 
     def translate_type(self, qy_type: types.BaseType) -> str:
         """
@@ -410,7 +414,7 @@ class Emitter(base_emitter.BaseEmitter):
             else:
                 raise NotImplementedError(f"Unknown float width in bits: {qy_type.width_in_bits}")
         elif isinstance(qy_type, types.StringType):
-            return "std::string";
+            return "std::string"
         elif isinstance(qy_type, types.BaseCompositeType):
             opt_existing_name = self.pub_type_to_header_name_map.get(qy_type)
             if opt_existing_name is not None:
@@ -428,12 +432,17 @@ class Emitter(base_emitter.BaseEmitter):
                         assert isinstance(qy_type, types.UnionType)
                         return f"union {{ {fields_str} }}"
                 elif isinstance(qy_type, (types.ProcedureType)):
-                    args_str = ', '.join((
-                        self.translate_type(arg_type)
-                        for arg_type in qy_type.arg_types
-                    ))
-                    return f"{self.translate_type(qy_type.ret_type)}(*)({args_str})"
-                elif isinstance(qy_type, (types.UnsafeCPointerType)):
+                    ret_type = self.translate_type(qy_type.ret_type)
+                    cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
+                    if qy_type.has_closure_slot:
+                        assert isinstance(qy_type, types.ProcedureType)
+                        if qy_type.has_closure_slot:
+                            return f"std::function<{ret_type}({cs_arg_str})>"
+                        else:
+                            return f"{ret_type}(*)({cs_arg_str})"
+                    else:
+                        return f"{self.translate_type(ret_type)}(*)({cs_arg_str})"
+                elif isinstance(qy_type, (types.PointerType)):
                     return f"{self.translate_type(qy_type.pointee_type)}*"
                 else:
                     raise NotImplementedError("Unknown compound type in 'translate_type'")
@@ -503,10 +512,12 @@ class Emitter(base_emitter.BaseEmitter):
             return json.dumps(exp.value), types.StringType.singleton
 
         elif isinstance(exp, ast1.UnaryOpExpression):
-            operand_type, operand_str = self.translate_expression_with_type(exp.operand)
+            operand_str, operand_type = self.translate_expression_with_type(exp.operand)
 
             if exp.operator == ast1.UnaryOperator.Do:
-                return f"{operand_str}()"
+                assert isinstance(operand_type, types.ProcedureType)
+                assert operand_type.arg_count == 0
+                return f"{operand_str}()", operand_type.ret_type
             else:
                 operator_str = {
                     ast1.UnaryOperator.DeRef: "*",
@@ -519,7 +530,7 @@ class Emitter(base_emitter.BaseEmitter):
                 # for now, Qy's builtin unary operators are a subset of C++'s builtin unary operators.            
                 if exp.operator == ast1.UnaryOperator.DeRef:
                     operand_ptr_type = operand_type
-                    assert isinstance(operand_ptr_type, types.UnsafeCPointerType)
+                    assert isinstance(operand_ptr_type, types.PointerType)
                     ret_type = operand_ptr_type.pointee_type
                     assert isinstance(ret_type, types.BaseConcreteType)
                 elif exp.operator == ast1.UnaryOperator.LogicalNot:
@@ -623,19 +634,46 @@ class Emitter(base_emitter.BaseEmitter):
                 return constructor_str, exp.made_ts.wb_type
         
         elif isinstance(exp, ast1.IfExpression):
+            # NOTE: If expressions are regular functions in this language, and must invoke their 'then' or 'else' branches 
+            # based on the result of 'cond'.
             cond_str = self.translate_expression(exp.cond_exp)
-            then_str = self.translate_expression(exp.then_exp)
-            else_str = self.translate_expression(exp.else_exp)
+            then_str = f"(({self.translate_expression(exp.then_exp)})())"
+            if exp.else_exp is not None:
+                else_str = f"(({self.translate_expression(exp.else_exp)})())"
+            else:
+                then_str = f"(({then_str}), 0)"
+                else_str = "0"
             ite_str = f"({cond_str} ? ({then_str}) : ({else_str}))"
             return ite_str, exp.wb_type
 
         elif isinstance(exp, ast1.LambdaExpression):
-            closure_prefix_str = '[=]' if exp.no_closure else '[]'
-            arg_names_str = '(' + f", ".join(f"auto {arg_name}" for arg_name in exp.arg_names) + ')'
-            # FIXME: need a way to translate blocks!
-            raise NotImplementedError("emitting a LambdaExpression")
-            return lambda_str, exp.wb_type
+            # TODO: review if '=' is a viable strategy to clone: would be safe, but costly: prefer '&', but then need to solve closure lifetimes...
+            # FIXME: issue with LambdaExpression's wb_type: see 'if exp.opt_body_tail is not None' guard
 
+            s = StringWriter()
+            with Block(s, opening_brace='(', closing_brace=')'):
+                s.print('[=]' if exp.no_closure else '[]')
+                
+                p_type = exp.wb_type
+                assert isinstance(p_type, types.ProcedureType)
+                arg_types = p_type.arg_types
+                ret_type = p_type.ret_type
+                if exp.arg_names:
+                    with Block(s, opening_brace='(', closing_brace=')'):
+                        s.print(", ".join(f"{self.translate_type(arg_type)} {arg_name}" for arg_name, arg_type in zip(exp.arg_names, arg_types)))
+                else:
+                    s.print('()')
+                ret_str = self.translate_type(p_type.ret_type) if exp.opt_body_tail is not None else "void"
+                s.print(f"-> {ret_str} ")
+
+                with Block(s, opening_brace='{', closing_brace='}'):
+                    self.emit_block(s, exp.body_prefix)
+                    if exp.opt_body_tail is not None:
+                        s.print(f"return {self.translate_expression(exp.opt_body_tail)};")
+                    else:
+                        s.print("return;")
+            
+            return s.close(), p_type
         else:
             raise NotImplementedError(f"Don't know how to translate expression to C++: {exp}")
             # print(f"WARNING: Don't know how to translate expression to C++: {exp}")
@@ -679,8 +717,8 @@ class Emitter(base_emitter.BaseEmitter):
                         assert main_target_name is None
                         main_target_name = qyp_name
 
-                    native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainHeader]}")
-                    native_source_file_paths.append(f"modules/{qyp_name}{CppFileWriter.file_type_suffix[CppFileType.MainSource]}")
+                    native_source_file_paths.append(f"impl/{qyp_name}.{CppFileWriter.doc_file_path_suffix[DocType.MainHeader]}")
+                    native_source_file_paths.append(f"impl/{qyp_name}.{CppFileWriter.doc_file_path_suffix[DocType.MainSource]}")
                 elif isinstance(qyp, ast2.CQyx):
                     for c_source_file in qyp.c_source_files:
                         if not c_source_file.is_header:
@@ -708,6 +746,7 @@ class Emitter(base_emitter.BaseEmitter):
 # CodeFragment: t.TypeAlias = t.Union[str, t.List[str]]
 CodeFragment = t.Union[str, t.List[str]]
 
+
 @dataclasses.dataclass
 class IncludeSpec:
     include_path: str
@@ -715,81 +754,45 @@ class IncludeSpec:
     extern_str: t.Optional[str] = None
 
 
-class CppFileType(enum.Enum):
+class DocType(enum.Enum):
     MainSource = enum.auto()
     MainHeader = enum.auto()
     TypeDefHeader = enum.auto()
     TypeDeclHeader = enum.auto()
+    ChainFragment = enum.auto()
 
 
-class CppFileWriter(object):
-    file_type_suffix = {
-        CppFileType.MainHeader: ".hpp",
-        CppFileType.MainSource: ".cpp",
-        CppFileType.TypeDefHeader: ".def.hpp",
-        CppFileType.TypeDeclHeader: ".decl.hpp"
-    }
+class DocumentSectionId(enum.Enum):
+    Prefix = enum.auto()
+    Body = enum.auto()
 
-    def __init__(
-        self, 
-        file_type: CppFileType,
-        file_stem: str
-        # indent_str: str='\t'
-    ) -> None:
+
+class StringWriter(object):
+    def __init__(self, document_type=DocType.ChainFragment, indent_str='\t') -> None:
         super().__init__()
-        self._type = file_type
-        self.stem = file_stem
-        self.stem_base = os.path.basename(self.stem)
-        self.path = f"{self.stem}{CppFileWriter.file_type_suffix[self._type]}"
-        self.os_file_handle = open(self.path, 'w', buffering=4*1024)
+        self.private_doc_type = document_type
         self.indent_count = 0
-        self.indent_str = '\t'
+        self.indent_str = indent_str
         self.include_specs: t.List[IncludeSpec] = []
-        self.document_sections = {"prefix": [], "body": []}
+        self.document_sections = {DocumentSectionId.Prefix: [], DocumentSectionId.Body: []}
         
-        #
-        # Post-constructor, but constructor-time:
-        #
-
-        # emitting preamble:
-        if self.type == CppFileType.MainHeader:
-            self.print("#pragma once", target='prefix')
-            self.print(target='prefix')
-            self.add_common_stdlib_header_includes()
-        elif self.type == CppFileType.MainSource:
-            # including the header file, as is customary for implementation files:
-            include_spec = IncludeSpec(use_angle_brackets=False, include_path=self.stem_base + CppFileWriter.file_type_suffix[CppFileType.MainHeader])
-            self.include_specs.append(include_spec)
-            self.add_common_stdlib_header_includes()
-        elif self.type == CppFileType.TypeDeclHeader:
-            self.print("#pragma once", target='prefix')
-            self.print(target='prefix')
-            self.add_common_stdlib_header_includes()
-        elif self.type == CppFileType.TypeDefHeader:
-            self.print("#pragma once", target='prefix')
-            self.print(target='prefix')
-
     @property
     def file_name(self):
         return os.path.basename(self.path)
 
     @property
-    def type(self):
-        return self._type
-
-    def close(self):
-        assert self.os_file_handle is not None
-
-        #
-        # writing all data in a deferred way:
-        #
+    def doc_type(self):
+        return self.private_doc_type
+    
+    def close(self) -> str:
+        # first assembling a list of string chunks, then printing:
+        chunks = []
 
         # prefix:
-        prefix_lines = self.document_sections['prefix']
-        for prefix_line in prefix_lines:
-            print(prefix_line, file=self.os_file_handle)
+        prefix_lines = self.document_sections[DocumentSectionId.Prefix]
+        chunks.append('\n'.join(prefix_lines))
 
-        # includes:
+        # sorting includes, then 'printing' to chunk list in order:
         cpp_include_specs = [include_spec for include_spec in self.include_specs if include_spec.extern_str is None]
         c_include_specs = [include_spec for include_spec in self.include_specs if include_spec.extern_str == "C"]
         assert len(cpp_include_specs) + len(c_include_specs) == len(self.include_specs)
@@ -797,44 +800,25 @@ class CppFileWriter(object):
         rel_cpp_include_specs = [it.include_path for it in cpp_include_specs if not it.use_angle_brackets]
         abs_extern_c_include_specs = [it.include_path for it in c_include_specs if it.use_angle_brackets]
         rel_extern_c_include_specs = [it.include_path for it in c_include_specs if not it.use_angle_brackets]
-
         if abs_cpp_include_specs:
-            self.print_includes(abs_cpp_include_specs, True)
+            chunks.append(self.print_includes(abs_cpp_include_specs, True))
         if rel_cpp_include_specs:
-            self.print_includes(rel_cpp_include_specs, False)
+            chunks.append(self.print_includes(rel_cpp_include_specs, False))
         if abs_extern_c_include_specs:
-            self.print_includes(abs_extern_c_include_specs, True, "C")
+            chunks.append(self.print_includes(abs_extern_c_include_specs, True, "C"))
         if rel_extern_c_include_specs:
-            self.print_includes(rel_extern_c_include_specs, False, "C")
+            chunks.append(self.print_includes(rel_extern_c_include_specs, False, "C"))
 
         # body lines:
-        body_lines = self.document_sections['body']
-        for body_line in body_lines:
-            print(body_line, file=self.os_file_handle)
+        chunks.append('\n'.join(self.document_sections[DocumentSectionId.Body]))
 
-        self.os_file_handle.close()
-        self.os_file_handle = None
-
-    def print_includes(self, include_specs, use_angle_brackets, opt_extern_str=None):
-        open_quote, close_quote = ('<', '>') if use_angle_brackets else ('"', '"')
+        # returning chunk text:
+        text = '\n'.join(chunks) + '\n'
         
-        if opt_extern_str:
-            indent_str = '\t'
-            print(f"extern \"{opt_extern_str}\" {{", file=self.os_file_handle)
-        else:
-            indent_str = ''
-
-        for include_path in include_specs:
-            sep_normalized_include_path = normalize_backslash_path(include_path)
-            clean_include_path = sep_normalized_include_path
-            print(f"{indent_str}#include {open_quote}{clean_include_path}{close_quote}", file=self.os_file_handle)
+        assert isinstance(text, str)
+        return text
         
-        if opt_extern_str:
-            print(f"}}", file=self.os_file_handle)
-        
-        print(file=self.os_file_handle)
-
-    def print(self, code_fragment: CodeFragment = "", target="body"):
+    def print(self, code_fragment: CodeFragment = "", target_section=DocumentSectionId.Body):
         if isinstance(code_fragment, str):
             lines = code_fragment.split('\n')
         elif isinstance(code_fragment, list):
@@ -845,12 +829,32 @@ class CppFileWriter(object):
         else:
             raise ValueError(f"Invalid CodeFragment: {code_fragment}")
         
-        target_lines_list = self.document_sections[target]
+        target_lines_list = self.document_sections[target_section]
         for line in lines:
             target_lines_list.append(f"{self.indent_str*self.indent_count}{line}")
-            
-        # print(file=self.os_file_handle)
-    
+
+    def print_includes(self, include_specs, use_angle_brackets, opt_extern_str=None):
+        open_quote, close_quote = ('<', '>') if use_angle_brackets else ('"', '"')
+        
+        output = []
+
+        if opt_extern_str:
+            indent_str = '\t'
+            output.append(f"extern \"{opt_extern_str}\" {{")
+        else:
+            indent_str = ''
+
+        for include_path in include_specs:
+            sep_normalized_include_path = normalize_backslash_path(include_path)
+            clean_include_path = sep_normalized_include_path
+            output.append(f"{indent_str}#include {open_quote}{clean_include_path}{close_quote}")
+        
+        if opt_extern_str:
+            output.append(f"}}")
+        
+        output.append('')
+        return '\n'.join(output)
+
     def add_common_stdlib_header_includes(self):
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
@@ -863,10 +867,59 @@ class CppFileWriter(object):
         self.indent_count -= 1
 
 
+class CppFileWriter(StringWriter):
+    doc_file_path_suffix = {
+        DocType.MainHeader: "hpp",
+        DocType.MainSource: "cpp",
+        DocType.TypeDefHeader: "def.hpp",
+        DocType.TypeDeclHeader: "decl.hpp"
+    }
+
+    def __init__(self, doc_type: DocType, file_stem: str, indent_str='\t') -> None:
+        super().__init__(doc_type, indent_str=indent_str)
+        assert doc_type in CppFileWriter.doc_file_path_suffix
+        self.stem = file_stem
+        self.stem_base = os.path.basename(self.stem)
+        self.path = f"{self.stem}.{CppFileWriter.doc_file_path_suffix[self.doc_type]}"
+        self.file_stem = file_stem
+
+        #
+        # Post-constructor, but constructor-time:
+        #
+
+        # emitting preamble:
+        if self.doc_type == DocType.MainHeader:
+            self.print("#pragma once", target_section=DocumentSectionId.Prefix)
+            self.print(target_section=DocumentSectionId.Prefix)
+            self.add_common_stdlib_header_includes()
+        elif self.doc_type == DocType.MainSource:
+            # including the header file, as is customary for implementation files:
+            include_spec = IncludeSpec(use_angle_brackets=False, include_path=self.stem_base+"."+CppFileWriter.doc_file_path_suffix[DocType.MainHeader])
+            self.include_specs.append(include_spec)
+            self.add_common_stdlib_header_includes()
+        elif self.doc_type == DocType.TypeDeclHeader:
+            self.print("#pragma once", target_section=DocumentSectionId.Prefix)
+            self.print(target_section=DocumentSectionId.Prefix)
+            self.add_common_stdlib_header_includes()
+        elif self.doc_type == DocType.TypeDefHeader:
+            self.print("#pragma once", target_section=DocumentSectionId.Prefix)
+            self.print(target_section=DocumentSectionId.Prefix)
+        
+    def close(self) -> str:
+        chunk_text = super().close()
+
+        # printing to the file in a single system call:
+        with open(self.path, 'w', buffering=len(chunk_text)) as os_file_handle:
+            print(chunk_text, file=os_file_handle, end='')
+
+        return chunk_text
+
+
+
 class Block(object):
     def __init__(
         self, 
-        cpp_file: "CppFileWriter", 
+        sw: "StringWriter", 
         prefix: str = "", 
         suffix: str = "", 
         opening_brace: str = "{",
@@ -874,7 +927,7 @@ class Block(object):
         close_with_semicolon: bool = False
 ) -> None:
         super().__init__()
-        self.cpp_file: "CppFileWriter" = cpp_file
+        self.sw: "StringWriter" = sw
         self.prefix: str = prefix
         self.suffix: str = suffix
         self.opening_brace = opening_brace
@@ -886,19 +939,19 @@ class Block(object):
 
     def __enter__(self):
         if self.prefix:
-            self.cpp_file.print(self.prefix)
-        self.cpp_file.print(self.opening_brace)
-        self.cpp_file.inc_indent()
+            self.sw.print(self.prefix)
+        self.sw.print(self.opening_brace)
+        self.sw.inc_indent()
         return self
 
     def __exit__(self, *_):
-        self.cpp_file.dec_indent()
+        self.sw.dec_indent()
         if self.close_with_semicolon:
-            self.cpp_file.print(f"{self.closing_brace};")
+            self.sw.print(f"{self.closing_brace};")
         else:
-            self.cpp_file.print(self.closing_brace)
+            self.sw.print(self.closing_brace)
         if self.suffix:
-            self.cpp_file.print(self.suffix)
+            self.sw.print(self.suffix)
 
 
 #

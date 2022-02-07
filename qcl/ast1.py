@@ -183,7 +183,7 @@ class Bind1fStatement(BaseIdQualifierStatement):
     def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional["BaseExpression"], is_variadic: bool = False):
         assert isinstance(body, (type(None), BaseExpression))
         super().__init__(loc, name)
-        self.args = args
+        self.args_names = args
         self.body_exp = body
         self.is_variadic = is_variadic
 

@@ -1,4 +1,4 @@
-def main () = {
+def main () = do {
     let v = make Vec2F(2.0f, 3.0f);
     let w = make Vec3F(2.0f, 3.0f, 4.0f);
     // return i32(v.x);

@@ -249,8 +249,8 @@ class BaseCompositeType(BaseConcreteType):
             assert isinstance(self, ProcedureType)
             copy.has_closure_slot = self.has_closure_slot
             copy.is_c_variadic = self.is_c_variadic
-        elif isinstance(copy, UnsafeCPointerType):
-            assert isinstance(self, UnsafeCPointerType)
+        elif isinstance(copy, PointerType):
+            assert isinstance(self, PointerType)
             copy.contents_is_mut = self.contents_is_mut
         else:
             pass
@@ -273,18 +273,18 @@ class BaseCompositeType(BaseConcreteType):
 
 
 
-class UnsafeCPointerType(BaseCompositeType):
+class PointerType(BaseCompositeType):
     @property
     def pointee_type(self) -> "BaseType":
         return self.field_types[0]
 
     def __str__(self) -> str:
-        ptr_name = 'MutUnsafeCPtr' if self.contents_is_mut else 'UnsafeCPtr'
+        ptr_name = 'MutPtr' if self.contents_is_mut else 'Ptr'
         return f"{ptr_name}[{str(self.pointee_type)}]"
 
     @staticmethod
     def new(pointee_type: BaseConcreteType, is_mut: bool):
-        return UnsafeCPointerType([('pointee', pointee_type)], contents_is_mut=is_mut)
+        return PointerType([('pointee', pointee_type)], contents_is_mut=is_mut)
 
     @classmethod
     def kind(cls):

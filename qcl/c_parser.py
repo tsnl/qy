@@ -311,7 +311,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         pointee_ts = translate_clang_type_to_ts(clang_pointee_ts, False)
         contents_is_mut = not clang_pointee_ts.is_const_qualified()
         ts = ast1.PtrTypeSpec(c_type_loc(c_type), pointee_ts, contents_is_mut)
-        ts.wb_type = types.UnsafeCPointerType.new(pointee_ts.wb_type, contents_is_mut)
+        ts.wb_type = types.PointerType.new(pointee_ts.wb_type, contents_is_mut)
         return ts
     elif c_type.kind == TypeKind.ENUM:
         ts = translate_clang_type_to_ts(c_type.get_declaration().enum_type)

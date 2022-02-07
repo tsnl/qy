@@ -218,14 +218,13 @@ def model_one_lambda_body(
         sub = model_one_block(ctx, body_prefix_stmt_list, dto_list)
 
     # solving the tail expression:
-    tail_type = types.VoidType.singleton
+    tail_return_type = types.VoidType.singleton
     tail_loc = loc
     if opt_body_tail_exp is not None:
-        tail_sub, tail_type = model_one_exp(fn_ctx, opt_body_tail_exp, dto_list)
+        tail_sub, tail_return_type = model_one_exp(fn_ctx, opt_body_tail_exp, dto_list)
         sub = tail_sub.compose(sub, opt_body_tail_exp.loc)
         tail_loc = opt_body_tail_exp.loc
-
-    sub = unify(fn_ctx.local_return_type, tail_type, tail_loc).compose(sub, loc)
+    sub = unify(fn_ctx.local_return_type, tail_return_type, tail_loc).compose(sub, loc)
 
     # returns sub + _return type_, not type of lambda
     return sub, fn_ctx.local_return_type
@@ -278,9 +277,9 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         else:
             arg_type_list = [
                 types.VarType(f"arg{arg_index}:{arg_name}")
-                for arg_index, arg_name in enumerate(stmt.args)
+                for arg_index, arg_name in enumerate(stmt.args_names)
             ]
-            arg_name_type_list = list(zip(stmt.args, arg_type_list))
+            arg_name_type_list = list(zip(stmt.args_names, arg_type_list))
             ret_sub, ret_type = model_one_lambda_body(ctx, stmt.loc, arg_name_type_list, [], stmt.body_exp, dto_list)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
@@ -490,16 +489,11 @@ def help_model_one_exp(
         if exp.body_prefix:
             prefix_stmt_list = exp.body_prefix
 
-        opt_tail_exp = exp.opt_body_tail    
+        opt_tail_exp = exp.opt_body_tail
 
         sub, ret_type = model_one_lambda_body(ctx, exp.loc, arg_name_type_list, prefix_stmt_list, opt_tail_exp, dto_list)
         
-        return Substitution.empty, types.ProcedureType.new(
-            arg_types,
-            ret_type,
-            has_closure_slot=has_closure_slot,
-            is_c_variadic=False
-        )
+        return sub, types.ProcedureType.new(arg_types, ret_type, has_closure_slot=has_closure_slot, is_c_variadic=False)
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 
@@ -582,7 +576,7 @@ def help_model_one_type_spec(
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
     elif isinstance(ts, ast1.PtrTypeSpec):
         pointee_sub, pointee_type = model_one_type_spec(ctx, ts.pointee_type_spec, dto_list)
-        return pointee_sub, types.UnsafeCPointerType.new(pointee_type, ts.is_mut)
+        return pointee_sub, types.PointerType.new(pointee_type, ts.is_mut)
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
 
@@ -1296,7 +1290,7 @@ class Substitution(object):
                 rt_is_t |= rt_field_type is not element_type
             if rt_is_t:
                 rt = t.copy_with_elements(new_fields)
-                if isinstance(t, types.UnsafeCPointerType):
+                if isinstance(t, types.PointerType):
                     rt.contents_is_mut = t.contents_is_mut
                 elif isinstance(t, types.ProcedureType):
                     rt.is_c_variadic = t.is_c_variadic
