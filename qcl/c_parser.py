@@ -323,7 +323,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         is_func_variadic = c_type.is_function_variadic()
         if is_func_variadic:
             raise NotImplementedError("Exposing variadic function type.")
-        return ast1.ProcSignatureTypeSpec(c_type_loc(c_type), args, ret_ts)
+        return ast1.ProcSignatureTypeSpec(c_type_loc(c_type), args, ret_ts, takes_closure=False, is_c_variadic=False)
     else:
         raise NotImplementedError(f"Unknown Clang canonical type kind for type: '{c_type.spelling}'")
 

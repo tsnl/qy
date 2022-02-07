@@ -30,6 +30,7 @@ class UnaryOperator(enum.Enum):
     LogicalNot = enum.auto()
     Minus = enum.auto()
     Plus = enum.auto()
+    Do = enum.auto()        # applies a thunk
 
 
 class BinaryOperator(enum.Enum):
@@ -179,15 +180,16 @@ class Bind1vStatement(BaseIdQualifierStatement):
 
 
 class Bind1fStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional[t.List[BaseStatement]], is_variadic: bool = False):
+    def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional["BaseExpression"], is_variadic: bool = False):
+        assert isinstance(body, (type(None), BaseExpression))
         super().__init__(loc, name)
         self.args = args
-        self.body = body
+        self.body_exp = body
         self.is_variadic = is_variadic
 
     def is_extern(self):
         if isinstance(self, Bind1fStatement):
-            assert self.body is None
+            assert self.body_exp is None
             return True
         else:
             return False
@@ -238,20 +240,6 @@ class ConstStatement(BaseStatement):
         self.loc = loc
         self.body = body
         self.const_type_spec = const_type_spec
-
-
-class IteStatement(BaseStatement):
-    def __init__(
-        self,
-        loc: fb.ILoc,
-        cond: BaseExpression,
-        then_block: t.List[BaseStatement],
-        else_block: t.List[BaseStatement]
-    ):
-        super().__init__(loc)
-        self.cond = cond
-        self.then_block = then_block
-        self.else_block = else_block
 
 
 class ReturnStatement(BaseStatement):
@@ -331,7 +319,7 @@ class StringExpression(BaseExpression):
         # print("StringExpression:", self.pieces, repr(self.value))
 
 
-class BuiltinConPrevExpression(BaseExpression):
+class ConstPredecessorExpression(BaseExpression):
     pass
 
 
@@ -340,18 +328,33 @@ class IdRefExpression(MIdQualifierNode, BaseExpression):
         super().__init__(name, loc)
 
 
-class MuxExpression(BaseExpression):
+class IfExpression(BaseExpression):
     def __init__(
         self, 
         loc: fb.ILoc, 
         cond_exp: "BaseExpression", 
-        then_block: t.List["BaseStatement"], 
-        else_block: t.List["BaseStatement"]
+        then_exp: "BaseExpression", 
+        opt_else_exp: t.Optional["BaseExpression"]
     ):
         super().__init__(loc)
         self.cond_exp = cond_exp
-        self.then_block = then_block
-        self.else_block = else_block
+        self.then_exp = then_exp
+        self.else_exp = opt_else_exp
+
+
+class LambdaExpression(BaseExpression):
+    def __init__(
+        self, loc: fb.ILoc, 
+        opt_arg_names: t.Optional[t.List[str]],
+        body_prefix: t.List["BaseExpression"],
+        opt_body_tail: t.Optional["BaseExpression"],
+        no_closure: bool
+    ):
+        super().__init__(loc)
+        self.arg_names = opt_arg_names if opt_arg_names is not None else []
+        self.body_prefix = body_prefix
+        self.opt_body_tail = opt_body_tail
+        self.no_closure = no_closure
 
 
 class ProcCallExpression(BaseExpression):
@@ -361,7 +364,7 @@ class ProcCallExpression(BaseExpression):
         self.arg_exps = arg_exps
 
 
-class ConstructorExpression(BaseExpression):
+class MakeExpression(BaseExpression):
     def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression]):
         super().__init__(loc)
         self.made_ts = made_ts
@@ -386,8 +389,9 @@ class BinaryOpExpression(BaseExpression):
     def __init__(self, loc: fb.ILoc, operator: BinaryOperator, lt_operand: BaseExpression, rt_operand: BaseExpression):
         super().__init__(loc)
         self.operator = operator
-        self.lt_operand = lt_operand
-        self.rt_operand = rt_operand
+        self.lt_operand_exp = lt_operand
+        self.rt_operand_exp = rt_operand
+
 
 
 #
@@ -455,7 +459,7 @@ class ProcSignatureTypeSpec(BaseTypeSpec):
         opt_args: t.Optional[t.List[t.Tuple[OptStr, BaseTypeSpec]]], 
         ret_ts: BaseTypeSpec,
         takes_closure: bool,
-        is_c_variadic: bool = False
+        is_c_variadic: bool
     ):
         super().__init__(loc)
         self.opt_args_list = opt_args

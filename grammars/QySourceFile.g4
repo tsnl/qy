@@ -4,40 +4,15 @@ options {
     language = 'Python3';
 }
 
-fragment L: [a-zA-Z] ;
-fragment D: [0-9] ;
-fragment H: [0-9a-fA-F] ;
-fragment ANY_ESC: (
-    ('\\' ('\\' | 'n' | 'r' | 't')) |
-    ('\\x' H H)
-    ('\\u' H H H H)
-    ('\\U' H H H H H H H H)
-);
-fragment IS: [uUlLsS]+ ;
-fragment FS: [fFdD]+ ;
-
-ID: ((L|'_') (L|D|'_')*) ;
-LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
-LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
-LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
-LIT_SQ_STRING: ('\'' (ANY_ESC|'\\\''|~[\r\n\\'])*?  '\'');
-LIT_DQ_STRING: ('"'  (ANY_ESC|'\\"' |~[\r\n\\"])*?  '"');
-LIT_ML_DQ_STRING: '"""' (.)*? '"""';
-LIT_ML_SQ_STRING: '\'\'\'' (.)*? '\'\'\'';
-
-LINE_COMMENT: '//' ~[\r\n]* -> skip;
-BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> skip;
-WHITESPACE: ('\n'|'\r'|'\t'|' ') -> skip;
-
 sourceFile
-    : unwrapped_block=unwrappedBlock EOF
+    : (statements+=statement ';')* EOF
     ;
 
 block
     : '{' unwrapped_block=unwrappedBlock '}'
     ;
 unwrappedBlock
-    : (prefix_statements+=statement ';')* (tail=expression)?
+    : (prefix_statements+=statement ';')* 
     ;
 
 statement
@@ -46,7 +21,6 @@ statement
     | b1t=bind1tStatement
     | t1v=type1vStatement
     | con=constStatement
-    | ite=iteStatement
     | ret=returnStatement
     | discard=discardStatement
     | for_=forStatement
@@ -58,14 +32,10 @@ bind1vStatement
     ;
 bind1fStatement
     : 'def' name=ID '(' args=csIdList ')' '=' body_exp=expression
-    | 'def' name=ID '(' args=csIdList ')' '=' body_block=block
     ;
-bind1tStatement: 'typ' name=ID '=' initializer=typeSpec ;
+bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
 constStatement: 'const' type_spec=typeSpec b=block ;
-iteStatement
-    : 'if' cond=expression then_body=block ('else' (elif_stmt=iteStatement | else_body=block))?
-    ;
 returnStatement: 'return' ret_exp=expression ;
 discardStatement: 'discard' discarded_exp=expression ;
 forStatement: 'for' body=block ;
@@ -74,15 +44,20 @@ continueStatement: 'continue' ;
 
 expression: through=binaryExpression ;
 primaryExpression
-    : litBoolean                                                        #litBoolPrimaryExpression
-    | litInteger                                                        #litIntPrimaryExpression
-    | litFloat                                                          #litFloatPrimaryExpression
-    | litString                                                         #litStringPrimaryExpression
-    | '$predecessor'                                                    #prevConstPrimaryExpression
-    | id_tok=ID                                                         #idPrimaryExpression
-    | '(' through=expression ')'                                        #parenPrimaryExpression
-    | 'mux' '(' cond=expression ')' then=block 'else' else_=block       #muxPrimaryExpression
+    : litBoolean                                                                #litBoolPrimaryExpression
+    | litInteger                                                                #litIntPrimaryExpression
+    | litFloat                                                                  #litFloatPrimaryExpression
+    | litString                                                                 #litStringPrimaryExpression
+    | '$predecessor'                                                            #prevConstPrimaryExpression
+    | id_tok=ID                                                                 #idPrimaryExpression
+    | '(' through=expression ')'                                                #parenPrimaryExpression
+    | lam=lambdaExpression                                                      #lambdaPrimaryExpression
+    | 'if' '(' cond=expression ')' then=expression ('else' else_=expression)?   #itePrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
+    ;
+lambdaExpression
+    : '{' ('(' opt_arg_names=csIdList ')' ('=>'|no_closure='->'))? 
+        prefix=unwrappedBlock (opt_tail=expression)? '}'
     ;
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression
@@ -99,6 +74,7 @@ unaryOperator
     | 'not'
     | '-'
     | '+'
+    | 'do'
     ;
 binaryExpression
     : through=logicalOrExpression
@@ -144,6 +120,7 @@ logicalOrExpression
     | lt=logicalOrExpression op=('or'|'||') rt=logicalAndExpression
     ;
 
+
 typeSpec
     : through=signatureTypeSpec
     ;
@@ -170,14 +147,12 @@ adtTypeSpec
     ;
 ptrTypeSpec
     : through=adtTypeSpec
-    | ptrName='UnsafePtr' '[' pointee=ptrTypeSpec ']'
-    | ptrName='MutUnsafePtr' '[' pointee=ptrTypeSpec ']'
+    | ptrName='Ptr'    '[' pointee=ptrTypeSpec ']'
+    | ptrName='MutPtr' '[' pointee=ptrTypeSpec ']'
     ;
 signatureTypeSpec
     : through=ptrTypeSpec
-    // TODO: enable optional args list with 0-arg closure: need typer overhaul!
-    // | ('(' args=csFormalArgSpecList ')')? ('->'|has_closure_slot='=>') ret=signatureTypeSpec
-    | ('(' args=csFormalArgSpecList ')') ('->'|has_closure_slot='=>') ret=signatureTypeSpec
+    | '(' args=csFormalArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
 formalArgSpec
     : ts=typeSpec
@@ -191,3 +166,28 @@ litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_D
 csIdList: (ids+=ID (',' ids+=ID)*)? ;
 csFormalArgSpecList: (specs+=formalArgSpec (',' specs+=formalArgSpec)*)? ;
 csExpressionList: (exps+=expression (',' exps+=expression)*)? ;
+
+fragment L: [a-zA-Z] ;
+fragment D: [0-9] ;
+fragment H: [0-9a-fA-F] ;
+fragment ANY_ESC: (
+    ('\\' ('\\' | 'n' | 'r' | 't')) |
+    ('\\x' H H)
+    ('\\u' H H H H)
+    ('\\U' H H H H H H H H)
+);
+fragment IS: [uUlLsS]+ ;
+fragment FS: [fFdD]+ ;
+
+ID: ((L|'_') (L|D|'_')*) ;
+LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
+LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
+LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
+LIT_SQ_STRING: ('\'' (ANY_ESC|'\\\''|~[\r\n\\'])*?  '\'');
+LIT_DQ_STRING: ('"'  (ANY_ESC|'\\"' |~[\r\n\\"])*?  '"');
+LIT_ML_DQ_STRING: '"""' (.)*? '"""';
+LIT_ML_SQ_STRING: '\'\'\'' (.)*? '\'\'\'';
+
+LINE_COMMENT: '//' ~[\r\n]* -> skip;
+BLOCK_COMMENT: '/*' (BLOCK_COMMENT|.)*? '*/' -> skip;
+WHITESPACE: ('\n'|'\r'|'\t'|' ') -> skip;

@@ -1,44 +1,43 @@
 pub hello: (I32) -> I32;
-def hello (x) = {
+def hello (x) = do {
     return x;
 };
 
 pub wrongPhi: (Bool, I32, I32) -> I32;
-def wrongPhi (b, x, y) = {
-    return mux (b) {x} else {y};
+def wrongPhi (b, x, y) = do {
+    return if (b) {x} else {y};
 };
 
 pub rightPhi: (Bool, I32, I32) -> I32;
-def rightPhi (b, x, y) = {
-    return mux (b) {x} else {y};
+def rightPhi (b, x, y) = do {
+    return if (b) {x} else {y};
 };
 
 val j = wrongPhi(true, 15, 32);
 
-def fibonacci (x) = {
-    if x == 0 {
-        return 0;
-    } else if x == 1 {
-        return 1;
+pub fibonacci: (x: I32) -> I32;
+def fibonacci (x) = do {
+    if (x == 0 or x == 1) {
+        x
     } else {
-        return fibonacci(x - 1) + fibonacci(x - 2);
-    };
+        fibonacci(x - 1) + fibonacci(x - 2)
+    }
 };
 
-typ FibRes = (x: I32, y: I32);
+type FibRes = (x: I32, y: I32);
 pub better_fibonacci: (x: I32) -> I32;
 pvt better_fibonacci_helper: (a: I32, b: I32) -> FibRes;
-def better_fibonacci (x) = {
-    return mux (x == 0 or x == 1) {
+def better_fibonacci (x) = do {
+    if (x == 0 or x == 1) {
         x
     } else {
         val res = better_fibonacci_helper(x, better_fibonacci(x - 1));
         res.y
-    };
+    }
 };
-def better_fibonacci_helper (a, b) = {
+def better_fibonacci_helper (a, b) = do {
     val c = a + b;
-    return make FibRes(b, c);
+    make FibRes(b, c)
 };
 
 val b1 = true;
@@ -50,7 +49,7 @@ val m = b1 or b2;
 //
 
 /*
-typ Vec2f = (
+type Vec2f = (
     x: f32,
     y: f32
 );
@@ -64,17 +63,17 @@ val Point = (
 /* FIXME: this example should produce a unification error because 
  * no implicit int->float conversion
 pub main: () -> i32;
-def main () = {
+def main () = do {
     val v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
     return v.x;
 };
 */
 
-typ Vec2f = (x: F32, y: F32);
+type Vec2f = (x: F32, y: F32);
 
 pub printFibUntil: (I32) -> Void;
-def printFibUntil (n) = {
-    if (n > 0) {
+def printFibUntil (n) = do {
+    discard if (n > 0) {
         discard printFibUntil(n - 1);
         discard printInt(n);
         discard printTab();
@@ -83,14 +82,14 @@ def printFibUntil (n) = {
     };
 };
 
-def main () = {
+def main () = do {
     // val v = Vec3F (1.0f, 2.0f, 3.0f);
     // val w = v3f_add(v, v);
     val w = make Vec2f(13, 0);
     val f = fibonacci(make I32(w.x));
     // discard printInt(f);
     val short_run = false;
-    discard printFibUntil(mux (short_run) {10} else {42});
+    discard printFibUntil(if (short_run) {10} else {42});
     // val _ = printFibUntil(20);
 
     for {

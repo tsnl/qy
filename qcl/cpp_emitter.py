@@ -1,6 +1,5 @@
 """
-FIXME: make all emitter writers uniformly write to a stream that can be string or file.
-- then, fix MuxExpression, IIFEs, lambdas.
+FIXME: need to update this backend to deal with lambdas, 'do' expressions.
 """
 
 import dataclasses
@@ -301,7 +300,7 @@ class Emitter(base_emitter.BaseEmitter):
                         for arg_type, arg_name in zip(def_type.arg_types, stmt.args)
                     )))
             with Block(c) as b:
-                self.emit_block(c, h, stmt.body)
+                self.emit_expression(c, stmt.body_exp)
             c.print()
         
         elif isinstance(stmt, ast1.Bind1tStatement):
@@ -444,6 +443,7 @@ class Emitter(base_emitter.BaseEmitter):
             # return f"<NotImplemented:{qy_type}>"
 
     def translate_expression(self, exp: ast1.BaseExpression) -> str:
+        # FIXME: can 'translate_expression_with_type' be replaced by looking up 'exp.wb_type'?
         ret_str, ret_type = self.translate_expression_with_type(exp)
         assert isinstance(ret_str, str)
         # assert isinstance(ret_type, types.BaseType)
@@ -503,36 +503,40 @@ class Emitter(base_emitter.BaseEmitter):
             return json.dumps(exp.value), types.StringType.singleton
 
         elif isinstance(exp, ast1.UnaryOpExpression):
-            operator_str = {
-                ast1.UnaryOperator.DeRef: "*",
-                ast1.UnaryOperator.LogicalNot: "!",
-                ast1.UnaryOperator.Minus: "-",
-                ast1.UnaryOperator.Plus: "+"
-            }[exp.operator]
             operand_type, operand_str = self.translate_expression_with_type(exp.operand)
 
-            # dispatch based on `operand_type` to select the right operator and return type:
-            # for now, Qy's builtin unary operators are a subset of C++'s builtin unary operators.            
-            if exp.operator == ast1.UnaryOperator.DeRef:
-                operand_ptr_type = operand_type
-                assert isinstance(operand_ptr_type, types.UnsafeCPointerType)
-                ret_type = operand_ptr_type.pointee_type
-                assert isinstance(ret_type, types.BaseConcreteType)
-            elif exp.operator == ast1.UnaryOperator.LogicalNot:
-                operand_type = operand_type
-                assert operand_type is types.IntType.get(1, is_signed=False)
-                ret_type = operand_type
-            elif exp.operator in (ast1.UnaryOperator.Minus, ast1.UnaryOperator.Plus):
-                if isinstance(operand_type, types.IntType):
-                    ret_type = types.IntType.get(operand_type.width_in_bits, is_signed=True)
-                elif isinstance(operand_type, types.FloatType):
-                    ret_type = operand_type
-                else:
-                    raise NotImplementedError(f"Unknown argument types in unary operator emitter")
+            if exp.operator == ast1.UnaryOperator.Do:
+                return f"{operand_str}()"
             else:
-                raise NotImplementedError("Unknown operator")
-            
-            return f"({operator_str} {operand_str})", ret_type
+                operator_str = {
+                    ast1.UnaryOperator.DeRef: "*",
+                    ast1.UnaryOperator.LogicalNot: "!",
+                    ast1.UnaryOperator.Minus: "-",
+                    ast1.UnaryOperator.Plus: "+"
+                }[exp.operator]
+                
+                # dispatch based on `operand_type` to select the right operator and return type:
+                # for now, Qy's builtin unary operators are a subset of C++'s builtin unary operators.            
+                if exp.operator == ast1.UnaryOperator.DeRef:
+                    operand_ptr_type = operand_type
+                    assert isinstance(operand_ptr_type, types.UnsafeCPointerType)
+                    ret_type = operand_ptr_type.pointee_type
+                    assert isinstance(ret_type, types.BaseConcreteType)
+                elif exp.operator == ast1.UnaryOperator.LogicalNot:
+                    operand_type = operand_type
+                    assert operand_type is types.IntType.get(1, is_signed=False)
+                    ret_type = operand_type
+                elif exp.operator in (ast1.UnaryOperator.Minus, ast1.UnaryOperator.Plus):
+                    if isinstance(operand_type, types.IntType):
+                        ret_type = types.IntType.get(operand_type.width_in_bits, is_signed=True)
+                    elif isinstance(operand_type, types.FloatType):
+                        ret_type = operand_type
+                    else:
+                        raise NotImplementedError(f"Unknown argument types in unary operator emitter")
+                else:
+                    raise NotImplementedError("Unknown operator")
+                
+                return f"({operator_str} {operand_str})", ret_type
 
         elif isinstance(exp, ast1.BinaryOpExpression):
             # FIXME: hacky; does not work for fmod, though type-checks
@@ -556,8 +560,8 @@ class Emitter(base_emitter.BaseEmitter):
                 ast1.BinaryOperator.LThan: "<=",
                 ast1.BinaryOperator.GThan: ">=",
             }[exp.operator]
-            lt_operand_str, lt_operand_type = self.translate_expression_with_type(exp.lt_operand)
-            rt_operand_str, rt_operand_type = self.translate_expression_with_type(exp.rt_operand)
+            lt_operand_str, lt_operand_type = self.translate_expression_with_type(exp.lt_operand_exp)
+            rt_operand_str, rt_operand_type = self.translate_expression_with_type(exp.rt_operand_exp)
             if exp.operator in typer.BinaryOpDTO.arithmetic_binary_operator_set:
                 if isinstance(lt_operand_type, types.IntType):
                     assert isinstance(rt_operand_type, types.IntType)
@@ -605,7 +609,7 @@ class Emitter(base_emitter.BaseEmitter):
             assert ret_type is not None
             return ret_str, ret_type
 
-        elif isinstance(exp, ast1.ConstructorExpression):
+        elif isinstance(exp, ast1.MakeExpression):
             if exp.wb_type.is_atomic and len(exp.initializer_list) == 1:
                 # 'cast' expressions
                 target_type_str = self.translate_type(exp.wb_type)
@@ -618,12 +622,19 @@ class Emitter(base_emitter.BaseEmitter):
                 constructor_str = f"{constructor_ts}{{{','.join(initializer_exps)}}}"
                 return constructor_str, exp.made_ts.wb_type
         
-        elif isinstance(exp, ast1.MuxExpression):
+        elif isinstance(exp, ast1.IfExpression):
             cond_str = self.translate_expression(exp.cond_exp)
-            then_str = self.translate_expression(exp.then_block)
-            else_str = self.translate_expression(exp.else_block)
-            mux_str = f"({cond_str} ? ({then_str}) : ({else_str}))"
-            return mux_str, exp.wb_type
+            then_str = self.translate_expression(exp.then_exp)
+            else_str = self.translate_expression(exp.else_exp)
+            ite_str = f"({cond_str} ? ({then_str}) : ({else_str}))"
+            return ite_str, exp.wb_type
+
+        elif isinstance(exp, ast1.LambdaExpression):
+            closure_prefix_str = '[=]' if exp.no_closure else '[]'
+            arg_names_str = '(' + f", ".join(f"auto {arg_name}" for arg_name in exp.arg_names) + ')'
+            # FIXME: need a way to translate blocks!
+            raise NotImplementedError("emitting a LambdaExpression")
+            return lambda_str, exp.wb_type
 
         else:
             raise NotImplementedError(f"Don't know how to translate expression to C++: {exp}")

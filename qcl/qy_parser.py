@@ -66,6 +66,8 @@ class QyErrorListener(antlr.ANTLR4ErrorListener):
     def reportAmbiguity(self, recognizer, dfa, start_index, stop_index, exact, ambig_alts, configs):
         if not exact:
             # raise excepts.ParserCompilationError(f"Inexact parser ambiguity detected (...)")
+            # NOTE: https://www.antlr.org/api/Java/org/antlr/v4/runtime/ANTLRErrorListener.html
+            # "...which does not result in a syntax error"
             panic.because(
                 panic.ExitCode.SyntaxError,
                 opt_msg="syntax ambiguity detected! (TODO: report more info if required)"
@@ -164,20 +166,16 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     #
 
     def visitSourceFile(self, ctx: antlr.QySourceFileParser.SourceFileContext) -> t.List[ast1.BaseStatement]:
-        return self.visit(ctx.unwrapped_block)
+        return [self.visit(s) for s in ctx.statements]
 
     def visitBlock(self, ctx: antlr.QySourceFileParser.BlockContext) -> t.List[ast1.BaseStatement]:
         return self.visit(ctx.unwrapped_block)
 
     def visitUnwrappedBlock(self, ctx: antlr.QySourceFileParser.UnwrappedBlockContext) -> t.List[ast1.BaseStatement]:
-        statements = [
+        return [
             self.visit(statement_ctx)
             for statement_ctx in ctx.prefix_statements
         ]
-        if ctx.tail is not None:
-            shallow_return_stmt = ast1.ReturnStatement(self.loc(ctx), self.visitExpression(ctx.tail), is_shallow=True)
-            statements.append(shallow_return_stmt)
-        return statements
 
     #
     # statement:
@@ -194,8 +192,6 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.t1v)
         elif ctx.con is not None:
             return self.visit(ctx.con)
-        elif ctx.ite is not None:
-            return self.visit(ctx.ite)
         elif ctx.ret is not None:
             return self.visit(ctx.ret)
         elif ctx.discard is not None:
@@ -214,15 +210,9 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
         arg_name_list = self.visit(ctx.args)
-        if ctx.body_exp is not None:
-            ret_exp = self.visit(ctx.body_exp)
-            body_stmt_list = [ast1.ReturnStatement(ret_exp.loc, ret_exp)]
-        elif ctx.body_block is not None:
-            body_stmt_list = self.visit(ctx.body_block)
-        else:
-            raise NotImplementedError("Unknown 'body' term in Bind1fStatement")
-
-        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, body_stmt_list)
+        assert ctx.body_exp is not None
+        ret_exp = self.visit(ctx.body_exp)
+        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, ret_exp)
 
     def visitBind1tStatement(self, ctx: antlr.QySourceFileParser.Bind1tStatementContext) -> ast1.Bind1tStatement:
         return ast1.Bind1tStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
@@ -233,18 +223,6 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
 
     def visitConstStatement(self, ctx: antlr.QySourceFileParser.ConstStatementContext) -> ast1.ConstStatement:
         return ast1.ConstStatement(self.loc(ctx), self.visit(ctx.b), self.visit(ctx.type_spec))
-
-    def visitIteStatement(self, ctx: antlr.QySourceFileParser.IteStatementContext) -> ast1.IteStatement:
-        then_body = self.visit(ctx.then_body)
-
-        if ctx.elif_stmt is not None:
-            else_body = [self.visit(ctx.elif_stmt)]
-        elif ctx.else_body is not None:
-            else_body = self.visit(ctx.else_body)
-        else:
-            else_body = []
-
-        return ast1.IteStatement(self.loc(ctx), self.visit(ctx.cond), then_body, else_body)
 
     def visitReturnStatement(self, ctx: antlr.QySourceFileParser.ReturnStatementContext) -> ast1.ReturnStatement:
         return ast1.ReturnStatement(self.loc(ctx), self.visit(ctx.ret_exp))
@@ -310,7 +288,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.StringExpression(self.loc(ctx), piece_text_list, value)
 
     def visitPrevConstPrimaryExpression(self, ctx: antlr.QySourceFileParser.PrevConstPrimaryExpressionContext):
-        return ast1.BuiltinConPrevExpression(self.loc(ctx))
+        return ast1.ConstPredecessorExpression(self.loc(ctx))
 
     def visitIdPrimaryExpression(self, ctx: antlr.QySourceFileParser.IdPrimaryExpressionContext):
         return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)
@@ -318,11 +296,21 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitParenPrimaryExpression(self, ctx: antlr.QySourceFileParser.ParenPrimaryExpressionContext):
         return self.visit(ctx.through)
 
-    def visitMuxPrimaryExpression(self, ctx: antlr.QySourceFileParser.MuxPrimaryExpressionContext):
+    def visitItePrimaryExpression(self, ctx: antlr.QySourceFileParser.ItePrimaryExpressionContext):
         cond_exp = self.visit(ctx.cond)
         then_exp = self.visit(ctx.then)
-        else_exp = self.visit(ctx.else_)
-        return ast1.MuxExpression(self.loc(ctx), cond_exp, then_exp, else_exp)
+        else_exp = self.visit(ctx.else_) if ctx.else_ is not None else None
+        return ast1.IfExpression(self.loc(ctx), cond_exp, then_exp, else_exp)
+
+    def visitLambdaPrimaryExpression(self, ctx: antlr.QySourceFileParser.LambdaPrimaryExpressionContext):
+        return self.visitLambdaExpression(ctx.lam)
+    
+    def visitLambdaExpression(self, ctx: antlr.QySourceFileParser.LambdaExpressionContext):
+        opt_arg_names = self.visit(ctx.opt_arg_names) if ctx.opt_arg_names is not None else None
+        prefix = self.visitUnwrappedBlock(ctx.prefix)
+        opt_tail_exp = self.visitExpression(ctx.opt_tail) if ctx.opt_tail is not None else None
+        no_closure = ctx.no_closure is not None or ctx.opt_arg_names is None        # default to closure
+        return ast1.LambdaExpression(self.loc(ctx), opt_arg_names, prefix, opt_tail_exp, no_closure)
 
     def visitThroughPostfixExpression(self, ctx: antlr.QySourceFileParser.ThroughPostfixExpressionContext):
         return self.visit(ctx.through)
@@ -331,27 +319,28 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.ProcCallExpression(self.loc(ctx), self.visit(ctx.proc), self.visit(ctx.args))
 
     def visitConstructorExpression(self, ctx: antlr.QySourceFileParser.ConstructorExpressionContext):
-        return ast1.ConstructorExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args))
+        return ast1.MakeExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args))
 
     def visitDotIdExpression(self, ctx: antlr.QySourceFileParser.DotIdExpressionContext):
         return ast1.DotIdExpression(self.loc(ctx), self.visit(ctx.container), ctx.key.text)
 
     def visitThroughUnaryExpression(self, ctx: antlr.QySourceFileParser.ThroughUnaryExpressionContext):
-        if ctx.through is not None:
-            return self.visit(ctx.through)
-        else:
-            return ast1.UnaryOpExpression(
-                self.loc(ctx),
-                self.visit(ctx.op),
-                self.visit(ctx.e)
-            )
+        return self.visit(ctx.through)
+
+    def visitUnaryOpExpression(self, ctx: antlr.QySourceFileParser.UnaryOpExpressionContext):
+        return ast1.UnaryOpExpression(
+            self.loc(ctx),
+            self.visit(ctx.op),
+            self.visit(ctx.e)
+        )
 
     def visitUnaryOperator(self, ctx: antlr.QySourceFileParser.UnaryOperatorContext) -> ast1.UnaryOperator:
         return {
             '*': ast1.UnaryOperator.DeRef,
             'not': ast1.UnaryOperator.LogicalNot,
             '-': ast1.UnaryOperator.Minus,
-            '+': ast1.UnaryOperator.Plus
+            '+': ast1.UnaryOperator.Plus,
+            'do': ast1.UnaryOperator.Do
         }[ctx.getText()]
 
     def visitBinaryExpression(self, ctx: antlr.QySourceFileParser.BinaryExpressionContext) -> ast1.BinaryOpExpression:
@@ -530,8 +519,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.through)
         else:
             is_mut = {
-                "&": False,
-                "&mut": True
+                "Ptr": False,
+                "MutPtr": True
             }[ctx.ptrName]
             return ast1.PtrTypeSpec(self.loc(ctx), self.visit(ctx.pointee), is_mut)
 
@@ -543,7 +532,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                 self.loc(ctx),
                 self.visit(ctx.args) if ctx.args is not None else None,
                 self.visit(ctx.ret),
-                ctx.has_closure_slot is not None
+                ctx.has_closure_slot is not None,
+                is_c_variadic=False
             )
 
     #

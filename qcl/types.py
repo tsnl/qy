@@ -332,7 +332,7 @@ class ProcedureType(BaseCompositeType):
             [('ret_type', ret_type)] +
             [(f'arg.{i}', arg_type) for i, arg_type in enumerate(arg_types)],
             has_closure_slot=has_closure_slot,
-            is_c_variadic=is_c_variadic,
+            is_c_variadic=is_c_variadic
         )
         return pt
 
