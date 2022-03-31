@@ -54,7 +54,7 @@
             -   No new functionality; just make the tool nicer to use.
             -   MAYBE includes LSP server support
             
-        -   Beyond this point, time is better spent implementing functionality in features.
+        -   Beyond this point, time is better spent writing Qy code rather than the Qy compiler.
             -   MAYBE `qc-v2.5.1`, ... such that `qc-v2.5.*` is an LTS line
         
         -   Can implement library features like...
@@ -64,6 +64,8 @@
                 -   support for interfacing with NumPy arrays along with other Python datatypes
                 -   allow Qy users to write Python code using 'monotype' system (e.g. `py::len`)
                 -   tap into an incredibly rich package ecosystem
+                -   cf Pi calculus for verified channel semantics
+                    -   use separate threads with reactor/proactor to avoid paying sync costs on everything.
             -   Macro-based serialization
 
     -   `qc-v3`

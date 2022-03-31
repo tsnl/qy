@@ -1,4 +1,4 @@
-// Qy is a programming language ideal for prototyping quickly.
+// Qy is a programming language ideal for prototyping quick17y.
 //   - it uses the C type system with a few enhancements and RTTI.
 //   - type specifiers are only needed for functions and type definitions.
 //   - it uses a single-pass compiler for simplicity
@@ -15,14 +15,14 @@ pub v3f_scale: (Vec3F, F32) -> Vec3F;
 // enums provided using 'const', which translates into preprocessor declarations
 const I32 {
     val EC_ALL_OK = 0;
-    val EC_BAD_CLI_ARGS = 1 + $predecessor;
-    val EC_BAD_FILE_PATH = 1 + $predecessor;
-    val EC_DETECTED_RUNTIME_ERROR = 1 + $predecessor;
+    val EC_BAD_CLI_ARGS = 1 + $pred;
+    val EC_BAD_FILE_PATH = 1 + $pred;
+    val EC_DETECTED_RUNTIME_ERROR = 1 + $pred;
 };
 const U32 {
     val WINDOW_FLAG_FULLSCREEN = 0x1u;
-    val WINDOW_FLAG_FIXED_SIZE = 2u * $predecessor;
-    val WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $predecessor;
+    val WINDOW_FLAG_FIXED_SIZE = 2u * $pred;
+    val WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $pred;
 };
 
 // struct definitions: (enum, union are similar, but use '{...}' instead)
@@ -32,7 +32,7 @@ type Vec3F = (x: F32, y: F32, z: F32);
 // function definitions:
 // NOTE: type inference fills in holes.
 def vec3f (x, y, z) = do {
-    make Vec3F(x, y, z)
+    new Vec3F(x, y, z)
 };
 
 def v3f_add (v1, v2) = do {

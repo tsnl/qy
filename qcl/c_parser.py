@@ -128,7 +128,7 @@ def translate_enum_decl(tu, node, rem_provided_symbols):
                 is_unsigned=const_ts.is_unsigned_int,
                 width_in_bits=const_ts.int_width_in_bits
             )
-            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp, is_mut=False)
+            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp)
             body.append(bind1v_stmt)
         yield ast1.ConstStatement(loc(node), body, const_ts)
 
@@ -166,7 +166,7 @@ def translate_variable_decl(tu, node, rem_provided_symbols):
         var_ts = translate_clang_type_to_ts(node.type, True)
         var_str = node.type.spelling + " " + node.spelling
         is_mut = var_ts.wb_type.is_mut
-        yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str, is_mut=is_mut)
+        yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str)
 
 
 def loc(node):

@@ -37,7 +37,7 @@ def better_fibonacci (x) = do {
 };
 def better_fibonacci_helper (a, b) = do {
     val c = a + b;
-    make FibRes(b, c)
+    new FibRes(b, c)
 };
 
 val b1 = true;
@@ -73,26 +73,27 @@ type Vec2f = (x: F32, y: F32);
 
 pub printFibUntil: (I32) -> Void;
 def printFibUntil (n) = do {
-    discard if (n > 0) {
-        discard printFibUntil(n - 1);
-        discard printInt(n);
-        discard printTab();
-        discard printInt(fibonacci(n));
-        discard printLine();
+    let if (n > 0) {
+        let printFibUntil(n - 1);
+        let printInt(n);
+        let printTab();
+        let printInt(fibonacci(n));
+        let printLine();
     };
 };
 
 def main () = do {
     // val v = Vec3F (1.0f, 2.0f, 3.0f);
     // val w = v3f_add(v, v);
-    val w = make Vec2f(13, 0);
-    val f = fibonacci(make I32(w.x));
+    val w = new Vec2f(13, 0);
+    val f = fibonacci(new I32(w.x));
+    
     // discard printInt(f);
     val short_run = false;
-    discard printFibUntil(if (short_run) {10} else {42});
+    let printFibUntil(if (short_run) {10} else {42});
     // val _ = printFibUntil(20);
 
-    for {
+    loop {
         break;
     };
 

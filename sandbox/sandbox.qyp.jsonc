@@ -4,8 +4,9 @@
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
         "./eg101-basics.qy",
-        "./eg199-scratch.qy",
-        "./eg102-literals.qy"
+        "./eg102-literals.qy",
+        "./eg103-vars.qy",
+        "./eg199-scratch1.qy"
     ],
     "deps": [
         "./import-test-qyp-1/import-test-qyp-1.qyp.jsonc",

@@ -1,4 +1,5 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}/qc-build",
+    "cmake.cmakePath": "cmake",
     "python.analysis.autoImportCompletions": false
 }

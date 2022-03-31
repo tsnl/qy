@@ -1,0 +1,5 @@
+def array_eg1 () = do {
+    val a = push mut I32(42);
+    let a := 1;
+    a
+};

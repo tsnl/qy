@@ -257,8 +257,8 @@ class Emitter(base_emitter.BaseEmitter):
                 s.print("// binding elided for 'void' type variable.")
             else:
                 bind_cpp_fragments = []
-                if not def_obj.is_public:
-                    bind_cpp_fragments.append('static')
+                # if not def_obj.is_public:
+                #     bind_cpp_fragments.append('static')
                 bind_cpp_fragments.append(self.translate_type(def_type))
                 bind_cpp_fragments.append(def_obj.name)
                 bind_cpp_fragments.append("=")
@@ -288,8 +288,8 @@ class Emitter(base_emitter.BaseEmitter):
             assert isinstance(def_type, types.ProcedureType)
             
             s.print(f"// bind {stmt.name} = {{...}}")
-            if not def_obj.is_public and stmt.name != 'main':
-                s.print('static')
+            # if not def_obj.is_public and stmt.name != 'main':
+            #     s.print('static')
             s.print(self.translate_type(def_type.ret_type))
             if not stmt.args_names:
                 s.print(f"{def_obj.name}()")
@@ -336,17 +336,17 @@ class Emitter(base_emitter.BaseEmitter):
             write_pub = def_obj.is_public and target == DocType.MainHeader
             write_pvt = not def_obj.is_public and target == DocType.MainSource
             if write_pub or write_pvt:
-                qy_visibility_prefix, decl_prefix = ("pub", "extern") if def_obj.is_public else ("pvt", "static")
+                qy_visibility_prefix, decl_prefix = ("pub ", "extern ") if def_obj.is_public else ("pvt ", "")
                 _, def_type = def_obj.scheme.instantiate()
-                s.print(f"// {qy_visibility_prefix} {stmt.name}")
+                s.print(f"// {qy_visibility_prefix}{stmt.name}")
                 if isinstance(def_type, types.ProcedureType) and not def_type.has_closure_slot:
                     if is_top_level:
                         args_list = ', '.join(map(self.translate_type, def_type.arg_types))
-                        s.print(f"{decl_prefix} {self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
+                        s.print(f"{decl_prefix}{self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
                     else:
                         raise NotImplementedError("Cannot type a function in a non-global context")
                 else:
-                    s.print(f"{decl_prefix} {self.translate_type(def_type)} {stmt.name};", target_section=DocumentSectionId.Prefix)
+                    s.print(f"{decl_prefix}{self.translate_type(def_type)} {stmt.name};", target_section=DocumentSectionId.Prefix)
                 s.print()
 
         elif isinstance(stmt, ast1.ConstStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
@@ -358,7 +358,7 @@ class Emitter(base_emitter.BaseEmitter):
         elif isinstance(stmt, ast1.ReturnStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             s.print(f"return {self.translate_expression(stmt.returned_exp)};")
 
-        elif isinstance(stmt, ast1.ForStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
+        elif isinstance(stmt, ast1.LoopStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             s.print("for (;;)")
             with Block(s):
                 self.emit_block(s, stmt.body)
@@ -620,7 +620,7 @@ class Emitter(base_emitter.BaseEmitter):
             assert ret_type is not None
             return ret_str, ret_type
 
-        elif isinstance(exp, ast1.MakeExpression):
+        elif isinstance(exp, ast1.ConstructExpression):
             if exp.wb_type.is_atomic and len(exp.initializer_list) == 1:
                 # 'cast' expressions
                 target_type_str = self.translate_type(exp.wb_type)
@@ -628,10 +628,26 @@ class Emitter(base_emitter.BaseEmitter):
                 return f"static_cast<{target_type_str}>({arg_str})", exp.wb_type
             else:
                 # constructor invocation
-                constructor_ts = self.translate_type(exp.wb_type)
-                initializer_exps = [self.translate_expression(exp) for exp in exp.initializer_list]
-                constructor_str = f"{constructor_ts}{{{','.join(initializer_exps)}}}"
-                return constructor_str, exp.made_ts.wb_type
+                res_type = exp.wb_type
+                initializer_exp_strs = [self.translate_expression(exp) for exp in exp.initializer_list]
+                initializer_list_str = ','.join(initializer_exp_strs)
+                
+                if exp.construct_frontend == ast1.ConstructFrontend.New:
+                    constructor_ts_str = self.translate_type(res_type)
+                    constructor_str = constructor_ts_str + "{" + initializer_list_str + "}"
+                    return constructor_str, exp.made_ts.wb_type
+                else:
+                    assert isinstance(res_type, types.PointerType)
+                    constructor_ts_str = self.translate_type(res_type.pointee_type)
+                    constructor_str = constructor_ts_str + "{" + initializer_list_str + "}"
+                
+                    if exp.construct_frontend == ast1.ConstructFrontend.Push:
+                        address_str = f"alloca(sizeof({constructor_ts_str}))"
+                    else:
+                        assert exp.construct_frontend == ast1.ConstructFrontend.Heap
+                        address_str = f"malloc(sizeof({constructor_ts_str}))"
+                    constructor_str = f"new({address_str}) {constructor_str}"
+                    return constructor_str, exp.made_ts.wb_type
         
         elif isinstance(exp, ast1.IfExpression):
             # NOTE: If expressions are regular functions in this language, and must invoke their 'then' or 'else' branches 
@@ -674,6 +690,17 @@ class Emitter(base_emitter.BaseEmitter):
                         s.print("return;")
             
             return s.close(), p_type
+
+        elif isinstance(exp, ast1.UpdateExpression):
+            store_address_str = self.translate_expression(exp.store_address)
+            stored_value_str = self.translate_expression(exp.stored_value)
+            
+            lvalue_str = f"*{store_address_str}"
+            rvalue_str = stored_value_str
+            res_str = lvalue_str + " = " + rvalue_str
+
+            return res_str, exp.wb_type
+
         else:
             raise NotImplementedError(f"Don't know how to translate expression to C++: {exp}")
             # print(f"WARNING: Don't know how to translate expression to C++: {exp}")
@@ -857,9 +884,15 @@ class StringWriter(object):
 
     def add_common_stdlib_header_includes(self):
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="malloc.h"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="functional"))
         
+    def inject_manual_main_preamble(self):
+        # FIXME: allow cross-compilation via args, not current platform
+        if os.name == 'nt':
+            self.print("#define alloca _alloca", target_section=DocumentSectionId.Prefix)
+
     def inc_indent(self):
         self.indent_count += 1
     
@@ -897,6 +930,8 @@ class CppFileWriter(StringWriter):
             include_spec = IncludeSpec(use_angle_brackets=False, include_path=self.stem_base+"."+CppFileWriter.doc_file_path_suffix[DocType.MainHeader])
             self.include_specs.append(include_spec)
             self.add_common_stdlib_header_includes()
+            # writing some text
+            self.inject_manual_main_preamble()
         elif self.doc_type == DocType.TypeDeclHeader:
             self.print("#pragma once", target_section=DocumentSectionId.Prefix)
             self.print(target_section=DocumentSectionId.Prefix)

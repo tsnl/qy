@@ -173,10 +173,9 @@ class BaseIdQualifierStatement(MIdQualifierNode, BaseStatement):
 
 
 class Bind1vStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression], is_mut: bool):
+    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression]):
         super().__init__(loc, name)
         self.initializer = initializer
-        self.is_mut = is_mut
 
 
 class Bind1fStatement(BaseIdQualifierStatement):
@@ -196,8 +195,8 @@ class Bind1fStatement(BaseIdQualifierStatement):
 
 
 class Extern1vStatement(Bind1vStatement):
-    def __init__(self, loc, var_name: str, var_ts: "BaseTypeSpec", var_str, is_mut):
-        super().__init__(loc, var_name, None, is_mut)
+    def __init__(self, loc, var_name: str, var_ts: "BaseTypeSpec", var_str):
+        super().__init__(loc, var_name, None)
         self.var_type_spec = var_ts
         self.extern_notation = var_str
 
@@ -255,7 +254,7 @@ class DiscardStatement(BaseStatement):
         self.discarded_exp = discarded_exp
 
 
-class ForStatement(BaseStatement):
+class LoopStatement(BaseStatement):
     def __init__(self, loc: fb.ILoc, body: BaseExpression):
         super().__init__(loc)
         self.body = body
@@ -364,11 +363,19 @@ class ProcCallExpression(BaseExpression):
         self.arg_exps = arg_exps
 
 
-class MakeExpression(BaseExpression):
-    def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression]):
+class ConstructFrontend(enum.Enum):
+    New = enum.auto()   # allocates object on the stack, returns value
+    Push = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
+    Heap = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
+
+
+class ConstructExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression], construct_frontend: ConstructFrontend, is_mut: bool):
         super().__init__(loc)
         self.made_ts = made_ts
         self.initializer_list = initializer_list
+        self.construct_frontend = construct_frontend
+        self.is_mut = is_mut
 
 
 class DotIdExpression(BaseExpression):
@@ -392,6 +399,12 @@ class BinaryOpExpression(BaseExpression):
         self.lt_operand_exp = lt_operand
         self.rt_operand_exp = rt_operand
 
+
+class UpdateExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, store_address: BaseExpression, stored_value: BaseExpression):
+        super().__init__(loc)
+        self.store_address = store_address
+        self.stored_value = stored_value
 
 
 #

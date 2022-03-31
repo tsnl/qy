@@ -3,6 +3,6 @@
     "author": "https://github.com/tsnl",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
-        "./eg199-scratch.qy"
+        "./eg199-scratch1.qy"
     ]
 }

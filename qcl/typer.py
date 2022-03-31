@@ -352,7 +352,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
     elif isinstance(stmt, ast1.DiscardStatement):
         sub, _ = model_one_exp(ctx, stmt.discarded_exp, dto_list)
         return sub
-    elif isinstance(stmt, ast1.ForStatement):
+    elif isinstance(stmt, ast1.LoopStatement):
         return model_one_block(ctx, stmt.body, dto_list)
     elif isinstance(stmt, ast1.BaseLoopControlStatement):
         return Substitution.empty
@@ -398,7 +398,7 @@ def help_model_one_exp(
         return Substitution.empty, types.FloatType.get(exp.width_in_bits)
     elif isinstance(exp, ast1.StringExpression):
         return Substitution.empty, types.StringType.singleton
-    elif isinstance(exp, ast1.MakeExpression):
+    elif isinstance(exp, ast1.ConstructExpression):
         made_ts_sub, made_type = model_one_type_spec(ctx, exp.made_ts, dto_list)
         args_sub = Substitution.empty
         initializer_type_list = []
@@ -406,9 +406,20 @@ def help_model_one_exp(
             initializer_arg_sub, initializer_arg_type = model_one_exp(ctx, initializer_arg_exp, dto_list)
             args_sub = initializer_arg_sub.compose(args_sub, exp.loc)
             initializer_type_list.append(initializer_arg_type)
+        
         # TODO: check the arguments against the made type, maybe using a deferred query or unification?
+        
+        # the constructed instance can be referenced directly or via a pointer:
+        # preparing the return type:
         sub = args_sub.compose(made_ts_sub, exp.loc)
-        return sub, made_type
+        if exp.construct_frontend == ast1.ConstructFrontend.New:
+            assert not exp.is_mut
+            ret_type = sub.rewrite_type(made_type)
+        elif exp.construct_frontend in (ast1.ConstructFrontend.Heap, ast1.ConstructFrontend.Push):
+            ret_type = types.PointerType.new(sub.rewrite_type(made_type), is_mut=exp.is_mut)
+        else:
+            raise NotImplementedError("ConstructExpression: Unknown frontend: how was this constructor used, and what does the user expect in return?")
+        return sub, ret_type
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
         operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
@@ -430,8 +441,8 @@ def help_model_one_exp(
             arg_sub, arg_type = model_one_exp(ctx, arg_exp, dto_list)
             arg_type_list.append(all_arg_sub.rewrite_type(arg_type))
             all_arg_sub = arg_sub.compose(all_arg_sub, exp.loc)
-        proxy_ret_type = types.VarType(f"proc_call_ret")
-        actual_proc_type = types.ProcedureType.new(arg_type_list, proxy_ret_type)
+        proxy_src_type = types.VarType(f"proc_call_ret")
+        actual_proc_type = types.ProcedureType.new(arg_type_list, proxy_src_type)
         
         # collecting formal procedure type information:
         # type based on how the procedure was defined in this context:
@@ -444,12 +455,12 @@ def help_model_one_exp(
             last_sub.rewrite_type(actual_proc_type),
             opt_loc=exp.loc
         ).compose(last_sub, exp.loc)
-        return sub, sub.rewrite_type(proxy_ret_type)
+        return sub, sub.rewrite_type(proxy_src_type)
     elif isinstance(exp, ast1.DotIdExpression):
         container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
-        proxy_ret_type = types.VarType(f"dot_{exp.key}")
-        add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_ret_type, exp.key))
-        return add_dto_sub.compose(container_sub, exp.loc), proxy_ret_type
+        proxy_src_type = types.VarType(f"dot_{exp.key}")
+        add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_src_type, exp.key))
+        return add_dto_sub.compose(container_sub, exp.loc), proxy_src_type
     elif isinstance(exp, ast1.ConstPredecessorExpression):
         return Substitution.empty, ctx.return_type
     elif isinstance(exp, ast1.IfExpression):
@@ -494,6 +505,39 @@ def help_model_one_exp(
         sub, ret_type = model_one_lambda_body(ctx, exp.loc, arg_name_type_list, prefix_stmt_list, opt_tail_exp, dto_list)
         
         return sub, types.ProcedureType.new(arg_types, ret_type, has_closure_slot=has_closure_slot, is_c_variadic=False)
+    elif isinstance(exp, ast1.UpdateExpression):
+        # typechecking the following rule:
+        # MutPtr(T) := T
+
+        proxy_src_type = types.VarType(f"update_proxy_src_type", exp.loc)
+        proxy_dst_type = types.PointerType.new(proxy_src_type, is_mut=True)
+
+        dst_sub, dst_type = model_one_exp(ctx, exp.store_address, dto_list)
+        sub = dst_sub
+
+        src_sub, src_type = model_one_exp(ctx, exp.stored_value, dto_list)
+        sub = src_sub.compose(dst_sub, exp.loc)
+        
+        src_type = sub.rewrite_type(src_type)
+        dst_type = sub.rewrite_type(dst_type)
+        proxy_dst_type = sub.rewrite_type(proxy_dst_type)
+        proxy_src_type = sub.rewrite_type(proxy_src_type)
+        
+        # unifying src type with the src proxy:
+        src_typecheck_sub = unify(proxy_src_type, src_type, exp.loc)
+        proxy_src_type = src_typecheck_sub.rewrite_type(proxy_src_type)
+        proxy_dst_type = src_typecheck_sub.rewrite_type(proxy_dst_type)
+        sub = src_typecheck_sub.compose(sub, exp.loc)
+
+        # unifying dst type with the dst proxy:
+        # via above sub, the dst proxy should contain information about actual src type.
+        dst_typecheck_sub = unify(proxy_dst_type, dst_type, exp.loc)
+        proxy_src_type = dst_typecheck_sub.rewrite_type(proxy_src_type)
+        proxy_dst_type = dst_typecheck_sub.rewrite_type(proxy_dst_type)
+        sub = dst_typecheck_sub.compose(sub, exp.loc)
+
+        return sub, proxy_src_type
+
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
 

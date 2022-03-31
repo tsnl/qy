@@ -23,12 +23,12 @@ statement
     | con=constStatement
     | ret=returnStatement
     | discard=discardStatement
-    | for_=forStatement
+    | loop=loopStatement
     | break_=breakStatement
     | continue_=continueStatement
     ;
 bind1vStatement
-    : ('val'|is_mut='var') name=ID '=' initializer=expression
+    : 'val' name=ID '=' initializer=expression
     ;
 bind1fStatement
     : 'def' name=ID '(' args=csIdList ')' '=' body_exp=expression
@@ -37,8 +37,8 @@ bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
 constStatement: 'const' type_spec=typeSpec b=block ;
 returnStatement: 'return' ret_exp=expression ;
-discardStatement: 'discard' discarded_exp=expression ;
-forStatement: 'for' body=block ;
+discardStatement: 'let' discarded_exp=expression ;
+loopStatement: 'loop' body=block ;
 breakStatement: 'break' ;
 continueStatement: 'continue' ;
 
@@ -48,7 +48,7 @@ primaryExpression
     | litInteger                                                                #litIntPrimaryExpression
     | litFloat                                                                  #litFloatPrimaryExpression
     | litString                                                                 #litStringPrimaryExpression
-    | '$predecessor'                                                            #prevConstPrimaryExpression
+    | '$pred'                                                                   #prevConstPrimaryExpression
     | id_tok=ID                                                                 #idPrimaryExpression
     | '(' through=expression ')'                                                #parenPrimaryExpression
     | lam=lambdaExpression                                                      #lambdaPrimaryExpression
@@ -62,7 +62,8 @@ lambdaExpression
 postfixExpression
     : through=primaryExpression                             #throughPostfixExpression
     | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
-    | 'make' made_ts=typeSpec '(' args=csExpressionList ')' #constructorExpression
+    | (kw='new'|(kw='push'|kw='heap') (is_mut='mut')?) 
+        made_ts=typeSpec '(' args=csExpressionList ')'      #constructorExpression
     | container=postfixExpression '.' key=ID                #dotIdExpression
     ;
 unaryExpression
@@ -77,7 +78,7 @@ unaryOperator
     | 'do'
     ;
 binaryExpression
-    : through=logicalOrExpression
+    : through=updateExpression
     ;
 multiplicativeExpression
     : through=unaryExpression
@@ -118,6 +119,10 @@ logicalAndExpression
 logicalOrExpression
     : through=logicalAndExpression
     | lt=logicalOrExpression op=('or'|'||') rt=logicalAndExpression
+    ;
+updateExpression
+    : through=logicalOrExpression
+    | lt=updateExpression op=':=' rt=logicalOrExpression
     ;
 
 

@@ -196,8 +196,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.ret)
         elif ctx.discard is not None:
             return self.visit(ctx.discard)
-        elif ctx.for_ is not None:
-            return self.visit(ctx.for_)
+        elif ctx.loop is not None:
+            return self.visit(ctx.loop)
         elif ctx.break_ is not None:
             return self.visit(ctx.break_)
         elif ctx.continue_ is not None:
@@ -206,7 +206,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             raise NotImplementedError(f"Unknown statement kind in parser: {ctx.getText()}")
 
     def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
-        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer), ctx.is_mut is not None)
+        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
         arg_name_list = self.visit(ctx.args)
@@ -230,8 +230,8 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitDiscardStatement(self, ctx: antlr.QySourceFileParser.DiscardStatementContext) -> t.List[ast1.BaseStatement]:
         return ast1.DiscardStatement(self.loc(ctx), self.visit(ctx.discarded_exp))
 
-    def visitForStatement(self, ctx: antlr.QySourceFileParser.ForStatementContext) -> ast1.ForStatement:
-        return ast1.ForStatement(self.loc(ctx), self.visit(ctx.body))
+    def visitLoopStatement(self, ctx: antlr.QySourceFileParser.LoopStatementContext) -> ast1.LoopStatement:
+        return ast1.LoopStatement(self.loc(ctx), self.visit(ctx.body))
 
     def visitBreakStatement(self, ctx: antlr.QySourceFileParser.BreakStatementContext) -> ast1.BreakStatement:
         return ast1.BreakStatement(self.loc(ctx))
@@ -319,7 +319,17 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.ProcCallExpression(self.loc(ctx), self.visit(ctx.proc), self.visit(ctx.args))
 
     def visitConstructorExpression(self, ctx: antlr.QySourceFileParser.ConstructorExpressionContext):
-        return ast1.MakeExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args))
+        construct_frontend = {
+            "new": ast1.ConstructFrontend.New,
+            "heap": ast1.ConstructFrontend.Heap,
+            "push": ast1.ConstructFrontend.Push
+        }[ctx.kw.text]
+        is_mut = ctx.is_mut is not None
+
+        if construct_frontend == ast1.ConstructFrontend.New:
+            assert not is_mut
+
+        return ast1.ConstructExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args), construct_frontend, is_mut)
 
     def visitDotIdExpression(self, ctx: antlr.QySourceFileParser.DotIdExpressionContext):
         return ast1.DotIdExpression(self.loc(ctx), self.visit(ctx.container), ctx.key.text)
@@ -473,6 +483,12 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                 self.visit(ctx.lt),
                 self.visit(ctx.rt)
             )
+
+    def visitUpdateExpression(self, ctx: antlr.QySourceFileParser.UpdateExpressionContext):
+        if ctx.through is not None:
+            return self.visit(ctx.through)
+        else:
+            return ast1.UpdateExpression(self.loc(ctx), store_address=self.visit(ctx.lt), stored_value=self.visit(ctx.rt))
 
     #
     # TypeSpec:
