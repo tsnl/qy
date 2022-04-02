@@ -408,6 +408,13 @@ def help_model_one_exp(
             initializer_type_list.append(initializer_arg_type)
         
         # TODO: check the arguments against the made type, maybe using a deferred query or unification?
+        # - different types admit different constructors, e.g.
+        #   - most datatypes accept an instance of the value or a value that can be cast to the target
+        #   - arrays accept a single 'init_fill' argument OR a 'fill' predicate mapping indices to objects
+        #   - dynamic arrays accept two arguments: length and a 'fill' value OR a 'fill' predicate mapping indices to objects
+        #   - slices accept four arguments: a backing array or buffer or slice, offset, count, stride
+        #     - elem-size inferred from element-type
+        #     - offset, count, and stride have same dimension as array key, i.e. 1
         
         # the constructed instance can be referenced directly or via a pointer:
         # preparing the return type:
@@ -419,6 +426,7 @@ def help_model_one_exp(
             ret_type = types.PointerType.new(sub.rewrite_type(made_type), is_mut=exp.is_mut)
         else:
             raise NotImplementedError("ConstructExpression: Unknown frontend: how was this constructor used, and what does the user expect in return?")
+
         return sub, ret_type
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
@@ -505,6 +513,7 @@ def help_model_one_exp(
         sub, ret_type = model_one_lambda_body(ctx, exp.loc, arg_name_type_list, prefix_stmt_list, opt_tail_exp, dto_list)
         
         return sub, types.ProcedureType.new(arg_types, ret_type, has_closure_slot=has_closure_slot, is_c_variadic=False)
+    
     elif isinstance(exp, ast1.UpdateExpression):
         # typechecking the following rule:
         # MutPtr(T) := T
@@ -537,6 +546,23 @@ def help_model_one_exp(
         sub = dst_typecheck_sub.compose(sub, exp.loc)
 
         return sub, proxy_src_type
+
+    elif isinstance(exp, ast1.IndexExpression):
+        container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
+        sub = container_sub
+
+        index_sub, index_type = model_one_exp(ctx, exp.index, dto_list)
+        index_type = sub.rewrite_type(index_type)
+        sub = index_sub.compose(sub, exp.loc)
+        
+        index_dto_sub = dto_list.add_dto(IsIntTypeDTO(exp.loc, index_type))
+        sub = index_dto_sub.compose(sub, exp.loc)
+
+        res_type = types.VarType("res-type", opt_loc=exp.loc)
+        get_item_dto_sub = dto_list.add_dto(ArrayLikeElementDTO(exp.loc, container_type, res_type, exp.ret_ref))
+        sub = get_item_dto_sub.compose(sub, exp.loc)
+
+        return sub, res_type
 
     else:
         raise NotImplementedError(f"Don't know how to solve types: {exp.desc}")
@@ -578,6 +604,7 @@ def help_model_one_type_spec(
             ast1.BuiltinPrimitiveTypeIdentity.String: types.StringType.singleton,
             ast1.BuiltinPrimitiveTypeIdentity.Void: types.VoidType.singleton
         }[ts.identity]
+        
     elif isinstance(ts, ast1.IdRefTypeSpec):
         found_definition = ctx.try_lookup(ts.name)
         if found_definition is None:
@@ -594,6 +621,7 @@ def help_model_one_type_spec(
             )
         sub, def_type = found_definition.scheme.instantiate()
         return sub, def_type
+
     elif isinstance(ts, ast1.ProcSignatureTypeSpec):
         all_args_sub = Substitution.empty
         all_arg_types = []
@@ -605,6 +633,7 @@ def help_model_one_type_spec(
         ret_sub, ret_type = model_one_type_spec(ctx, ts.ret_ts, dto_list)
         sub = ret_sub.compose(all_args_sub, ts.loc)
         return sub, types.ProcedureType.new(all_arg_types, ret_type, ts.takes_closure)
+
     elif isinstance(ts, ast1.AdtTypeSpec):
         sub = Substitution.empty
         fields = []
@@ -618,9 +647,27 @@ def help_model_one_type_spec(
             return sub, types.UnionType(fields)
         else:
             raise NotImplementedError(f"Unknown LinearTypeOp: {ts.linear_op.name}")
+    
     elif isinstance(ts, ast1.PtrTypeSpec):
         pointee_sub, pointee_type = model_one_type_spec(ctx, ts.pointee_type_spec, dto_list)
         return pointee_sub, types.PointerType.new(pointee_type, ts.is_mut)
+    
+    elif isinstance(ts, ast1.ArrayTypeSpec):
+        element_sub, element_type = model_one_type_spec(ctx, ts.element_type_spec, dto_list)
+        sub = element_sub
+        
+        count_sub, count_type = model_one_exp(ctx, ts.count_expression, dto_list)
+        sub = count_sub.compose(sub, ts.count_expression.loc)
+        
+        add_dto_sub = dto_list.add_dto(IsIntTypeDTO(ts.count_expression.loc, count_type))
+        sub = add_dto_sub.compose(sub, ts.count_expression.loc)
+        
+        return sub, types.ArrayType.new(element_type, ts.is_mut)
+
+    elif isinstance(ts, ast1.ArrayBoxTypeSpec):
+        element_sub, element_type = model_one_type_spec(ctx, ts.element_type_spec, dto_list)
+        return element_sub, types.ArrayBoxType.new(element_type, ts.is_mut)
+
     else:
         raise NotImplementedError(f"Don't know how to solve type-spec: {ts.desc}")
 
@@ -696,6 +743,10 @@ class DTOList(object):
 #
 
 class BaseDTO(object, metaclass=abc.ABCMeta):
+    """
+    Each DTO encodes a type relation of the form `R(arg-type-list...)`
+    """
+
     def __init__(self, loc: fb.ILoc, arg_type_list: t.List[types.BaseType]):
         super().__init__()
         self.loc: fb.ILoc = loc
@@ -971,6 +1022,76 @@ class DotIdDTO(BaseDTO):
 
     def prefix_str(self):
         return f"DOT({self.container_type}, {self.key_name}, {self.proxy_ret_type})"
+
+
+class IsIntTypeDTO(BaseDTO):
+    def __init__(self, loc: fb.ILoc, checked_type: types.BaseType):
+        super().__init__(loc, [checked_type])
+    
+    @property
+    def checked_type(self):
+        return self.arg_type_list[0]
+
+    def prefix_str(self):
+        return f"INT?({self.checked_type})"
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        if self.checked_type.is_var:
+            return True, Substitution.get({self.checked_type: types.IntType.get(64, True)})
+        else:
+            if self.checked_type.kind() == types.TypeKind.Int:
+                assert isinstance(self.checked_type, types.IntType)
+                if self.checked_type.is_signed:
+                    return True, Substitution.empty
+                else:
+                    panic.because(
+                        panic.ExitCode.TyperDtoSolverFailedError,
+                        f"Expected a signed integer, got unsigned: {self.checked_type}",
+                        opt_loc=self.loc
+                    )
+            else:
+                panic.because(
+                    panic.ExitCode.TyperDtoSolverFailedError,
+                    f"Expected an integer datatype, got: {self.checked_type}",
+                    opt_loc=self.loc
+                )
+
+
+class ArrayLikeElementDTO(BaseDTO):
+    def __init__(self, loc, container_type, res_type, ret_ref):
+        super().__init__(loc, [container_type, res_type])
+        self.ret_ref = ret_ref
+
+    @property
+    def container_type(self):
+        return self.arg_type_list[0]
+
+    @property
+    def res_type(self):
+        return self.arg_type_list[1]
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        def is_flat_array_type(t):
+            return isinstance(t, (types.ArrayType, types.ArrayBoxType))
+        
+        is_flat_array = is_flat_array_type(self.container_type)
+        if is_flat_array:
+            elem_type = self.container_type.element_type
+
+            if not self.ret_ref:
+                return True, unify(self.res_type, elem_type, self.loc)
+            else:
+                return True, unify(self.res_type, types.PointerType.new(elem_type, is_mut=self.container_type.is_mut))
+
+        if isinstance(self.container_type, types.PointerType) and is_flat_array_type(self.container_type.pointee_type):
+            array_type = self.container_type.pointee_type
+            elem_type = array_type.element_type
+            return True, unify(self.res_type, types.PointerType.new(elem_type, is_mut=self.container_type.is_mut))
+
+        return False, Substitution.empty
+
+    def prefix_str(self):
+        return f"ARRAYLIKE_ELEMENT({self.container_type}, {self.res_type})"
 
 
 #
@@ -1370,7 +1491,7 @@ class Substitution(object):
         
         # if t1 is composite, check if t2 has preferable fields.
         if t1.is_composite and t2.is_composite:
-            if t1.kind == t2.kind and len(t1.fields) == len(t2.fields):
+            if t1.kind() == t2.kind() and len(t1.fields) == len(t2.fields):
                 return all((
                     Substitution.can_overwrite_t1_with_t2(field_type1, field_type2)
                     for field_type1, field_type2 in zip(t1.field_types, t2.field_types)

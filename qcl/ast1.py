@@ -385,6 +385,14 @@ class DotIdExpression(BaseExpression):
         self.key = key
 
 
+class IndexExpression(BaseExpression):
+    def __init__(self, loc: fb.ILoc, container: BaseExpression, index: BaseExpression, ret_ref: bool):
+        super().__init__(loc)
+        self.container = container
+        self.index = index
+        self.ret_ref = ret_ref
+
+
 class UnaryOpExpression(BaseExpression):
     def __init__(self, loc: fb.ILoc, operator: UnaryOperator, operand: BaseExpression):
         super().__init__(loc)
@@ -463,6 +471,20 @@ class PtrTypeSpec(BaseTypeSpec):
         super().__init__(loc)
         self.pointee_type_spec = pointee_type_spec
         self.is_mut = is_mut
+
+
+class ArrayTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, element_type_spec: BaseTypeSpec, count_expression: BaseExpression, is_mut: bool):
+        super().__init__(loc)
+        self.element_type_spec = element_type_spec
+        self.count_expression = count_expression
+        self.is_mut = is_mut
+
+
+class ArrayBoxTypeSpec(BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, element_type_spec: BaseTypeSpec):
+        super().__init__(loc)
+        self.element_type_spec = element_type_spec
 
 
 class ProcSignatureTypeSpec(BaseTypeSpec):

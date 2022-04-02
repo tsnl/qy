@@ -1,0 +1,22 @@
+# Arrays are of static length.
+# No compile-time evaluation at the moment.
+# Dependent typing will be useful with slices, whose lengths are determined dynamically.
+# Slices may reference either arrays or vectors.
+
+# Constexpr? Nope, just literals for now.
+# - Best way to do this? Wait for serialization, then add '#run <expr>' keyword
+#   - used to convert a runtime expression into a compile-time expression (cf JAI)
+#     - any referenced constants or literals are preserved
+#     - arguments must be constant or themselves `run` expressions
+#     - works well with macros
+#     - must disallow global variables/allow them to persist across phase-levels.
+#   - expansion produces several 'phase-levels': can compile a program for each one, but
+#     want a way to store and fetch results between execution of separate phase-levels
+#   - IDEA: fast serialization => bitmaps, possibly with compression.
+#     - cf SquashFS, which is likely optimized to do this exact thing.
+#   - REASON: do not need to define separate `constexpr` functions.
+# - Macros help wrap `#run` invocations and compositions of these expressions.
+
+const x = 42.0f;
+
+val a = new Array[F32, 5](0.0f);

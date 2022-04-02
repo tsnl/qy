@@ -23,6 +23,8 @@ class TypeKind(enum.Enum):
     Procedure = enum.auto()
     Struct = enum.auto()
     Union = enum.auto()
+    Array = enum.auto()
+    ArrayBox = enum.auto()
 
 
 class BaseType(object, metaclass=abc.ABCMeta):
@@ -358,7 +360,6 @@ class BaseAlgebraicType(BaseCompositeType):
         else:
             return self.opt_name
 
-
 class StructType(BaseAlgebraicType):
     def prefix(cls):
         return "struct"
@@ -377,13 +378,48 @@ class UnionType(BaseAlgebraicType):
         return TypeKind.Union
 
 
+class ArrayType(BaseCompositeType):
+    @property
+    def element_type(self) -> "BaseType":
+        return self.field_types[0]
+
+    def __str__(self) -> str:
+        poly_array_name = 'MutArray' if self.contents_is_mut else 'Array'
+        return f"{poly_array_name}[{str(self.element_type)}]"
+
+    @staticmethod
+    def new(element_type: BaseConcreteType, is_mut: bool):
+        return ArrayType([('element_type', element_type)], contents_is_mut=is_mut)
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.Array
+
+
+class ArrayBoxType(BaseCompositeType):
+    @property
+    def element_type(self) -> "BaseType":
+        return self.field_types[0]
+
+    def __str__(self) -> str:
+        poly_array_name = 'MutArrayBox' if self.contents_is_mut else 'ArrayBox'
+        return f"{poly_array_name}[{str(self.element_type)}]"
+
+    @staticmethod
+    def new(element_type: BaseConcreteType, is_mut: bool):
+        return ArrayBoxType([('element_type', element_type)], contents_is_mut=is_mut)
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.ArrayBox
+
+
 def get_id_str_suffix(it, id_suffix_w=4):
     # trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
     # return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
     trimmed_number = hex(it.id)[2:]
     return trimmed_number
     
-
 
 word_size_in_bits = int(1+math.log2(sys.maxsize))
 word_size_in_bytes = word_size_in_bits // 8

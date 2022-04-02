@@ -43,7 +43,7 @@ def because(
 ):
     """
     Halts program execution after printing a helpful error message with a reference to the error.
-    NOTE: you can either supply 'opt_file_path', 'opt_file_path, opt_file_region', or 'opt_loc': do not mix otherwise.
+    NOTE: you can either supply 'opt_file_path', '(opt_file_path + opt_file_region)', or 'opt_loc': do not mix otherwise.
     """
 
     if opt_file_path is not None:

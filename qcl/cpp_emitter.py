@@ -442,10 +442,10 @@ class Emitter(base_emitter.BaseEmitter):
                             return f"{ret_type}(*)({cs_arg_str})"
                     else:
                         return f"{self.translate_type(ret_type)}(*)({cs_arg_str})"
-                elif isinstance(qy_type, (types.PointerType)):
+                elif isinstance(qy_type, types.PointerType):
                     return f"{self.translate_type(qy_type.pointee_type)}*"
                 else:
-                    raise NotImplementedError("Unknown compound type in 'translate_type'")
+                    raise NotImplementedError(f"Unknown compound type in 'translate_type': {qy_type}")
         else:
             raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
             # print(f"WARNING: Don't know how to translate type to C++: {qy_type}")

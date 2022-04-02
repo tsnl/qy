@@ -9,5 +9,5 @@ val s2 = """
     Where are you
 """;
 
-pub s2: Str;
+pub s2: String;
 

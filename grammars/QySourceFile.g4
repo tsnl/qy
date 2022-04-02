@@ -60,11 +60,13 @@ lambdaExpression
         prefix=unwrappedBlock (opt_tail=expression)? '}'
     ;
 postfixExpression
-    : through=primaryExpression                             #throughPostfixExpression
-    | proc=postfixExpression '(' args=csExpressionList ')'  #procCallExpression
+    : through=primaryExpression                                 #throughPostfixExpression
+    | proc=postfixExpression '(' args=csExpressionList ')'      #procCallExpression
     | (kw='new'|(kw='push'|kw='heap') (is_mut='mut')?) 
-        made_ts=typeSpec '(' args=csExpressionList ')'      #constructorExpression
-    | container=postfixExpression '.' key=ID                #dotIdExpression
+        made_ts=typeSpec '(' args=csExpressionList ')'          #constructorExpression
+    | container=postfixExpression '.' key=ID                          #dotIdExpression
+    | container=postfixExpression '.' 'get' '(' index=expression ')'  #indexExpression
+    | container=postfixExpression '.' 'ptr' '(' index=expression ')'  #indexRefExpression
     ;
 unaryExpression
     : through=postfixExpression             #throughUnaryExpression
@@ -143,7 +145,7 @@ primaryTypeSpec
     | tok='U8'
     | tok='Bool'
     | tok='Void'
-    | tok='Str'
+    | tok='String'
     ;
 adtTypeSpec
     : through=primaryTypeSpec               #throughAdtTypeSpec
@@ -155,8 +157,15 @@ ptrTypeSpec
     | ptrName='Ptr'    '[' pointee=ptrTypeSpec ']'
     | ptrName='MutPtr' '[' pointee=ptrTypeSpec ']'
     ;
-signatureTypeSpec
+arrayTypeSpec
     : through=ptrTypeSpec
+    | tok='Array'       '[' elem_ts=typeSpec ',' count=expression ']'
+    | tok='MutArray'    '[' elem_ts=typeSpec ',' count=expression ']'
+    | tok='ArrayBox'    '[' elem_ts=typeSpec ']'
+    | tok='MutArrayBox' '[' elem_ts=typeSpec ']'
+    ;
+signatureTypeSpec
+    : through=arrayTypeSpec
     | '(' args=csFormalArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
 formalArgSpec

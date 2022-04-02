@@ -334,6 +334,12 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitDotIdExpression(self, ctx: antlr.QySourceFileParser.DotIdExpressionContext):
         return ast1.DotIdExpression(self.loc(ctx), self.visit(ctx.container), ctx.key.text)
 
+    def visitIndexExpression(self, ctx: antlr.QySourceFileParser.IndexExpressionContext):
+        return ast1.IndexExpression(self.loc(ctx), self.visit(ctx.container), self.visit(ctx.index), ret_ref=False)
+
+    def visitIndexRefExpression(self, ctx: antlr.QySourceFileParser.IndexRefExpressionContext):
+        return ast1.IndexExpression(self.loc(ctx), self.visit(ctx.container), self.visit(ctx.index), ret_ref=True)
+
     def visitThroughUnaryExpression(self, ctx: antlr.QySourceFileParser.ThroughUnaryExpressionContext):
         return self.visit(ctx.through)
 
@@ -517,9 +523,25 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                     'U8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
                     'Bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
                     'Void': ast1.BuiltinPrimitiveTypeIdentity.Void,
-                    'Str': ast1.BuiltinPrimitiveTypeIdentity.String
+                    'String': ast1.BuiltinPrimitiveTypeIdentity.String
                 }[ctx.tok.text]
             )
+
+    def visitArrayTypeSpec(self, ctx: antlr.QySourceFileParser.ArrayTypeSpecContext):
+        if ctx.through is not None:
+            return self.visit(ctx.through)
+    
+        kw = ctx.tok.text
+        elem_ts = self.visit(ctx.elem_ts)
+        is_mut = kw.startswith('Mut')
+
+        if kw in ('Array', 'MutArray'):
+            count_exp = self.visit(ctx.count)
+            return ast1.ArrayTypeSpec(self.loc(ctx), elem_ts, count_exp, is_mut)
+        elif kw in ('ArrayBox', 'MutArrayBox'):
+            return ast1.ArrayBoxTypeSpec(self.loc(ctx), elem_ts, is_mut)    
+        else:
+            raise NotImplementedError(f"Unknown keyword in ArrayTypeSpec: {repr(kw)}")
 
     def visitThroughAdtTypeSpec(self, ctx: antlr.QySourceFileParser.ThroughAdtTypeSpecContext):
         return self.visit(ctx.through)
