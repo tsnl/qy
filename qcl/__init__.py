@@ -56,6 +56,9 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
         # TODO: run post-typing checks
         # - e.g. check that 'main' has the correct signature.
 
+        # compile-time evaluation:
+        
+
         # emitting:
         emitter.emit_qyp_set(qyp_set)
     except panic.PanicException as exc:

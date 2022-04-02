@@ -1,13 +1,14 @@
-val x = 42;
-val y = 100.0;
-val z = 42.0f;
-val w = 0x100lu;
+def literals_test() = do {
+    val x = 42;
+    val y = 100.0;
+    val z = 42.0f;
+    val w = 0x100lu;
 
-val s1 = "hello " "world";
-val s2 = """
-    Scooby Dooby Doo,
-    Where are you
-""";
+    val s1 = "hello " "world";
+    val s2 = """
+        Scooby Dooby Doo,
+        Where are you
+    """;
+};
 
-pub s2: String;
 

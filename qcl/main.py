@@ -1,8 +1,4 @@
-import os
-import os.path
-import typing as t
 import argparse
-import enum
 import cProfile as profile
 import pstats
 
@@ -10,6 +6,19 @@ import qcl
 
 
 def main():
+    args_obj = parse_args()
+    transpile_opts = qcl.TranspileOptions(print_summary_after_run=args_obj.verbose > 0, run_debug_routine_after_compilation=False)
+    root_qyp_path = args_obj.root_qyp_path
+    output_dir_path = args_obj.output_dir_path
+
+    emitter = qcl.cpp_emitter.Emitter(output_dir_path)
+    root_qyp = qcl.transpile_one_package_set(root_qyp_path, emitter, transpile_opts)
+    del root_qyp
+
+    return 0
+
+
+def parse_args():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "root_qyp_path", metavar="<any/abs/or/rel/path/to/some.qyp.json>",
@@ -25,14 +34,7 @@ def main():
         help="If 'verbose' mode is specified, the compiler prints a bunch of information about compiled files to STDOUT. Good for debugging the compiler.",
         default=0
     )
-    args_obj = arg_parser.parse_args()
-    transpile_opts = qcl.TranspileOptions(print_summary_after_run=args_obj.verbose > 0, run_debug_routine_after_compilation=False)
-    root_qyp_path = args_obj.root_qyp_path
-    output_dir_path = args_obj.output_dir_path
-    emitter = qcl.cpp_emitter.Emitter(output_dir_path)
-    root_qyp = qcl.transpile_one_package_set(root_qyp_path, emitter, transpile_opts)
-    del root_qyp
-    return 0
+    return arg_parser.parse_args()
 
 
 def main_wrapper(profiling=False):
@@ -49,5 +51,3 @@ def main_wrapper(profiling=False):
         
     except qcl.panic.PanicException as exc:
         return exc.exit_code.value
-
-

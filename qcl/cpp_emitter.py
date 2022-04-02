@@ -42,6 +42,9 @@ class Emitter(base_emitter.BaseEmitter):
         self.active_c_file = None
         self.active_h_file = None
     
+        # v-- used by emit_exp
+        self.tmp_var_id_counter = 0
+
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
         # cleaning old directories:
         # on macOS, Windows, with case-insensitive paths, renaming symbols with different case 
@@ -444,6 +447,8 @@ class Emitter(base_emitter.BaseEmitter):
                         return f"{self.translate_type(ret_type)}(*)({cs_arg_str})"
                 elif isinstance(qy_type, types.PointerType):
                     return f"{self.translate_type(qy_type.pointee_type)}*"
+                elif isinstance(qy_type, types.ArrayType):
+                    return f"std::array< {self.translate_type(qy_type.element_type)}, {qy_type.count} >"
                 else:
                     raise NotImplementedError(f"Unknown compound type in 'translate_type': {qy_type}")
         else:
@@ -568,8 +573,8 @@ class Emitter(base_emitter.BaseEmitter):
                 ast1.BinaryOperator.RSh: ">>",
                 ast1.BinaryOperator.LThan: "<",
                 ast1.BinaryOperator.GThan: ">",
-                ast1.BinaryOperator.LThan: "<=",
-                ast1.BinaryOperator.GThan: ">=",
+                ast1.BinaryOperator.LEq: "<=",
+                ast1.BinaryOperator.GEq: ">=",
             }[exp.operator]
             lt_operand_str, lt_operand_type = self.translate_expression_with_type(exp.lt_operand_exp)
             rt_operand_str, rt_operand_type = self.translate_expression_with_type(exp.rt_operand_exp)
@@ -652,6 +657,10 @@ class Emitter(base_emitter.BaseEmitter):
         elif isinstance(exp, ast1.IfExpression):
             # NOTE: If expressions are regular functions in this language, and must invoke their 'then' or 'else' branches 
             # based on the result of 'cond'.
+
+            tmp_res_id = self.tmp_var_id_counter
+            self.tmp_var_id_counter += 1
+
             cond_str = self.translate_expression(exp.cond_exp)
             then_str = f"(({self.translate_expression(exp.then_exp)})())"
             if exp.else_exp is not None:
@@ -698,6 +707,14 @@ class Emitter(base_emitter.BaseEmitter):
             lvalue_str = f"*{store_address_str}"
             rvalue_str = stored_value_str
             res_str = lvalue_str + " = " + rvalue_str
+
+            return res_str, exp.wb_type
+
+        elif isinstance(exp, ast1.IndexExpression):
+            container_str = self.translate_expression(exp.container)
+            final_prefix = "&" if exp.ret_ref else ""
+
+            res_str = f"({final_prefix}{container_str}[{self.translate_expression(exp.index)}])"
 
             return res_str, exp.wb_type
 
@@ -883,10 +900,11 @@ class StringWriter(object):
         return '\n'.join(output)
 
     def add_common_stdlib_header_includes(self):
-        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
-        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="malloc.h"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="functional"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="array"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="malloc.h"))
         
     def inject_manual_main_preamble(self):
         # FIXME: allow cross-compilation via args, not current platform

@@ -13,7 +13,9 @@ def rightPhi (b, x, y) = do {
     if (b) {x} else {y}
 };
 
-val j = wrongPhi(true, 15, 32);
+def runWrongPhi() = do {
+    val j = wrongPhi(true, 15, 32);
+};
 
 pub fibonacci: (x: I32) -> I32;
 def fibonacci (x) = do {
@@ -40,9 +42,11 @@ def better_fibonacci_helper (a, b) = do {
     new FibRes(b, c)
 };
 
-val b1 = true;
-val b2 = false;
-val m = b1 or b2;
+def booleans () = do {
+    val b1 = true;
+    val b2 = false;
+    val m = b1 or b2;
+};
 
 //
 // Testing types output:
@@ -82,6 +86,34 @@ def printFibUntil (n) = do {
     };
 };
 
+const: I32 {
+    val n = 42;
+};
+def fastPrintFibUntilN () = do {
+    // TODO: replace with ArrayBox, make 'n' dynamic
+    val a = new MutArray[I32, n]();
+    let a.ptr(0) := 0;
+    let a.ptr(1) := 1;
+    val i_mem = push mut I32(0);
+    loop {
+        val i = *i_mem;
+        let a.ptr(i) := a.get(i-1) + a.get(i-2);
+        let printInt(i);
+        let printTab();
+        let printInt(a.get(i));
+        let printLine();
+        let i_mem := i+1;
+        let if (i >= n) {
+            break;
+        };
+    };
+    
+    // FIXME: why doesn't 'n' lookup compile correctly?
+    // a.get(n-1)
+    a.get(41)
+};
+
+
 def main () = do {
     // val v = Vec3F (1.0f, 2.0f, 3.0f);
     // val w = v3f_add(v, v);
@@ -90,12 +122,9 @@ def main () = do {
     
     // discard printInt(f);
     val short_run = false;
-    let printFibUntil(if (short_run) {10} else {42});
+    // let printFibUntil(if (short_run) {10} else {42});
+    let fastPrintFibUntilN();
     // val _ = printFibUntil(20);
-
-    loop {
-        break;
-    };
 
     0
 };

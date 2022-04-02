@@ -13,13 +13,13 @@ pub v3f_add: (Vec3F, Vec3F) -> Vec3F;
 pub v3f_scale: (Vec3F, F32) -> Vec3F;
 
 // enums provided using 'const', which translates into preprocessor declarations
-const I32 {
+const: I32 {
     val EC_ALL_OK = 0;
     val EC_BAD_CLI_ARGS = 1 + $pred;
     val EC_BAD_FILE_PATH = 1 + $pred;
     val EC_DETECTED_RUNTIME_ERROR = 1 + $pred;
 };
-const U32 {
+const: U32 {
     val WINDOW_FLAG_FULLSCREEN = 0x1u;
     val WINDOW_FLAG_FIXED_SIZE = 2u * $pred;
     val WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $pred;

@@ -140,6 +140,8 @@ class BaseTypeSpec(WbTypeMixin, BaseFileNode):
 class BaseExpression(WbTypeMixin, BaseFileNode):
     def __init__(self, loc: fb.ILoc):
         super().__init__(loc)
+        self.opt_cached_const_value = None
+        self.cache_valid = False
 
 
 class BaseStatement(BaseFileNode):
@@ -173,9 +175,10 @@ class BaseIdQualifierStatement(MIdQualifierNode, BaseStatement):
 
 
 class Bind1vStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression]):
+    def __init__(self, loc: fb.ILoc, name: str, initializer: t.Optional[BaseExpression], is_constant: bool = False):
         super().__init__(loc, name)
         self.initializer = initializer
+        self.is_constant = is_constant
 
 
 class Bind1fStatement(BaseIdQualifierStatement):

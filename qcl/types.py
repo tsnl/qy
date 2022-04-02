@@ -12,6 +12,10 @@ import typing as t
 from . import feedback as fb
 
 
+#
+# Types:
+#
+
 class TypeKind(enum.Enum):
     Var_Bound = enum.auto()
     Var = enum.auto()
@@ -25,6 +29,7 @@ class TypeKind(enum.Enum):
     Union = enum.auto()
     Array = enum.auto()
     ArrayBox = enum.auto()
+    UniqueValue = enum.auto()
 
 
 class BaseType(object, metaclass=abc.ABCMeta):
@@ -72,6 +77,10 @@ class BaseType(object, metaclass=abc.ABCMeta):
     @property
     def is_atomic(self):
         return isinstance(self, AtomicConcreteType)
+
+    @property
+    def is_unique_value(self):
+        return isinstance(self, UniqueValueType)
 
     @classmethod
     @abc.abstractmethod
@@ -383,13 +392,22 @@ class ArrayType(BaseCompositeType):
     def element_type(self) -> "BaseType":
         return self.field_types[0]
 
+    @property
+    def count_value_encoded_type(self) -> "UniqueValueType":
+        return self.field_types[1]
+    
+    @property
+    def count(self):
+        return self.count_value_encoded_type.unique_value
+
     def __str__(self) -> str:
         poly_array_name = 'MutArray' if self.contents_is_mut else 'Array'
-        return f"{poly_array_name}[{str(self.element_type)}]"
+        return f"{poly_array_name}[{str(self.element_type)}, {self.count}]"
 
     @staticmethod
-    def new(element_type: BaseConcreteType, is_mut: bool):
-        return ArrayType([('element_type', element_type)], contents_is_mut=is_mut)
+    def new(element_type: BaseConcreteType, count_value_encoding: "UniqueValueType", is_mut: bool):
+        assert isinstance(count_value_encoding, UniqueValueType) and isinstance(count_value_encoding.unique_value, int)
+        return ArrayType([('element_type', element_type), ('encoded_count', count_value_encoding)], contents_is_mut=is_mut)
 
     @classmethod
     def kind(cls):
@@ -414,6 +432,25 @@ class ArrayBoxType(BaseCompositeType):
         return TypeKind.ArrayBox
 
 
+class UniqueValueType(BaseType):
+    def __init__(self, unique_value: object):
+        super().__init__()
+        self.unique_value = unique_value
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, UniqueValueType) and self.value == o.value
+
+    def __hash__(self) -> int:
+        return hash(self.unique_value)
+    
+    def __str__(self) -> str:
+        return str(self.unique_value)
+
+    @classmethod
+    def kind(cls):
+        return TypeKind.UniqueValue
+
+
 def get_id_str_suffix(it, id_suffix_w=4):
     # trimmed_number = id(it)//word_size_in_bytes % 0x10**id_suffix_w
     # return hex(trimmed_number)[2:].rjust(id_suffix_w, '0')
@@ -423,3 +460,4 @@ def get_id_str_suffix(it, id_suffix_w=4):
 
 word_size_in_bits = int(1+math.log2(sys.maxsize))
 word_size_in_bytes = word_size_in_bits // 8
+

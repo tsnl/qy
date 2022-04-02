@@ -128,7 +128,7 @@ def translate_enum_decl(tu, node, rem_provided_symbols):
                 is_unsigned=const_ts.is_unsigned_int,
                 width_in_bits=const_ts.int_width_in_bits
             )
-            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp)
+            bind1v_stmt = ast1.Bind1vStatement(loc(entry), entry.spelling, init_exp, is_constant=True)
             body.append(bind1v_stmt)
         yield ast1.ConstStatement(loc(node), body, const_ts)
 

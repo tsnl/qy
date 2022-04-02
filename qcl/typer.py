@@ -10,6 +10,7 @@ from . import feedback as fb
 from . import types
 from . import ast1
 from . import ast2
+from . import interp
 
 
 #
@@ -44,12 +45,22 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             var_type = stmt.var_type_spec.wb_type
             assert var_type is not None
         else:
-            var_type = types.VarType(f"bind1v_{stmt.name}")
+            assert isinstance(stmt, ast1.Bind1vStatement)
+            if stmt.is_constant:
+                var_type = types.VarType(f"bind1v_{stmt.name}")
+            else:
+                panic.because(
+                    panic.ExitCode.ScopingError,
+                    "Runtime `val` bindings are not allowed at the top-level: no global variables are supported: use `const` instead.",
+                    opt_loc=stmt.loc
+                )
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name, 
             Scheme([], var_type),
-            extern_tag=extern_tag
+            stmt,
+            extern_tag=extern_tag,
+            is_compile_time_constant=stmt.is_constant
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
         extern_tag = None
@@ -68,7 +79,9 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             stmt.loc,
             stmt.name,
             Scheme([], fn_type),
-            extern_tag=extern_tag
+            stmt,
+            extern_tag=extern_tag,
+            is_compile_time_constant=True
         )
     elif isinstance(stmt, ast1.Bind1tStatement):
         if stmt.initializer is not None and stmt.initializer.wb_type is not None:
@@ -82,6 +95,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             stmt.loc,
             stmt.name,
             Scheme([], bound_type),
+            stmt,
             extern_tag=extern_tag
         )
     elif not isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
@@ -210,7 +224,7 @@ def model_one_lambda_body(
     for arg_index, (arg_name, arg_type) in enumerate(arg_name_type_list):
         loc = fb.BuiltinLoc(f"arg({arg_index}):{arg_name}")
         scm = Scheme([], arg_type)
-        fn_ctx.try_define(ValueDefinition(loc, arg_name, scm))
+        fn_ctx.try_define(ValueDefinition(loc, arg_name, scm, binder=None))
 
     # solving any prefix statements:
     #   - any 'return' statements are associated with the nearest 'return_type' attribute, set above.
@@ -250,7 +264,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             ).compose(last_sub, stmt.loc)
         else:
             # try to create a local definition using the expression type.
-            definition = ValueDefinition(stmt.loc, stmt.name, Scheme([], exp_type))
+            definition = ValueDefinition(stmt.loc, stmt.name, Scheme([], exp_type), stmt)
             conflicting_def = ctx.try_define(definition)
             if conflicting_def is not None:
                 panic.because(
@@ -555,7 +569,7 @@ def help_model_one_exp(
         index_type = sub.rewrite_type(index_type)
         sub = index_sub.compose(sub, exp.loc)
         
-        index_dto_sub = dto_list.add_dto(IsIntTypeDTO(exp.loc, index_type))
+        index_dto_sub = dto_list.add_dto(IsIntTypeDTO(exp.loc, index_type, "array-like index expression"))
         sub = index_dto_sub.compose(sub, exp.loc)
 
         res_type = types.VarType("res-type", opt_loc=exp.loc)
@@ -658,11 +672,28 @@ def help_model_one_type_spec(
         
         count_sub, count_type = model_one_exp(ctx, ts.count_expression, dto_list)
         sub = count_sub.compose(sub, ts.count_expression.loc)
+
+        # NOTE: must run evaluation AFTER modelling so 'ctx' is valid for const IDs
+        count_value = interp.evaluate_constant(ts.count_expression)
+        count_value_type_encoding = types.UniqueValueType(count_value)
         
-        add_dto_sub = dto_list.add_dto(IsIntTypeDTO(ts.count_expression.loc, count_type))
+        if not isinstance(count_value, int):
+            panic.because(
+                panic.ExitCode.CompileTimeEvaluationError,
+                f"Expected an integer as array count, got: {count_value}",
+                opt_loc=ts.count_expression.loc
+            )
+        if count_value < 0:
+            panic.because(
+                panic.ExitCode.CompileTimeEvaluationError,
+                f"Received a negative value as array count: either overflow or logical error: {count_value}",
+                opt_loc=ts.count_expression.loc
+            )
+        
+        add_dto_sub = dto_list.add_dto(IsIntTypeDTO(ts.count_expression.loc, count_type, "array type-spec size"))
         sub = add_dto_sub.compose(sub, ts.count_expression.loc)
         
-        return sub, types.ArrayType.new(element_type, ts.is_mut)
+        return sub, types.ArrayType.new(element_type, count_value_type_encoding, ts.is_mut)
 
     elif isinstance(ts, ast1.ArrayBoxTypeSpec):
         element_sub, element_type = model_one_type_spec(ctx, ts.element_type_spec, dto_list)
@@ -846,6 +877,19 @@ class UnaryOpDTO(BaseDTO):
                     return True, ret_sub
                 else:
                     self.panic_because_invalid_overload()
+        elif self.unary_op == ast1.UnaryOperator.DeRef:
+            if self.operand_type.is_var:
+                return False, Substitution.empty
+            else:
+                if operand_kind == types.TypeKind.Pointer:
+                    sol_type = self.operand_type.pointee_type
+                    return True, unify(sol_type, self.return_type, self.loc)
+                else:
+                    panic.because(
+                        panic.ExitCode.TyperDtoSolverFailedError,
+                        f"Invalid argument to unary-'*' (de-ref) operator: expected Pointer type, got: {self.operand_type}",
+                        opt_loc=self.loc
+                    )
         else:
             raise NotImplementedError(f"Solving one iter for UnaryOpDTO for unary op: {self.unary_op.name}")
 
@@ -1025,8 +1069,9 @@ class DotIdDTO(BaseDTO):
 
 
 class IsIntTypeDTO(BaseDTO):
-    def __init__(self, loc: fb.ILoc, checked_type: types.BaseType):
+    def __init__(self, loc: fb.ILoc, checked_type: types.BaseType, purpose_hint: str):
         super().__init__(loc, [checked_type])
+        self.purpose_hint = purpose_hint
     
     @property
     def checked_type(self):
@@ -1052,7 +1097,7 @@ class IsIntTypeDTO(BaseDTO):
             else:
                 panic.because(
                     panic.ExitCode.TyperDtoSolverFailedError,
-                    f"Expected an integer datatype, got: {self.checked_type}",
+                    f"Expected an integer datatype for {self.purpose_hint}, got: {self.checked_type}",
                     opt_loc=self.loc
                 )
 
@@ -1296,13 +1341,20 @@ Context.builtin_root = Context(ContextKind.BuiltinRoot, None)
 #
 
 class BaseDefinition(object, metaclass=abc.ABCMeta):
-    def __init__(self, loc: fb.ILoc, name: str, scm: "Scheme", extern_tag=None) -> None:
+    def __init__(
+        self, 
+        loc: fb.ILoc, name: str, scm: "Scheme", 
+        binder: t.Optional[t.Union[ast1.Bind1vStatement, ast1.Bind1tStatement]], 
+        extern_tag=None, is_compile_time_constant=False
+    ) -> None:
         super().__init__()
         self.loc = loc
         self.name = name
         self.scheme = scm
         self.bound_in_ctx = None
         self.extern_tag = extern_tag
+        self.binder = binder
+        self.is_compile_time_constant = is_compile_time_constant
 
     @property
     def is_value_definition(self):

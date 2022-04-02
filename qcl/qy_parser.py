@@ -206,7 +206,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             raise NotImplementedError(f"Unknown statement kind in parser: {ctx.getText()}")
 
     def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
-        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
+        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer), False)
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
         arg_name_list = self.visit(ctx.args)
@@ -222,7 +222,10 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.Type1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.ts), is_export_line)
 
     def visitConstStatement(self, ctx: antlr.QySourceFileParser.ConstStatementContext) -> ast1.ConstStatement:
-        return ast1.ConstStatement(self.loc(ctx), self.visit(ctx.b), self.visit(ctx.type_spec))
+        bind_statements = self.visit(ctx.b)
+        for statement in bind_statements:
+            statement.is_constant = True
+        return ast1.ConstStatement(self.loc(ctx), bind_statements, self.visit(ctx.type_spec))
 
     def visitReturnStatement(self, ctx: antlr.QySourceFileParser.ReturnStatementContext) -> ast1.ReturnStatement:
         return ast1.ReturnStatement(self.loc(ctx), self.visit(ctx.ret_exp))

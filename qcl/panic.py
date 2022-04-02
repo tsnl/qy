@@ -32,6 +32,7 @@ class ExitCode(enum.Enum):
     EmitterError = enum.auto()
     UnsupportedExternCFeature = enum.auto()
     ExternCompileFailed = enum.auto()
+    CompileTimeEvaluationError = enum.auto()
 
 
 def because(

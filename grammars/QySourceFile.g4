@@ -35,7 +35,7 @@ bind1fStatement
     ;
 bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
-constStatement: 'const' type_spec=typeSpec b=block ;
+constStatement: 'const' ':' type_spec=typeSpec b=block ;
 returnStatement: 'return' ret_exp=expression ;
 discardStatement: 'let' discarded_exp=expression ;
 loopStatement: 'loop' body=block ;
@@ -194,8 +194,8 @@ fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
 ID: ((L|'_') (L|D|'_')*) ;
-LIT_DEC_INT: ('+'|'-')?      D+ IS? ;
-LIT_HEX_INT: ('+'|'-')? '0x' H+ IS? ;
+LIT_DEC_INT:      D+ IS? ;
+LIT_HEX_INT: '0x' H+ IS? ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
 LIT_SQ_STRING: ('\'' (ANY_ESC|'\\\''|~[\r\n\\'])*?  '\'');
 LIT_DQ_STRING: ('"'  (ANY_ESC|'\\"' |~[\r\n\\"])*?  '"');
