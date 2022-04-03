@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "qc sandbox/sandbox.qyp.jsonc",
             "type": "python",
@@ -40,6 +41,14 @@
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
             "args": ["sandbox/sandbox-ss4.qyp.jsonc"]
+        },
+        {
+            "name": "qc sandbox/sandbox-ss6.qyp.jsonc",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["sandbox/sandbox-ss6.qyp.jsonc"]
         }
     ]
 }

@@ -77,12 +77,12 @@ type Vec2f = (x: F32, y: F32);
 
 pub printFibUntil: (I32) -> Void;
 def printFibUntil (n) = do {
-    let if (n > 0) {
-        let printFibUntil(n - 1);
-        let printInt(n);
-        let printTab();
-        let printInt(fibonacci(n));
-        let printLine();
+    eval if (n > 0) {
+        eval printFibUntil(n - 1);
+        eval printInt(n);
+        eval printTab();
+        eval printInt(fibonacci(n));
+        eval printLine();
     };
 };
 
@@ -92,21 +92,18 @@ const: I32 {
 def fastPrintFibUntilN () = do {
     // TODO: replace with ArrayBox, make 'n' dynamic
     val a = new MutArray[I32, n]();
-    let a.ptr(0) := 0;
-    let a.ptr(1) := 1;
+    eval a.ptr(0) := 0;
+    eval a.ptr(1) := 1;
     val i_mem = push mut I32(0);
-    loop {
+    do {
         val i = *i_mem;
-        let a.ptr(i) := a.get(i-1) + a.get(i-2);
-        let printInt(i);
-        let printTab();
-        let printInt(a.get(i));
-        let printLine();
-        let i_mem := i+1;
-        let if (i >= n) {
-            break;
-        };
-    };
+        eval a.ptr(i) := a.get(i-1) + a.get(i-2);
+        eval printInt(i);
+        eval printTab();
+        eval printInt(a.get(i));
+        eval printLine();
+        eval i_mem := i+1;
+    } while (i >= n);
     
     // FIXME: why doesn't 'n' lookup compile correctly?
     // a.get(n-1)
@@ -122,8 +119,8 @@ def main () = do {
     
     // discard printInt(f);
     val short_run = false;
-    // let printFibUntil(if (short_run) {10} else {42});
-    let fastPrintFibUntilN();
+    // eval printFibUntil(if (short_run) {10} else {42});
+    eval fastPrintFibUntilN();
     // val _ = printFibUntil(20);
 
     0

@@ -18,10 +18,6 @@ from . import interp
 #
 
 def seed_one_source_file(sf: ast2.BaseSourceFile, new_ctx):
-    seed_one_source_file(sf)
-
-
-def seed_one_source_file(sf: ast2.BaseSourceFile, new_ctx):
     """
     defines global symbols in a context using free variables, then sets it on `x_typer_ctx`
     """
@@ -98,7 +94,10 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             stmt,
             extern_tag=extern_tag
         )
-    elif not isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
+    elif isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
+        # handled later...
+        pass
+    else:
         panic.because(
             panic.ExitCode.ScopingError,
             "Invalid statement found in top-level scope: please move this into a function.",
@@ -252,9 +251,12 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             exp_sub, exp_type = model_one_type_spec(ctx, stmt.var_type_spec, dto_list)
         else:
             exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
-        if ctx.kind == ContextKind.TopLevelOfQypSet:
+        if ctx.kind in (ContextKind.TopLevelOfQypSet, ContextKind.ConstImmediatelyInvokedFunctionBlock):
             # definition is already seeded-- just retrieve and unify.
-            definition = ctx.symbol_table[stmt.name]
+            # NOTE: must use 'lookup' instead of a shallow lookup in symbol table for special case of 'ConstStatement':
+            # - the 'ctx_with_loc' context is a child of the global context containing the defined symbol
+            # - the 'ctx_with_loc' context is used to extend the global context with '$pred' or other special keywords.
+            definition = ctx.lookup(stmt.name)
             def_sub, def_type = definition.scheme.instantiate()
             last_sub = def_sub.compose(exp_sub, stmt.loc)
             return unify(
@@ -276,6 +278,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             else:
                 def_sub, def_type = definition.scheme.instantiate()
                 return def_sub
+
     elif isinstance(stmt, ast1.Bind1fStatement):
         args_sub = Substitution.empty
         if isinstance(stmt, ast1.Extern1fStatement):
@@ -303,6 +306,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             last_sub.rewrite_type(def_type),
             opt_loc=stmt.loc
         ).compose(last_sub, stmt.loc)
+
     elif isinstance(stmt, ast1.Bind1tStatement):
         definition = ctx.try_lookup(stmt.name)
         assert definition is not None
@@ -314,6 +318,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             last_sub.rewrite_type(ts_type),
             opt_loc=stmt.loc
         ).compose(last_sub, stmt.loc)
+
     elif isinstance(stmt, ast1.Type1vStatement):
         definition = ctx.try_lookup(stmt.name)
         if definition is None:
@@ -331,28 +336,26 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             last_sub.rewrite_type(ts_type),
             opt_loc=stmt.loc
         ).compose(last_sub, stmt.loc)
+
     elif isinstance(stmt, ast1.ConstStatement):
         sub, enum_type = model_one_type_spec(ctx, stmt.const_type_spec, dto_list)
-        iota_ctx = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx)
-        iota_ctx.local_return_type = enum_type
+        
+        ctx_with_pred = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx)
+        ctx_with_pred.local_return_type = enum_type
+        
         for const_bind_stmt in stmt.body:
             assert isinstance(const_bind_stmt, ast1.Bind1vStatement)
-            definition = ctx.try_lookup(const_bind_stmt.name)
-            assert definition is not None
-            const_sub, const_type = definition.scheme.instantiate()
             
-            # unifying with RHS; note 'iota_ctx' so 'iota' resolves correctly
-            rhs_sub, rhs_type = model_one_exp(iota_ctx, const_bind_stmt.initializer, dto_list)
-            rhs_u_sub = unify(rhs_type, const_type)
+            # note 'ctx_with_pred' so '$pred' resolves correctly
+            new_sub = model_one_statement(ctx_with_pred, const_bind_stmt, dto_list)
+            sub = new_sub.compose(sub, const_bind_stmt.loc)
 
-            # unifying with enum type:
-            common_u_sub = unify(const_type, enum_type)
-
-            # updating accumulator 'sub'
-            l = const_bind_stmt.loc
-            sub = common_u_sub.compose(rhs_u_sub,l).compose(rhs_sub,l).compose(const_sub,l).compose(sub,l)
+            # type-checking:
+            typecheck_sub = unify(const_bind_stmt.initializer.wb_type, enum_type, stmt.loc)
+            sub = typecheck_sub.compose(sub, stmt.loc)
 
         return sub
+
     elif isinstance(stmt, ast1.ReturnStatement):
         if ctx.return_type is None:
             panic.because(
@@ -363,13 +366,40 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         ret_exp_sub, ret_exp_type = model_one_exp(ctx, stmt.returned_exp, dto_list)
         l = stmt.loc
         return unify(ret_exp_type, ret_exp_sub.rewrite_type(ctx.return_type),l).compose(ret_exp_sub,l)
+    
     elif isinstance(stmt, ast1.DiscardStatement):
         sub, _ = model_one_exp(ctx, stmt.discarded_exp, dto_list)
         return sub
+    
     elif isinstance(stmt, ast1.LoopStatement):
-        return model_one_block(ctx, stmt.body, dto_list)
+        # if `while (cond) do {body...}`, then model 'cond' before 'body'
+        cond_exp_sub, cond_exp_type = (
+            model_one_exp(ctx, stmt.cond, dto_list)
+            if stmt.loop_style == ast1.LoopStyle.WhileDo else
+            (None, None)
+        )
+        
+        # modelling body:
+        body_sub = model_one_block(ctx, stmt.body, dto_list)
+        
+        # if `do {body...} while (cond)`, then model 'body' before 'cond'
+        cond_exp_sub, cond_exp_type = (
+            model_one_exp(ctx, stmt.cond, dto_list)
+            if stmt.loop_style == ast1.LoopStyle.DoWhile else
+            (cond_exp_sub, cond_exp_type)
+        )
+
+        # returning:
+        assert cond_exp_type is not None and cond_exp_sub is not None
+        return (
+            body_sub.compose(cond_exp_sub, stmt.loc)
+            if stmt.loop_style == ast1.LoopStyle.DoWhile else
+            cond_exp_sub.compose(body_sub, stmt.loc)
+        )
+    
     elif isinstance(stmt, ast1.BaseLoopControlStatement):
         return Substitution.empty
+    
     else:
         raise NotImplementedError(f"Don't know how to solve types: {stmt.desc}")
 
@@ -406,12 +436,16 @@ def help_model_one_exp(
             )
         sub, id_type = found_definition.scheme.instantiate()
         return sub, id_type
+
     elif isinstance(exp, ast1.IntExpression):
         return Substitution.empty, types.IntType.get(exp.width_in_bits, not exp.is_unsigned)
+
     elif isinstance(exp, ast1.FloatExpression):
         return Substitution.empty, types.FloatType.get(exp.width_in_bits)
+
     elif isinstance(exp, ast1.StringExpression):
         return Substitution.empty, types.StringType.singleton
+
     elif isinstance(exp, ast1.ConstructExpression):
         made_ts_sub, made_type = model_one_type_spec(ctx, exp.made_ts, dto_list)
         args_sub = Substitution.empty
@@ -442,11 +476,13 @@ def help_model_one_exp(
             raise NotImplementedError("ConstructExpression: Unknown frontend: how was this constructor used, and what does the user expect in return?")
 
         return sub, ret_type
+
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
         operand_sub, operand_type = model_one_exp(ctx, exp.operand, dto_list)
         operation_dto_sub = dto_list.add_dto(UnaryOpDTO(exp.loc, exp.operator, res_type, operand_type))
         return operand_sub.compose(operation_dto_sub, exp.loc), res_type
+
     elif isinstance(exp, ast1.BinaryOpExpression):
         res_type = types.VarType(f"binary_op_{exp.operator.name.lower()}_res")
         lt_operand_sub, lt_operand_type = model_one_exp(ctx, exp.lt_operand_exp, dto_list)
@@ -454,6 +490,7 @@ def help_model_one_exp(
         operation_dto_sub = dto_list.add_dto(BinaryOpDTO(exp.loc, exp.operator, res_type, lt_operand_type, rt_operand_type))
         sub = operation_dto_sub.compose(rt_operand_sub, exp.loc).compose(lt_operand_sub, exp.loc)
         return sub, res_type
+
     elif isinstance(exp, ast1.ProcCallExpression):
         # collecting actual procedure type information:
         # type based on how the procedure is used, derived from 'actual' arguments and 'actual' return type
@@ -478,33 +515,61 @@ def help_model_one_exp(
             opt_loc=exp.loc
         ).compose(last_sub, exp.loc)
         return sub, sub.rewrite_type(proxy_src_type)
+
     elif isinstance(exp, ast1.DotIdExpression):
         container_sub, container_type = model_one_exp(ctx, exp.container, dto_list)
         proxy_src_type = types.VarType(f"dot_{exp.key}")
         add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_src_type, exp.key))
         return add_dto_sub.compose(container_sub, exp.loc), proxy_src_type
+
     elif isinstance(exp, ast1.ConstPredecessorExpression):
         return Substitution.empty, ctx.return_type
+
     elif isinstance(exp, ast1.IfExpression):
+        def help_model_branch_type(branch_exp):
+            nonlocal ctx, dto_list, sub
+            
+            # first, ensuring this branch is a 0-ary lambda:
+            assert isinstance(branch_exp, ast1.LambdaExpression)
+            if branch_exp.arg_names:
+                panic.because(
+                    panic.ExitCode.TyperModelerBadConditional,
+                    opt_msg=f"Expected a 0-ary lambda, but got {len(branch_exp.arg_names)}-ary lambda",
+                    opt_loc=branch_exp.loc
+                )
+            
+            # next, typing the branch:
+            branch_sub, branch_lambda_type = model_one_exp(ctx, branch_exp, dto_list)
+            branch_lambda_type = sub.rewrite_type(branch_lambda_type)
+            sub = branch_sub.compose(sub, branch_exp.loc)
+            
+            # extracting the branch return-value as the 'ite' return value
+            assert isinstance(branch_lambda_type, types.ProcedureType)
+            branch_type = branch_lambda_type.ret_type
+
+            # returning:
+            return sub, branch_type
+
         # first, modelling the 'cond', 'then', and 'else' branch expressions:
         cond_sub, cond_type = model_one_exp(ctx, exp.cond_exp, dto_list)
-        then_sub, then_type = model_one_exp(ctx, exp.then_exp, dto_list)
-        then_sub, then_type = then_sub.compose(cond_sub, exp.loc), then_sub.rewrite_type(then_type)
-        if exp.else_exp is not None:
-            else_sub, else_type = model_one_exp(ctx, exp.else_exp, dto_list)
-            else_sub, else_type = else_sub.compose(then_sub, exp.loc), else_sub.rewrite_type(else_type)
-        else:
-            else_sub = Substitution.empty
-            else_type = types.ProcedureType.new([], types.VoidType.singleton, has_closure_slot=True, is_c_variadic=False)
-        sub = else_sub
+        sub = cond_sub
+        sub, then_type = help_model_branch_type(exp.then_exp)
+        sub, else_type = (
+            help_model_branch_type(exp.else_exp)
+            if exp.else_exp is not None else
+            (Substitution.empty, types.VoidType.singleton)
+        )
+        
         # next, unifying types to type-check.
         ret_type = types.VarType(f"ite_ret_type", exp.loc)
-        branch_thunk_type = types.ProcedureType.new([], ret_type, has_closure_slot=True, is_c_variadic=True)
         bool_type = types.IntType.get(1, is_signed=False)
         sub = unify(cond_type, bool_type, exp.loc).compose(sub, exp.loc)     # ensuring 'cond' is a boolean
         sub = unify(then_type, else_type, exp.loc).compose(sub, exp.loc)     # ensuring branches return the same type
-        sub = unify(then_type, branch_thunk_type, exp.loc).compose(sub, exp.loc)    # ensuring branches are thunks
+        sub = unify(then_type, ret_type, exp.loc).compose(sub, exp.loc)      # ensuring branches return the ret type
+        
+        # finally, returning:
         return sub, sub.rewrite_type(ret_type)
+
     elif isinstance(exp, ast1.LambdaExpression):
         # TODO: check that 'has_closure_slot' is respected before passing to C++
         has_closure_slot = exp.no_closure
@@ -1288,6 +1353,14 @@ class Context(object):
             return self.opt_parent.try_lookup(name)
         else:
             return None
+
+    def lookup(self, name: str) -> "BaseDefinition":
+        """
+        Finds a symbol of this name and returns its Definition, else behavior undefined.
+        """
+        res = self.try_lookup(name)
+        assert res is not None
+        return res
 
     @property
     def return_type(self):

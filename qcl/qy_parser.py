@@ -234,13 +234,18 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.DiscardStatement(self.loc(ctx), self.visit(ctx.discarded_exp))
 
     def visitLoopStatement(self, ctx: antlr.QySourceFileParser.LoopStatementContext) -> ast1.LoopStatement:
-        return ast1.LoopStatement(self.loc(ctx), self.visit(ctx.body))
-
-    def visitBreakStatement(self, ctx: antlr.QySourceFileParser.BreakStatementContext) -> ast1.BreakStatement:
-        return ast1.BreakStatement(self.loc(ctx))
-
-    def visitContinueStatement(self, ctx: antlr.QySourceFileParser.ContinueStatementContext) -> ast1.ContinueStatement:
-        return ast1.ContinueStatement(self.loc(ctx))
+        def get_loop_style():
+            if ctx.do_while:
+                return ast1.LoopStyle.DoWhile
+            if ctx.while_do:
+                return ast1.LoopStyle.WhileDo
+            raise NotImplementedError(f"Unknown `loop` style: {ctx.getText()}")
+        
+        return ast1.LoopStatement(
+            self.loc(ctx), 
+            self.visit(ctx.cond), self.visit(ctx.body), 
+            get_loop_style()
+        )
 
     #
     # expressions:

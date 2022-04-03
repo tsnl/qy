@@ -250,7 +250,7 @@ class Emitter(base_emitter.BaseEmitter):
             def_obj = stmt.lookup_def_obj()
             if stmt.wb_ctx.kind == typer.ContextKind.TopLevelOfQypSet:
                 self.check_global_definition(stmt.name, stmt.loc, def_obj.is_public)
-        
+
             assert isinstance(def_obj, typer.BaseDefinition)
             assert not def_obj.scheme.vars
             _, def_type = def_obj.scheme.instantiate()
@@ -262,6 +262,8 @@ class Emitter(base_emitter.BaseEmitter):
                 bind_cpp_fragments = []
                 # if not def_obj.is_public:
                 #     bind_cpp_fragments.append('static')
+                if def_obj.is_compile_time_constant:
+                    bind_cpp_fragments.append('constexpr')
                 bind_cpp_fragments.append(self.translate_type(def_type))
                 bind_cpp_fragments.append(def_obj.name)
                 bind_cpp_fragments.append("=")
@@ -353,24 +355,27 @@ class Emitter(base_emitter.BaseEmitter):
                 s.print()
 
         elif isinstance(stmt, ast1.ConstStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
-            # for stmt in stmt.body:
-            #     self.emit_statement_impl(s, stmt, is_top_level=is_top_level)
-            # FIXME: I added this block and it broke compilation... but are constants emitted?
-            pass
-
+            for stmt in stmt.body:
+                self.emit_statement_impl(s, stmt, is_top_level=is_top_level)
+            
         elif isinstance(stmt, ast1.ReturnStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             s.print(f"return {self.translate_expression(stmt.returned_exp)};")
 
         elif isinstance(stmt, ast1.LoopStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             s.print("for (;;)")
+            
             with Block(s):
+                if stmt.loop_style == ast1.LoopStyle.WhileDo:
+                    cond_str = self.translate_expression(stmt.cond)
+                    s.print("// `while (cond) do ...` termination check:")
+                    s.print(f"if (!{cond_str}) {{ break; }}")
+
                 self.emit_block(s, stmt.body)
 
-        elif isinstance(stmt, ast1.BreakStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
-            s.print("break;")
-
-        elif isinstance(stmt, ast1.ContinueStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
-            s.print("continue;")
+                if stmt.loop_style == ast1.LoopStyle.DoWhile:
+                    cond_str = self.translate_expression(stmt.cond)
+                    s.print("// `do ... while (cond)` termination check:")
+                    s.print(f"if (!{cond_str}) {{ break; }}")
 
         else:
             pass
@@ -658,9 +663,6 @@ class Emitter(base_emitter.BaseEmitter):
             # NOTE: If expressions are regular functions in this language, and must invoke their 'then' or 'else' branches 
             # based on the result of 'cond'.
 
-            tmp_res_id = self.tmp_var_id_counter
-            self.tmp_var_id_counter += 1
-
             cond_str = self.translate_expression(exp.cond_exp)
             then_str = f"(({self.translate_expression(exp.then_exp)})())"
             if exp.else_exp is not None:
@@ -904,7 +906,7 @@ class StringWriter(object):
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="functional"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="array"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
-        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="malloc.h"))
+        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdlib"))
         
     def inject_manual_main_preamble(self):
         # FIXME: allow cross-compilation via args, not current platform

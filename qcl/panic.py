@@ -23,6 +23,7 @@ class ExitCode(enum.Enum):
     TyperUnificationError = enum.auto()
     TyperSeedingInputError = enum.auto()
     TyperSeedingDoubleBindError = enum.auto()
+    TyperModelerBadConditional = enum.auto()
     TyperModelerUndefinedIdError = enum.auto()
     TyperModelerRedefinedIdError = enum.auto()
     TyperModelerInvalidIdError = enum.auto()

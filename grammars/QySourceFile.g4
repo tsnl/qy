@@ -24,8 +24,6 @@ statement
     | ret=returnStatement
     | discard=discardStatement
     | loop=loopStatement
-    | break_=breakStatement
-    | continue_=continueStatement
     ;
 bind1vStatement
     : 'val' name=ID '=' initializer=expression
@@ -37,22 +35,23 @@ bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
 constStatement: 'const' ':' type_spec=typeSpec b=block ;
 returnStatement: 'return' ret_exp=expression ;
-discardStatement: 'let' discarded_exp=expression ;
-loopStatement: 'loop' body=block ;
-breakStatement: 'break' ;
-continueStatement: 'continue' ;
+discardStatement: 'eval' discarded_exp=expression ;
+loopStatement
+    : while_do='while' cond=expression 'do' body=block
+    | do_while='do' body=block 'while' cond=expression 
+    ;
 
 expression: through=binaryExpression ;
 primaryExpression
-    : litBoolean                                                                #litBoolPrimaryExpression
-    | litInteger                                                                #litIntPrimaryExpression
-    | litFloat                                                                  #litFloatPrimaryExpression
-    | litString                                                                 #litStringPrimaryExpression
-    | '$pred'                                                                   #prevConstPrimaryExpression
-    | id_tok=ID                                                                 #idPrimaryExpression
-    | '(' through=expression ')'                                                #parenPrimaryExpression
-    | lam=lambdaExpression                                                      #lambdaPrimaryExpression
-    | 'if' '(' cond=expression ')' then=expression ('else' else_=expression)?   #itePrimaryExpression
+    : litBoolean                                                                            #litBoolPrimaryExpression
+    | litInteger                                                                            #litIntPrimaryExpression
+    | litFloat                                                                              #litFloatPrimaryExpression
+    | litString                                                                             #litStringPrimaryExpression
+    | '$pred'                                                                               #prevConstPrimaryExpression
+    | id_tok=ID                                                                             #idPrimaryExpression
+    | '(' through=expression ')'                                                            #parenPrimaryExpression
+    | lam=lambdaExpression                                                                  #lambdaPrimaryExpression
+    | 'if' '(' cond=expression ')' then=lambdaExpression ('else' else_=lambdaExpression)?   #itePrimaryExpression
 /*  | 'rtti' '(' typeSpec ')'       #rttiPrimaryExpression */
     ;
 lambdaExpression

@@ -1,6 +1,6 @@
 def main () = do {
-    let v = new Vec2F(2.0f, 3.0f);
-    let w = new Vec3F(2.0f, 3.0f, 4.0f);
+    eval v = new Vec2F(2.0f, 3.0f);
+    eval w = new Vec3F(2.0f, 3.0f, 4.0f);
     // return i32(v.x);
     return 0;
 };
@@ -8,6 +8,6 @@ def main () = do {
 type Vec2F = (x: f32, y: f32);
 
 // pub vec2f: (f32, f32) -> Vec2F;
-// let vec2f (a, b) = new Vec2F(a, b);
+// eval vec2f (a, b) = new Vec2F(a, b);
 
-// let x = vec2f(0.0f, 0.0f);
+// eval x = vec2f(0.0f, 0.0f);

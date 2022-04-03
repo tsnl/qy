@@ -1,0 +1,11 @@
+const: I32 {
+    val x = 128;
+};
+
+def hello () = do {
+    x
+};
+
+def main () = do {
+    hello()
+};

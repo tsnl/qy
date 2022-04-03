@@ -1,5 +1,10 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}/qc-build",
     "cmake.cmakePath": "cmake",
-    "python.analysis.autoImportCompletions": false
+    "python.analysis.autoImportCompletions": false,
+    "files.associations": {
+        "*.rkt": "racket",
+        "*.purr": "racket",
+        "random": "cpp"
+    }
 }

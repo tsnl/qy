@@ -257,22 +257,17 @@ class DiscardStatement(BaseStatement):
         self.discarded_exp = discarded_exp
 
 
+class LoopStyle(enum.Enum):
+    WhileDo = enum.auto()
+    DoWhile = enum.auto()
+
+
 class LoopStatement(BaseStatement):
-    def __init__(self, loc: fb.ILoc, body: BaseExpression):
+    def __init__(self, loc: fb.ILoc, cond: BaseExpression, body: BaseExpression, loop_style: LoopStyle):
         super().__init__(loc)
+        self.cond = cond
         self.body = body
-
-
-class BaseLoopControlStatement(BaseStatement, metaclass=abc.ABCMeta):
-    pass
-
-
-class BreakStatement(BaseLoopControlStatement):
-    pass
-
-
-class ContinueStatement(BaseLoopControlStatement):
-    pass
+        self.loop_style = loop_style
 
 
 #

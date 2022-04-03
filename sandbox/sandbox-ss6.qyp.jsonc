@@ -1,0 +1,6 @@
+{
+  "name": "sandbox_ss6",
+  "author": "https://github.com/tsnl",
+  "help": "This module contains a scratch file about pointers & mutability.",
+  "src": ["eg403-consts.qy"]
+}
