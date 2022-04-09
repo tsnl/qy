@@ -242,6 +242,18 @@ class ConstStatement(BaseStatement):
         self.loc = loc
         self.body = body
         self.const_type_spec = const_type_spec
+        self.wb_ctx_chain = []
+        self.wb_synth_pred_binders = []
+
+    @property
+    def root_ctx(self):
+        return self.wb_ctx_chain[0]
+
+    def pre_ctx_of_constant(self, i):
+        return self.wb_ctx_chain[i]
+    
+    def post_ctx_of_constant(self, i):
+        return self.wb_ctx_chain[i+1]
 
 
 class ReturnStatement(BaseStatement):
@@ -314,10 +326,6 @@ class StringExpression(BaseExpression):
         self.pieces = pieces
         self.value = value
         # print("StringExpression:", self.pieces, repr(self.value))
-
-
-class ConstPredecessorExpression(BaseExpression):
-    pass
 
 
 class IdRefExpression(MIdQualifierNode, BaseExpression):
@@ -404,7 +412,6 @@ class BinaryOpExpression(BaseExpression):
         self.operator = operator
         self.lt_operand_exp = lt_operand
         self.rt_operand_exp = rt_operand
-
 
 class UpdateExpression(BaseExpression):
     def __init__(self, loc: fb.ILoc, store_address: BaseExpression, stored_value: BaseExpression):

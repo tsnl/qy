@@ -296,7 +296,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.StringExpression(self.loc(ctx), piece_text_list, value)
 
     def visitPrevConstPrimaryExpression(self, ctx: antlr.QySourceFileParser.PrevConstPrimaryExpressionContext):
-        return ast1.ConstPredecessorExpression(self.loc(ctx))
+        return ast1.IdRefExpression(self.loc(ctx), "$pred")
 
     def visitIdPrimaryExpression(self, ctx: antlr.QySourceFileParser.IdPrimaryExpressionContext):
         return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)
@@ -324,7 +324,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return self.visit(ctx.through)
 
     def visitProcCallExpression(self, ctx: antlr.QySourceFileParser.ProcCallExpressionContext):
-        return ast1.ProcCallExpression(self.loc(ctx), self.visit(ctx.proc), self.visit(ctx.args))
+        return ast1.ProcCallExpression(self.loc(ctx), self.visit(ctx.proc), self.visit(ctx.args) if ctx.args else [])
 
     def visitConstructorExpression(self, ctx: antlr.QySourceFileParser.ConstructorExpressionContext):
         construct_frontend = {
@@ -337,7 +337,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         if construct_frontend == ast1.ConstructFrontend.New:
             assert not is_mut
 
-        return ast1.ConstructExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args), construct_frontend, is_mut)
+        return ast1.ConstructExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args) if ctx.args else [], construct_frontend, is_mut)
 
     def visitDotIdExpression(self, ctx: antlr.QySourceFileParser.DotIdExpressionContext):
         return ast1.DotIdExpression(self.loc(ctx), self.visit(ctx.container), ctx.key.text)
@@ -555,10 +555,10 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return self.visit(ctx.through)
     
     def visitUnionAdtTypeSpec(self, ctx: antlr.QySourceFileParser.UnionAdtTypeSpecContext):
-        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Sum, self.visit(ctx.args))
+        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Sum, self.visit(ctx.args) if ctx.args else [])
 
     def visitTupleAdtTypeSpec(self, ctx: antlr.QySourceFileParser.TupleAdtTypeSpecContext):
-        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Product, self.visit(ctx.args))
+        return ast1.AdtTypeSpec(self.loc(ctx), ast1.LinearTypeOp.Product, self.visit(ctx.args) if ctx.args else [])
 
     def visitPtrTypeSpec(self, ctx: antlr.QySourceFileParser.PtrTypeSpecContext):
         if ctx.through is not None:

@@ -94,16 +94,15 @@ def fastPrintFibUntilN () = do {
     val a = new MutArray[I32, n]();
     eval a.ptr(0) := 0;
     eval a.ptr(1) := 1;
-    val i_mem = push mut I32(0);
+    val i = push mut I32(2);
     do {
-        val i = *i_mem;
-        eval a.ptr(i) := a.get(i-1) + a.get(i-2);
-        eval printInt(i);
+        eval a.ptr(*i) := a.get(*i-1) + a.get(*i-2);
+        eval printInt(*i);
         eval printTab();
-        eval printInt(a.get(i));
+        eval printInt(a.get(*i));
         eval printLine();
-        eval i_mem := i+1;
-    } while (i >= n);
+        eval i := *i+1;
+    } while (*i < n);
     
     // FIXME: why doesn't 'n' lookup compile correctly?
     // a.get(n-1)

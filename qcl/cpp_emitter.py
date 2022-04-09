@@ -14,6 +14,7 @@ from . import ast2
 from . import types
 from . import typer
 from . import base_emitter
+from . import interp
 from . import panic
 
 #
@@ -471,12 +472,25 @@ class Emitter(base_emitter.BaseEmitter):
 
     def translate_expression_with_type(self, exp: ast1.BaseExpression) -> t.Tuple[str, types.BaseConcreteType]:
         if isinstance(exp, ast1.IdRefExpression):
-            # FIXME: what if lookup type is 'void'? Must elide/default somehow.
             def_obj = exp.lookup_def_obj()
             assert isinstance(def_obj, typer.BaseDefinition)
             s, def_type = def_obj.scheme.instantiate()
             assert s is typer.Substitution.empty
-            return exp.name, def_type
+            
+            if exp.name.startswith('$'):
+                if exp.name == "$pred":
+                    res = interp.evaluate_constant(def_obj.binder.initializer)
+                    if res is None:
+                        panic.because(
+                            panic.ExitCode.CompileTimeEvaluationError,
+                            "Tried to evaluate '$pred', but failed: this is most likely caused by a prior error.",
+                            opt_loc=exp.loc
+                        )
+                    return repr(res), def_type
+                else:
+                    raise NotImplementedError(f"Unknown builtin macro: {exp.name}")
+            else:
+                return exp.name, def_type
 
         elif isinstance(exp, ast1.IntExpression):
             if exp.width_in_bits == 1:
@@ -746,7 +760,9 @@ class Emitter(base_emitter.BaseEmitter):
             cml_print()
             cml_print(f"set(CMAKE_CXX_STANDARD 17)")
             cml_print()
-            cml_print(f"set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
+            cml_print(f"if (NOT MSVC)")
+            cml_print(f"    set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
+            cml_print(f"endif()")
             cml_print()
 
             # all source files go into one 'add_executable' for now.

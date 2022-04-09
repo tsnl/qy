@@ -94,10 +94,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             stmt,
             extern_tag=extern_tag
         )
-    elif isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
-        # handled later...
-        pass
-    else:
+    elif not isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
         panic.because(
             panic.ExitCode.ScopingError,
             "Invalid statement found in top-level scope: please move this into a function.",
@@ -131,16 +128,34 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
     #
 
     if isinstance(stmt, ast1.ConstStatement):
-        for nested_stmt in stmt.body:
+        ctx_chain = [bind_in_ctx]
+        synth_pred_binders = []
+        for i, nested_stmt in enumerate(stmt.body):
+            # handling this statement:
             if not isinstance(nested_stmt, ast1.Bind1vStatement):
                 panic.because(
                     panic.ExitCode.SyntaxError,
                     "In 'const' block, expected only 'Bind1v' statements",
                     opt_loc=stmt.loc
                 )
-            seed_one_top_level_stmt(bind_in_ctx, nested_stmt)
+            seed_one_top_level_stmt(ctx_chain[-1], nested_stmt)
 
-        return 
+            # creating and binding a synthetic definition for '$pred' (for the next statement) pointing to the currently 
+            # bound 'const_bind_stmt' such that
+            #   $pred = <IdRef(const_bind_stmt.name)>
+            new_ctx = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx_chain[-1])
+            synthetic_binder_initializer = ast1.IdRefExpression(nested_stmt.loc, nested_stmt.name)
+            synthetic_pred_binder = ast1.Bind1vStatement(nested_stmt.loc, "$pred", synthetic_binder_initializer, is_constant=True)
+            new_pred_def = ValueDefinition(nested_stmt.loc, "$pred", Scheme([], types.VarType(f"pred.{i}")), synthetic_pred_binder, is_compile_time_constant=True)
+            new_ctx.define(new_pred_def)
+            ctx_chain.append(new_ctx)
+            synth_pred_binders.append(synthetic_pred_binder)
+
+        assert len(ctx_chain) == len(stmt.body)+1
+        assert len(stmt.body) == len(synth_pred_binders)
+        stmt.wb_ctx_chain = ctx_chain
+        stmt.wb_synth_pred_binders = synth_pred_binders
+        return
 
     #
     # All other statements => error
@@ -251,6 +266,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             exp_sub, exp_type = model_one_type_spec(ctx, stmt.var_type_spec, dto_list)
         else:
             exp_sub, exp_type = model_one_exp(ctx, stmt.initializer, dto_list)
+
         if ctx.kind in (ContextKind.TopLevelOfQypSet, ContextKind.ConstImmediatelyInvokedFunctionBlock):
             # definition is already seeded-- just retrieve and unify.
             # NOTE: must use 'lookup' instead of a shallow lookup in symbol table for special case of 'ConstStatement':
@@ -340,19 +356,27 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
     elif isinstance(stmt, ast1.ConstStatement):
         sub, enum_type = model_one_type_spec(ctx, stmt.const_type_spec, dto_list)
         
-        ctx_with_pred = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx)
-        ctx_with_pred.local_return_type = enum_type
+        const_iife_ctx = stmt.root_ctx
+        const_iife_ctx.local_return_type = enum_type
         
-        for const_bind_stmt in stmt.body:
+        # In order to model statements in an IIFE, we must handle binding '$pred' which must be resolved at compile time.
+        # - we create a synthetic definition of $pred in the scope of each statement but the first
+        # - $pred maps to the previous element's ID as an expression: this symbolic representation makes it fully and 
+        #   trivially compatible with anything added later in the compilation pipeline
+        for i, (const_bind_stmt, synth_pred_binder) in enumerate(zip(stmt.body, stmt.wb_synth_pred_binders)):
             assert isinstance(const_bind_stmt, ast1.Bind1vStatement)
+            pre_ctx = stmt.pre_ctx_of_constant(i)
+            post_ctx = stmt.post_ctx_of_constant(i)
             
             # note 'ctx_with_pred' so '$pred' resolves correctly
-            new_sub = model_one_statement(ctx_with_pred, const_bind_stmt, dto_list)
-            sub = new_sub.compose(sub, const_bind_stmt.loc)
+            sub = model_one_statement(pre_ctx, const_bind_stmt, dto_list).compose(sub, const_bind_stmt.loc)
 
-            # type-checking:
-            typecheck_sub = unify(const_bind_stmt.initializer.wb_type, enum_type, stmt.loc)
-            sub = typecheck_sub.compose(sub, stmt.loc)
+            # type-checking: must check both binding and '$pred' binding:
+            sub = unify(const_bind_stmt.initializer.wb_type, enum_type, const_bind_stmt.loc).compose(sub, const_bind_stmt.loc)
+            scm = post_ctx.lookup("$pred").scheme
+            pred_type = sub.rewrite_type(scm.instantiate_monomorphically())
+            sub = unify(pred_type, enum_type, const_bind_stmt.loc).compose(sub, const_bind_stmt.loc)
+            sub = model_one_statement(post_ctx, synth_pred_binder, dto_list).compose(sub, const_bind_stmt.loc)
 
         return sub
 
@@ -521,9 +545,6 @@ def help_model_one_exp(
         proxy_src_type = types.VarType(f"dot_{exp.key}")
         add_dto_sub = dto_list.add_dto(DotIdDTO(exp.loc, container_type, proxy_src_type, exp.key))
         return add_dto_sub.compose(container_sub, exp.loc), proxy_src_type
-
-    elif isinstance(exp, ast1.ConstPredecessorExpression):
-        return Substitution.empty, ctx.return_type
 
     elif isinstance(exp, ast1.IfExpression):
         def help_model_branch_type(branch_exp):
@@ -835,7 +856,7 @@ class DTOList(object):
         return all_finished, new_dto_list, sub
 
 
-# DTO = Deferred Type Order
+# DTO = Deferred Typer Order
 #
 
 class BaseDTO(object, metaclass=abc.ABCMeta):
@@ -1354,6 +1375,9 @@ class Context(object):
         else:
             return None
 
+    def define(self, defn: "BaseDefinition") -> None:
+        assert self.try_define(defn) is None
+
     def lookup(self, name: str) -> "BaseDefinition":
         """
         Finds a symbol of this name and returns its Definition, else behavior undefined.
@@ -1638,6 +1662,10 @@ class Scheme(object):
         super().__init__()
         self.vars = vars
         self.body = body
+
+    def instantiate_monomorphically(self):
+        assert not self.vars
+        return self.body
 
     def instantiate(
         self, 

@@ -139,7 +139,7 @@ class VoidType(SingletonAtomicConcreteType):
     singleton = None
 
     def __str__(self) -> str:
-        return "Void"
+        return "Unit"
 
     @classmethod
     def kind(cls):

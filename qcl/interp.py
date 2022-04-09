@@ -13,10 +13,48 @@ def evaluate_constant(exp: ast1.BaseExpression):
         return exp.value
     
     elif isinstance(exp, ast1.UnaryOpExpression):
-        return exp.value
+        assert exp.operand is not None
+        
+        operand_value = evaluate_constant(exp.operand)
+        try:
+            return {
+                ast1.UnaryOperator.LogicalNot: lambda: not operand_value,
+                ast1.UnaryOperator.Minus: lambda: -operand_value,
+                ast1.UnaryOperator.Plus: lambda: +operand_value
+            }[exp.operator]()
+        except KeyError:
+            # error handled below...
+            pass
+
     
     elif isinstance(exp, ast1.BinaryOpExpression):
-        return exp.value
+        assert exp.lt_operand_exp is not None and exp.rt_operand_exp is not None
+        
+        lt_operand_value = evaluate_constant(exp.lt_operand_exp)
+        rt_operand_value = evaluate_constant(exp.rt_operand_exp)
+        try:
+            return {
+                ast1.BinaryOperator.Mul: lambda: lt_operand_value * rt_operand_value,
+                ast1.BinaryOperator.Div: lambda: lt_operand_value / rt_operand_value,
+                ast1.BinaryOperator.Mod: lambda: lt_operand_value % rt_operand_value,
+                ast1.BinaryOperator.Add: lambda: lt_operand_value + rt_operand_value,
+                ast1.BinaryOperator.Sub: lambda: lt_operand_value - rt_operand_value,
+                ast1.BinaryOperator.LSh: lambda: lt_operand_value << rt_operand_value,
+                ast1.BinaryOperator.RSh: lambda: lt_operand_value >> rt_operand_value,
+                ast1.BinaryOperator.BitwiseAnd: lambda: lt_operand_value & rt_operand_value,
+                ast1.BinaryOperator.BitwiseXOr: lambda: lt_operand_value ^ rt_operand_value,
+                ast1.BinaryOperator.BitwiseOr: lambda: lt_operand_value | rt_operand_value,
+                ast1.BinaryOperator.LThan: lambda: lt_operand_value < rt_operand_value,
+                ast1.BinaryOperator.GThan: lambda: lt_operand_value > rt_operand_value,
+                ast1.BinaryOperator.LEq: lambda: lt_operand_value <= rt_operand_value,
+                ast1.BinaryOperator.GEq: lambda: lt_operand_value >= rt_operand_value,
+                ast1.BinaryOperator.Eq: lambda: lt_operand_value == rt_operand_value,
+                ast1.BinaryOperator.NEq: lambda: lt_operand_value != rt_operand_value
+            }[exp.operator]()
+        except KeyError:
+            # error handled below...
+            pass
+
     
     elif isinstance(exp, ast1.IdRefExpression):
         def_obj = exp.lookup_def_obj()
@@ -37,9 +75,8 @@ def evaluate_constant(exp: ast1.BaseExpression):
         
         return evaluate_constant(def_obj.binder.initializer)
 
-    else:
-        panic.because(
-            panic.ExitCode.CompileTimeEvaluationError,
-            f"Cannot evaluate expression at compile-time: {exp.desc}",
-            opt_loc=exp.loc
-        )
+    panic.because(
+        panic.ExitCode.CompileTimeEvaluationError,
+        f"Cannot evaluate expression at compile-time: {exp.desc}",
+        opt_loc=exp.loc
+    )
