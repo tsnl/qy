@@ -6,6 +6,7 @@
         "./eg101-basics.qy",
         "./eg102-literals.qy",
         "./eg103-vars.qy",
+        "./eg104-fib.qy",
         "./eg199-scratch1.qy"
     ],
     "deps": [

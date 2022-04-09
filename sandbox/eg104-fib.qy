@@ -1,0 +1,51 @@
+pub printFibUntil: (I32) -> Void;
+def printFibUntil (n) = do {
+    eval if (n > 0) {
+        eval printFibUntil(n - 1);
+        eval printInt(n);
+        eval printTab();
+        eval printInt(fibonacci(n));
+        eval printLine();
+    };
+};
+
+const: I64 { val n = 90L; };
+const: I32 { val n32 = 90; };
+def fastPrintFibUntilN () = do {
+    // TODO: replace with ArrayBox, make 'n' dynamic
+    
+    // TODO: implement 'assert' based on symbolic logic
+    // assert n > 1;
+
+    val a = new MutArray[I64, n]();
+    eval a.ptr(0) := 0L;
+    eval a.ptr(1) := 1L;
+    val i = push mut I64(2);
+    while (*i < n) do {
+        eval a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
+        eval printLong(*i);
+        eval printTab();
+        eval printLong(a.get(*i));
+        eval printLine();
+        eval i := *i+1L;
+    };
+    a.get(n-1L)
+};
+
+def main () = do {
+    // FIXME: why don't these cross-module references work?
+    
+    // val v = Vec3F (1.0f, 2.0f, 3.0f);
+    // val w = v3f_add(v, v);
+    
+    // val w = new Vec2f(13, 0);
+    // val f = fibonacci(new I32(w.x));
+    
+    // discard printInt(f);
+    val short_run = false;
+    // eval printFibUntil(if (short_run) {10} else {42});
+    // eval fastPrintFibUntilN();
+    val _ = printFibUntil(n32);
+
+    0
+};
