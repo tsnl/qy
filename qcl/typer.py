@@ -996,7 +996,9 @@ class BinaryOpDTO(BaseDTO):
         ast1.BinaryOperator.Div,
         ast1.BinaryOperator.Mod,
         ast1.BinaryOperator.Add,
-        ast1.BinaryOperator.Sub
+        ast1.BinaryOperator.Sub,
+        ast1.BinaryOperator.LSh,
+        ast1.BinaryOperator.RSh
     }
     comparison_binary_operator_set = {
         ast1.BinaryOperator.LThan,

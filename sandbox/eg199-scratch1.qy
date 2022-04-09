@@ -86,27 +86,24 @@ def printFibUntil (n) = do {
     };
 };
 
-const: I32 {
-    val n = 42;
+const: I64 {
+    val n = 90L;
 };
 def fastPrintFibUntilN () = do {
     // TODO: replace with ArrayBox, make 'n' dynamic
-    val a = new MutArray[I32, n]();
-    eval a.ptr(0) := 0;
-    eval a.ptr(1) := 1;
-    val i = push mut I32(2);
+    val a = new MutArray[I64, n]();
+    eval a.ptr(0) := 0L;
+    eval a.ptr(1) := 1L;
+    val i = push mut I64(2);
     do {
-        eval a.ptr(*i) := a.get(*i-1) + a.get(*i-2);
-        eval printInt(*i);
+        eval a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
+        eval printLong(*i);
         eval printTab();
-        eval printInt(a.get(*i));
+        eval printLong(a.get(*i));
         eval printLine();
-        eval i := *i+1;
+        eval i := *i+1L;
     } while (*i < n);
-    
-    // FIXME: why doesn't 'n' lookup compile correctly?
-    // a.get(n-1)
-    a.get(41)
+    a.get(n-1L)
 };
 
 

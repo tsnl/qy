@@ -14,7 +14,7 @@
             "headers": [
                 {"path": "print-v1.h", "provides": [
                     "File", "FileAccess", "FileType",
-                    "printInt", "printLine", "printTab",
+                    "printInt", "printLong", "printLine", "printTab",
                     // "openFile", "closeFile",
                     // "readCharFromFile",
                     "fh1", "fh2"

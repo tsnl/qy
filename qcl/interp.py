@@ -49,7 +49,9 @@ def evaluate_constant(exp: ast1.BaseExpression):
                 ast1.BinaryOperator.LEq: lambda: lt_operand_value <= rt_operand_value,
                 ast1.BinaryOperator.GEq: lambda: lt_operand_value >= rt_operand_value,
                 ast1.BinaryOperator.Eq: lambda: lt_operand_value == rt_operand_value,
-                ast1.BinaryOperator.NEq: lambda: lt_operand_value != rt_operand_value
+                ast1.BinaryOperator.NEq: lambda: lt_operand_value != rt_operand_value,
+                ast1.BinaryOperator.LogicalAnd: lambda: lt_operand_value and rt_operand_value,
+                ast1.BinaryOperator.LogicalOr: lambda: lt_operand_value or rt_operand_value
             }[exp.operator]()
         except KeyError:
             # error handled below...
