@@ -14,6 +14,9 @@ block
 unwrappedBlock
     : (prefix_statements+=statement ';')* 
     ;
+constBlock
+    : '{' (bindings+=bind1vTerm ';')* '}'
+    ;
 
 statement
     : b1v=bind1vStatement
@@ -26,19 +29,23 @@ statement
     | loop=loopStatement
     ;
 bind1vStatement
-    : 'val' name=ID '=' initializer=expression
+    : 'val' b1v_term=bind1vTerm
     ;
 bind1fStatement
     : 'def' name=ID '(' args=csIdList ')' '=' body_exp=expression
     ;
 bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
-constStatement: 'const' ':' type_spec=typeSpec b=block ;
+constStatement: 'const' ':' type_spec=typeSpec b=constBlock ;
 returnStatement: 'return' ret_exp=expression ;
 discardStatement: 'eval' discarded_exp=expression ;
 loopStatement
     : while_do='while' cond=expression 'do' body=block
     | do_while='do' body=block 'while' cond=expression 
+    ;
+
+bind1vTerm
+    : name=ID '=' initializer=expression
     ;
 
 expression: through=binaryExpression ;

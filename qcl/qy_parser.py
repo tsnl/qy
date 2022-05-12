@@ -177,9 +177,18 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             for statement_ctx in ctx.prefix_statements
         ]
 
+    def visitConstBlock(self, ctx: antlr.QySourceFileParser.ConstBlockContext) -> t.List[ast1.Bind1vStatement]:
+        return [
+            self.visit(statement_ctx)
+            for statement_ctx in ctx.bindings
+        ]
+
     #
     # statement:
     #
+
+    def visitBind1vTerm(self, ctx: antlr.QySourceFileParser.Bind1vTermContext):
+        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer), False)
 
     def visitStatement(self, ctx: antlr.QySourceFileParser.StatementContext) -> ast1.BaseStatement:
         if ctx.b1v is not None:
@@ -206,7 +215,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             raise NotImplementedError(f"Unknown statement kind in parser: {ctx.getText()}")
 
     def visitBind1vStatement(self, ctx: antlr.QySourceFileParser.Bind1vStatementContext) -> ast1.Bind1vStatement:
-        return ast1.Bind1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer), False)
+        return self.visit(ctx.b1v_term)
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
         arg_name_list = self.visit(ctx.args)

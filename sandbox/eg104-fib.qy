@@ -9,8 +9,8 @@ def printFibUntil (n) = do {
     };
 };
 
-const: I64 { val n = 90L; };
-const: I32 { val n32 = 90; };
+const: I64 { n = 90L; };
+const: I32 { n32 = 90; };
 def fastPrintFibUntilN () = do {
     // TODO: replace with ArrayBox, make 'n' dynamic
     
@@ -44,8 +44,8 @@ def main () = do {
     // discard printInt(f);
     val short_run = false;
     // eval printFibUntil(if (short_run) {10} else {42});
-    // eval fastPrintFibUntilN();
-    val _ = printFibUntil(n32);
+    eval fastPrintFibUntilN();
+    // val _ = printFibUntil(n32);
 
     0
 };
