@@ -11,8 +11,9 @@ When writing prototypes...
     - instead, aim for manifest typing with interfaces and implementation (like Go)
     - interfaces are also too static! Can we build automatic interfaces? Yes! (See rambles-pt4)
 - want low-level memory access
-    - numpy for Python is a step in the right direction
     - C-level data-types => can directly interface with C programs
+    - emphasis on pointers and memory rather than 'objects' and messages feels more like an array-programming
+      language.
 
 Thus, design
 - type system, semantics identical to C
@@ -29,9 +30,12 @@ Thus, design
       - after living with interpreted language standards for checking, lax AoT type-checking standards > just scoping
 - rely on user-defined RTTI
     - just like in C, user must define their own 'kind' tags
-    - instead of one-size-fits-all solution, which is inferior
+    - instead of one-size-fits-all solution, which makes general trade-offs rather than more efficient, specific ones.
 
 For typing, cf ML
+- (REVISION) also allow _partial_ type-specifiers in function definitions: compiler unifies these against top-level decl
+  and inference.
+  - This allows writing declarations+definitions in either Scala style or C/OCaml style.
 
 https://courses.cs.washington.edu/courses/cse341/04wi/lectures/06-ml-polymorphic-types.html
 

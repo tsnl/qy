@@ -182,11 +182,20 @@ class Bind1vStatement(BaseIdQualifierStatement):
 
 
 class Bind1fStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, args: t.List[str], body: t.Optional["BaseExpression"], is_variadic: bool = False):
+    def __init__(
+        self, 
+        loc: fb.ILoc, 
+        name: str, 
+        arg_names: t.List[str], arg_types: t.List["BaseTypeSpec"], 
+        body: t.Optional["BaseExpression"], opt_ret_ts: t.Optional["BaseTypeSpec"], 
+        is_variadic: bool = False
+    ):
         assert isinstance(body, (type(None), BaseExpression))
         super().__init__(loc, name)
-        self.args_names = args
+        self.args_names = arg_names
+        self.args_types = arg_types
         self.body_exp = body
+        self.opt_ret_ts = opt_ret_ts
         self.is_variadic = is_variadic
 
     def is_extern(self):
@@ -213,9 +222,7 @@ class Extern1fStatement(Bind1fStatement):
         name: str, arg_names: t.List[str], arg_typespecs: t.List["BaseTypeSpec"], ret_typespec: "BaseTypeSpec",
         extern_notation: str
     ):
-        super().__init__(loc, name, arg_names, None)
-        self.arg_typespecs = arg_typespecs
-        self.ret_typespec = ret_typespec
+        super().__init__(loc, name, arg_names, arg_typespecs, None, ret_typespec)
         self.extern_notation = extern_notation
     
     def __str__(self) -> str:

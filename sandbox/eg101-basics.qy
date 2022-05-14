@@ -31,17 +31,17 @@ type Vec3F = (x: F32, y: F32, z: F32);
 
 // function definitions:
 // NOTE: type inference fills in holes.
-def vec3f (x, y, z) = do {
+def vec3f (x: F32, y: F32, z: F32): Vec3F = do {
     new Vec3F(x, y, z)
 };
 
-def v3f_add (v1, v2) = do {
+def v3f_add (v1: Vec3F, v2: Vec3F): Vec3F = do {
     val vx = v1.x + v2.x;
     val vy = v1.y + v2.y;
     val vz = v1.z + v2.z;
     vec3f(vx, vy, vz)
 };
-def v3f_scale (v, s) = do {
+def v3f_scale (v: Vec3F, s: F32): Vec3F = do {
     val sx = v.x * s;
     val sy = v.y * s;
     val sz = v.z * s;

@@ -32,7 +32,7 @@ bind1vStatement
     : 'val' b1v_term=bind1vTerm
     ;
 bind1fStatement
-    : 'def' name=ID '(' args=csIdList ')' '=' body_exp=expression
+    : 'def' name=ID '(' args=csDefArgSpecList ')' (':' opt_ret_ts=typeSpec)? '=' body_exp=expression
     ;
 bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
@@ -155,8 +155,8 @@ primaryTypeSpec
     ;
 adtTypeSpec
     : through=primaryTypeSpec               #throughAdtTypeSpec
-    | '{' args=csFormalArgSpecList '}'      #unionAdtTypeSpec
-    | '(' args=csFormalArgSpecList ')'      #tupleAdtTypeSpec
+    | '{' args=csTypeArgSpecList '}'      #unionAdtTypeSpec
+    | '(' args=csTypeArgSpecList ')'      #tupleAdtTypeSpec
     ;
 ptrTypeSpec
     : through=adtTypeSpec
@@ -172,10 +172,15 @@ arrayTypeSpec
     ;
 signatureTypeSpec
     : through=arrayTypeSpec
-    | '(' args=csFormalArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
+    | '(' args=csTypeArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
-formalArgSpec
+
+typeArgSpec
     : ts=typeSpec
+    | name_tok=ID ':' ts=typeSpec
+    ;
+defArgSpec
+    : name_tok=ID
     | name_tok=ID ':' ts=typeSpec
     ;
 
@@ -184,7 +189,9 @@ litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
 litString: (pieces+=(LIT_SQ_STRING | LIT_DQ_STRING | LIT_ML_SQ_STRING | LIT_ML_DQ_STRING))+;
 csIdList: (ids+=ID (',' ids+=ID)*)? ;
-csFormalArgSpecList: (specs+=formalArgSpec (',' specs+=formalArgSpec)*)? ;
+
+csTypeArgSpecList: (specs+=typeArgSpec (',' specs+=typeArgSpec)*)? ;
+csDefArgSpecList: (specs+=defArgSpec (',' specs+=defArgSpec)*)? ;
 csExpressionList: (exps+=expression (',' exps+=expression)*)? ;
 
 fragment L: [a-zA-Z] ;

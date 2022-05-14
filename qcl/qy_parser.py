@@ -218,10 +218,15 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return self.visit(ctx.b1v_term)
 
     def visitBind1fStatement(self, ctx: antlr.QySourceFileParser.Bind1fStatementContext) -> ast1.Bind1fStatement:
-        arg_name_list = self.visit(ctx.args)
+        arg_name_list = []
+        opt_arg_type_list = []
+        for arg_name, opt_arg_type in self.visit(ctx.args):
+            arg_name_list.append(arg_name)
+            opt_arg_type_list.append(opt_arg_type)
         assert ctx.body_exp is not None
+        opt_ret_ts = self.visit(ctx.opt_ret_ts) if ctx.opt_ret_ts is not None else None
         ret_exp = self.visit(ctx.body_exp)
-        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, ret_exp)
+        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, opt_arg_type_list, ret_exp, opt_ret_ts)
 
     def visitBind1tStatement(self, ctx: antlr.QySourceFileParser.Bind1tStatementContext) -> ast1.Bind1tStatement:
         return ast1.Bind1tStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
@@ -594,9 +599,13 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     #
     # Misc:
     #
+    
+    def visitDefArgSpec(self, ctx: antlr.QySourceFileParser.DefArgSpecContext) -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
+        name = ctx.name_tok.text
+        opt_ts = self.visit(ctx.ts) if ctx.ts is not None else None
+        return name, opt_ts
 
-    def visitFormalArgSpec(self, ctx: antlr.QySourceFileParser.FormalArgSpecContext) \
-            -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
+    def visitTypeArgSpec(self, ctx: antlr.QySourceFileParser.TypeArgSpecContext) -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
         opt_name = ctx.name_tok.text if ctx.name_tok is not None else None
         ts = self.visit(ctx.ts)
         return opt_name, ts
@@ -604,12 +613,13 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     def visitCsIdList(self, ctx: antlr.QySourceFileParser.CsIdListContext) -> t.List[str]:
         return [id_tok.text for id_tok in ctx.ids]
 
-    def visitCsFormalArgSpecList(self, ctx: antlr.QySourceFileParser.CsFormalArgSpecListContext) \
-            -> t.List[t.Tuple[t.Optional[str], ast1.BaseTypeSpec]]:
+    def visitCsDefArgSpecList(self, ctx: antlr.QySourceFileParser.DefArgSpecContext) -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
         return [self.visit(spec) for spec in ctx.specs]
 
-    def visitCsExpressionList(self, ctx: antlr.QySourceFileParser.CsExpressionListContext) \
-            -> t.List[ast1.BaseExpression]:
+    def visitCsTypeArgSpecList(self, ctx: antlr.QySourceFileParser.CsTypeArgSpecListContext) -> t.List[t.Tuple[t.Optional[str], ast1.BaseTypeSpec]]:
+        return [self.visit(spec) for spec in ctx.specs]
+
+    def visitCsExpressionList(self, ctx: antlr.QySourceFileParser.CsExpressionListContext) -> t.List[ast1.BaseExpression]:
         return [self.visit(e) for e in ctx.exps]
 
 

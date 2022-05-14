@@ -60,17 +60,27 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
         )
     elif isinstance(stmt, ast1.Bind1fStatement):
         extern_tag = None
+        # determining 'fn_type'
         if isinstance(stmt, ast1.Extern1fStatement):
             extern_tag = "c"
             fn_arg_types = []
-            for arg_ts in stmt.arg_typespecs:
+            for arg_ts in stmt.args_types:
+                # In C, type-specs are required for each formal arg.
+                # Thus, for such extern modules, we store a 'wb_type' early, in the front-end itself.
+                # This is not true for other 'wb_type' slots, which are only populated during the 'modelling'
+                # phase, which follows the 'seeding' phase.
                 arg_type = arg_ts.wb_type
                 assert arg_type is not None
                 fn_arg_types.append(arg_type)
-            fn_ret_type = stmt.ret_typespec.wb_type
+            fn_ret_type = stmt.opt_ret_ts.wb_type
             fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, has_closure_slot=False, is_c_variadic=stmt.is_variadic)
         else:
-            fn_type = types.VarType(f"bind1f_{stmt.name}")
+            fn_arg_types = [
+                types.VarType(f"bind1f_arg_{arg_name}")
+                for arg_name in stmt.args_names
+            ]
+            fn_ret_type = types.VarType(f"bind1f_ret")
+            fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, has_closure_slot=False, is_c_variadic=False)
         new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
@@ -298,25 +308,30 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
     elif isinstance(stmt, ast1.Bind1fStatement):
         args_sub = Substitution.empty
         if isinstance(stmt, ast1.Extern1fStatement):
-            assert stmt.ret_typespec.wb_type is not None
-            ret_sub, ret_type = model_one_type_spec(ctx, stmt.ret_typespec, dto_list)
+            assert stmt.opt_ret_ts.wb_type is not None
+            ret_sub, ret_type = model_one_type_spec(ctx, stmt.opt_ret_ts, dto_list)
             arg_type_list = []
-            for arg_ts in stmt.arg_typespecs:
+            for arg_ts in stmt.args_types:
                 assert arg_ts.wb_type is not None
-                arg_ts_sub, arg_type = model_one_type_spec(ctx, arg_ts, dto_list)
+                arg_ts_sub, this_arg_type = model_one_type_spec(ctx, arg_ts, dto_list)
 
                 args_sub = arg_ts_sub.compose(args_sub, arg_ts.loc)
-                arg_type_list.append(arg_type)
+                arg_type_list.append(this_arg_type)
         else:
-            arg_type_list = [
-                types.VarType(f"arg{arg_index}:{arg_name}")
-                for arg_index, arg_name in enumerate(stmt.args_names)
-            ]
-            arg_name_type_list = list(zip(stmt.args_names, arg_type_list))
+            arg_name_type_list = []
+            arg_type_list = []
+            for arg_index, (arg_name, opt_arg_ts) in enumerate(zip(stmt.args_names, stmt.args_types)):
+                if opt_arg_ts is not None:
+                    this_arg_sub, this_arg_type = model_one_type_spec(ctx, opt_arg_ts, dto_list)
+                    args_sub = this_arg_sub.compose(args_sub, opt_arg_ts.loc)
+                else:
+                    this_arg_type = types.VarType(f"arg{arg_index}:{arg_name}")
+                arg_type_list.append(this_arg_type)
+                arg_name_type_list.append((arg_name, this_arg_type))
             ret_sub, ret_type = model_one_lambda_body(ctx, stmt.loc, arg_name_type_list, [], stmt.body_exp, dto_list)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
-        last_sub = def_sub.compose(ret_sub, stmt.loc)
+        last_sub = def_sub.compose(ret_sub, stmt.loc).compose(args_sub, stmt.loc)
         return unify(
             last_sub.rewrite_type(proc_type), 
             last_sub.rewrite_type(def_type),
