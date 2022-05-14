@@ -112,7 +112,7 @@ pacman-mirrors==4.23.2
 pandas==1.4.2
 pandas-datareader==0.10.0
 pandocfilters==1.5.0
-paramiko==2.9.2
+paramiko==2.10.1
 parso==0.8.3
 passlib==1.7.4
 pbr==5.8.1
