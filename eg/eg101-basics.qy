@@ -15,14 +15,14 @@ pub v3f_scale: (Vec3F, F32) -> Vec3F;
 // enums provided using 'const', which translates into preprocessor declarations
 const: I32 {
     EC_ALL_OK                 = 0;
-    EC_BAD_CLI_ARGS           = 1 + $pred;
-    EC_BAD_FILE_PATH          = 1 + $pred;
-    EC_DETECTED_RUNTIME_ERROR = 1 + $pred;
+    EC_BAD_CLI_ARGS           = 1 + pred!;
+    EC_BAD_FILE_PATH          = 1 + pred!;
+    EC_DETECTED_RUNTIME_ERROR = 1 + pred!;
 };
 const: U32 {
     WINDOW_FLAG_FULLSCREEN           = 0x1u;
-    WINDOW_FLAG_FIXED_SIZE           = 2u * $pred;
-    WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * $pred;
+    WINDOW_FLAG_FIXED_SIZE           = 2u * pred!;
+    WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * pred!;
 };
 
 // struct definitions: (enum, union are similar, but use '{...}' instead)

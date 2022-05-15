@@ -44,6 +44,7 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
         # NOTE: this is happening during 'seeding' in the typer instead... clean up typer if this changes.
 
         # typing native source files:
+        # - two distinct passes: seeding and modelling
         dto_list = typer.DTOList()
         new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
         sub = typer.Substitution.empty
@@ -58,7 +59,6 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
 
         # compile-time evaluation:
         
-
         # emitting:
         emitter.emit_qyp_set(qyp_set)
     except panic.PanicException as exc:

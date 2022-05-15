@@ -477,13 +477,13 @@ class Emitter(base_emitter.BaseEmitter):
             s, def_type = def_obj.scheme.instantiate()
             assert s is typer.Substitution.empty
             
-            if exp.name.startswith('$'):
-                if exp.name == "$pred":
+            if exp.name.endswith('!'):
+                if exp.name == "pred!":
                     res = interp.evaluate_constant(def_obj.binder.initializer)
                     if res is None:
                         panic.because(
                             panic.ExitCode.CompileTimeEvaluationError,
-                            "Tried to evaluate '$pred', but failed: this is most likely caused by a prior error.",
+                            "Tried to evaluate 'pred!', but failed: this is most likely caused by a prior error.",
                             opt_loc=exp.loc
                         )
                     return repr(res), def_type

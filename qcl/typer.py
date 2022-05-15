@@ -150,13 +150,13 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
                 )
             seed_one_top_level_stmt(ctx_chain[-1], nested_stmt)
 
-            # creating and binding a synthetic definition for '$pred' (for the next statement) pointing to the currently 
+            # creating and binding a synthetic definition for 'pred!' (for the next statement) pointing to the currently 
             # bound 'const_bind_stmt' such that
-            #   $pred = <IdRef(const_bind_stmt.name)>
+            #   pred! = <IdRef(const_bind_stmt.name)>
             new_ctx = Context(ContextKind.ConstImmediatelyInvokedFunctionBlock, ctx_chain[-1])
             synthetic_binder_initializer = ast1.IdRefExpression(nested_stmt.loc, nested_stmt.name)
-            synthetic_pred_binder = ast1.Bind1vStatement(nested_stmt.loc, "$pred", synthetic_binder_initializer, is_constant=True)
-            new_pred_def = ValueDefinition(nested_stmt.loc, "$pred", Scheme([], types.VarType(f"pred.{i}")), synthetic_pred_binder, is_compile_time_constant=True)
+            synthetic_pred_binder = ast1.Bind1vStatement(nested_stmt.loc, "pred!", synthetic_binder_initializer, is_constant=True)
+            new_pred_def = ValueDefinition(nested_stmt.loc, "pred!", Scheme([], types.VarType(f"pred.{i}")), synthetic_pred_binder, is_compile_time_constant=True)
             new_ctx.define(new_pred_def)
             ctx_chain.append(new_ctx)
             synth_pred_binders.append(synthetic_pred_binder)
@@ -281,7 +281,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             # definition is already seeded-- just retrieve and unify.
             # NOTE: must use 'lookup' instead of a shallow lookup in symbol table for special case of 'ConstStatement':
             # - the 'ctx_with_loc' context is a child of the global context containing the defined symbol
-            # - the 'ctx_with_loc' context is used to extend the global context with '$pred' or other special keywords.
+            # - the 'ctx_with_loc' context is used to extend the global context with 'pred!' or other special keywords.
             definition = ctx.lookup(stmt.name)
             def_sub, def_type = definition.scheme.instantiate()
             last_sub = def_sub.compose(exp_sub, stmt.loc)
@@ -374,21 +374,21 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         const_iife_ctx = stmt.root_ctx
         const_iife_ctx.local_return_type = enum_type
         
-        # In order to model statements in an IIFE, we must handle binding '$pred' which must be resolved at compile time.
-        # - we create a synthetic definition of $pred in the scope of each statement but the first
-        # - $pred maps to the previous element's ID as an expression: this symbolic representation makes it fully and 
+        # In order to model statements in an IIFE, we must handle binding 'pred!' which must be resolved at compile time.
+        # - we create a synthetic definition of pred! in the scope of each statement but the first
+        # - pred! maps to the previous element's ID as an expression: this symbolic representation makes it fully and 
         #   trivially compatible with anything added later in the compilation pipeline
         for i, (const_bind_stmt, synth_pred_binder) in enumerate(zip(stmt.body, stmt.wb_synth_pred_binders)):
             assert isinstance(const_bind_stmt, ast1.Bind1vStatement)
             pre_ctx = stmt.pre_ctx_of_constant(i)
             post_ctx = stmt.post_ctx_of_constant(i)
             
-            # note 'ctx_with_pred' so '$pred' resolves correctly
+            # note 'ctx_with_pred' so 'pred!' resolves correctly
             sub = model_one_statement(pre_ctx, const_bind_stmt, dto_list).compose(sub, const_bind_stmt.loc)
 
-            # type-checking: must check both binding and '$pred' binding:
+            # type-checking: must check both binding and 'pred!' binding:
             sub = unify(const_bind_stmt.initializer.wb_type, enum_type, const_bind_stmt.loc).compose(sub, const_bind_stmt.loc)
-            scm = post_ctx.lookup("$pred").scheme
+            scm = post_ctx.lookup("pred!").scheme
             pred_type = sub.rewrite_type(scm.instantiate_monomorphically())
             sub = unify(pred_type, enum_type, const_bind_stmt.loc).compose(sub, const_bind_stmt.loc)
             sub = model_one_statement(post_ctx, synth_pred_binder, dto_list).compose(sub, const_bind_stmt.loc)

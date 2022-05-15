@@ -310,7 +310,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.StringExpression(self.loc(ctx), piece_text_list, value)
 
     def visitPrevConstPrimaryExpression(self, ctx: antlr.QySourceFileParser.PrevConstPrimaryExpressionContext):
-        return ast1.IdRefExpression(self.loc(ctx), "$pred")
+        return ast1.IdRefExpression(self.loc(ctx), "pred!")
 
     def visitIdPrimaryExpression(self, ctx: antlr.QySourceFileParser.IdPrimaryExpressionContext):
         return ast1.IdRefExpression(self.loc(ctx), ctx.id_tok.text)

@@ -27,6 +27,7 @@ statement
     | ret=returnStatement
     | discard=discardStatement
     | loop=loopStatement
+    | 'test' ID '=' ID macroArgBlock
     ;
 bind1vStatement
     : 'val' b1v_term=bind1vTerm
@@ -54,7 +55,7 @@ primaryExpression
     | litInteger                                                                            #litIntPrimaryExpression
     | litFloat                                                                              #litFloatPrimaryExpression
     | litString                                                                             #litStringPrimaryExpression
-    | '$pred'                                                                               #prevConstPrimaryExpression
+    | 'pred!'                                                                               #prevConstPrimaryExpression
     | id_tok=ID                                                                             #idPrimaryExpression
     | '(' through=expression ')'                                                            #parenPrimaryExpression
     | lam=lambdaExpression                                                                  #lambdaPrimaryExpression
@@ -184,6 +185,10 @@ defArgSpec
     | name_tok=ID ':' ts=typeSpec
     ;
 
+macroArgBlock
+    : '[' (mab=macroArgBlock | ident=ID | exp=expression | ts=typeSpec)+? ']'
+    ;
+
 litBoolean: is_true='true' | 'false';
 litInteger: deci=LIT_DEC_INT | hexi=LIT_HEX_INT;
 litFloat: tok=LIT_FLOAT;
@@ -205,8 +210,10 @@ fragment ANY_ESC: (
 );
 fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
+fragment BASIC_ID: ((L|'_') (L|D|'_')*) ;
 
-ID: ((L|'_') (L|D|'_')*) ;
+MACRO_ID: BASIC_ID '!';
+ID: BASIC_ID;
 LIT_DEC_INT:      D+ IS? ;
 LIT_HEX_INT: '0x' H+ IS? ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;

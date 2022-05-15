@@ -1,4 +1,4 @@
-def literals_test() = do {
+def literals_test(): Void = do {
     val x = 42;
     val y = 100.0;
     val z = 42.0f;
