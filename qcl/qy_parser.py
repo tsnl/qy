@@ -16,7 +16,9 @@ def parse_one_file(abs_file_path: str) -> t.List[ast1.BaseStatement]:
     """
     if config.COMPILER_IN_DEBUG_MODE:
         assert abs_file_path == os.path.abspath(abs_file_path)
-
+    
+    print(f"\t{abs_file_path}")
+    
     opt_cached_result = file_parse_cache.get(abs_file_path, None)
     if opt_cached_result is not None:
         return opt_cached_result

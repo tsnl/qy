@@ -1,0 +1,11 @@
+{
+    "name": "qsl",
+    "author": "https://github.com/tsnl",
+    "help": "This module contains the Qy Standard Library.",
+    "src": [],
+    "deps": [
+        "./file/file.qyx.jsonc",
+        "./memory/memory.qyx.jsonc",
+        "./string/string.qyx.jsonc"
+    ]
+}

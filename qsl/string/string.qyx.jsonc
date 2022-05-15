@@ -1,0 +1,31 @@
+{
+    "name": "string",
+    "author": "https://github.com/tsnl",
+    "help": "Implementation of `string` library",
+    "binder": "c-v1",
+    "cc-args": {
+        "*": {
+            "c-flags": ["-Wall"],
+            "sources": [
+                "./string.c", 
+                "./string-stream.c"
+            ],
+            "headers": [
+                {
+                    "path": "string.h", 
+                    "provides": [
+                        "String", "new_string", "new_string_from_cstr", "string_dispose",
+                        "StringView", "new_string_view"
+                    ]
+                },
+                {
+                    "path": "string-stream.h", 
+                    "provides": [
+                        "StringStream", "new_string_stream", "string_stream_flush",
+                        "string_stream_push"
+                    ]
+                }
+            ]
+        }
+    }
+}

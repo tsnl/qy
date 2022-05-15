@@ -29,6 +29,11 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     target_platform = platform.core_macos_amd64
 
     qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file, target_platform)
+    if qyp_set is None:
+        panic.because(
+            panic.ExitCode.BadProjectFile,
+            "Failed to load project files: please see above errors"
+        )
 
     caught_exc = None
 

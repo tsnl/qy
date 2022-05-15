@@ -1,0 +1,33 @@
+{
+    "name": "file",
+    "author": "https://github.com/tsnl",
+    "help": "Implementation of `file` library",
+    "binder": "c-v1",
+    "cc-args": {
+        "*": {
+            "c-flags": ["-Wall"],
+            "sources": ["./file.c"],
+            "headers": [
+                {
+                    "path": "file.h", 
+                    "provides": [
+                        "File", 
+                        "FileOpenFlag", 
+                        "FILE_OPEN_FLAG__BINARY", 
+                        "FILE_OEPN_FLAG__TEXT",
+                        "FILE_OPEN_FLAG__CAN_READ",
+                        "FILE_OPEN_FLAG__CAN_WRITE",
+                        
+                        "file_open", "file_close"
+                    ]
+                },
+                {
+                    "path": "std.h",
+                    "provides": [                        
+                        "STDOUT", "STDERR"
+                    ]
+                }
+            ]
+        }
+    }
+}

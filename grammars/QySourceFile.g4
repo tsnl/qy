@@ -67,10 +67,10 @@ lambdaExpression
         prefix=unwrappedBlock (opt_tail=expression)? '}'
     ;
 postfixExpression
-    : through=primaryExpression                                 #throughPostfixExpression
-    | proc=postfixExpression '(' args=csExpressionList ')'      #procCallExpression
+    : through=primaryExpression                                       #throughPostfixExpression
+    | proc=postfixExpression '(' args=csExpressionList ')'            #procCallExpression
     | (kw='new'|(kw='push'|kw='heap') (is_mut='mut')?) 
-        made_ts=typeSpec '(' args=csExpressionList ')'          #constructorExpression
+        made_ts=typeSpec '(' args=csExpressionList ')'                #constructorExpression
     | container=postfixExpression '.' key=ID                          #dotIdExpression
     | container=postfixExpression '.' 'get' '(' index=expression ')'  #indexExpression
     | container=postfixExpression '.' 'ptr' '(' index=expression ')'  #indexRefExpression

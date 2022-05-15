@@ -1,0 +1,22 @@
+{
+    "name": "memory",
+    "author": "https://github.com/tsnl",
+    "help": "Implementation of `memory` library",
+    "binder": "c-v1",
+    "cc-args": {
+        "*": {
+            "c-flags": ["-Wall"],
+            "sources": [],
+            "headers": [
+                {
+                    "path": "alloc.h", 
+                    "provides": [
+                        "AllocCb", 
+                        "FreeCb", 
+                        "Allocator"
+                    ]
+                }
+            ]
+        }
+    }
+}

@@ -224,6 +224,9 @@ class NativeQyp(BaseQyp):
 
         # args look OK!
 
+        # logging:
+        print(f"INFO: Loading Qyp: {path_to_root_qyp_file}")
+
         # loading each source file, checking for duplicates or errors:
         qyp_dir_path = os.path.dirname(path_to_root_qyp_file)
         src_map = {}
@@ -310,6 +313,9 @@ class BaseQyx(BaseQyp, metaclass=abc.ABCMeta):
         qyx_dir_path = os.path.dirname(path_to_root_qyx_file)
         
         # args look OK!
+
+        # logging:
+        print(f"INFO: Loading Qyx: {path_to_root_qyx_file}")
 
         # dispatching to language-specific loaders:
         lang = js_map["binder"].upper()

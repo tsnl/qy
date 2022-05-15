@@ -37,11 +37,12 @@ TypeKind = clang.cindex.TypeKind
 
 
 def parse_one_file(source_file_path, rem_provided_symbols: t.Set[str], is_header: bool) -> t.Tuple[t.List[ast1.BaseStatement], t.Set[str]]:
+    print(f"\t{source_file_path}")
+    
     tu = index.parse(
         source_file_path,
         # options=clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
     )
-    print(f"INFO: Parsed C TranslationUnit (TU): {tu.spelling}")
     # dbg_print_visit(tu, tu.cursor)
 
     all_provided_symbols = set(rem_provided_symbols)
@@ -78,10 +79,12 @@ def translate_tu_top_level_stmt(tu, node, rem_provided_symbols) -> t.Iterable[as
         yield from translate_function_decl(tu, node, rem_provided_symbols)
     elif node.kind == CursorKind.VAR_DECL:
         yield from translate_variable_decl(tu, node, rem_provided_symbols)
+    elif node.kind == CursorKind.TYPEDEF_DECL:
+        yield from translate_typedef_decl(tu, node, rem_provided_symbols)
 
     else:
         # ignore this statement
-        pass
+        raise NotImplementedError(f"Compiler error: unknown statement in extern C code: {node.kind}")
 
 
 def translate_inclusion_directive(tu, node, rem_provided_symbols):
@@ -165,8 +168,16 @@ def translate_variable_decl(tu, node, rem_provided_symbols):
         rem_provided_symbols.remove(var_name)
         var_ts = translate_clang_type_to_ts(node.type, True)
         var_str = node.type.spelling + " " + node.spelling
-        is_mut = var_ts.wb_type.is_mut
+        # is_mut = var_ts.wb_type.is_mut
         yield ast1.Extern1vStatement(loc(node), var_name, var_ts, var_str)
+
+
+def translate_typedef_decl(tu, node, rem_provided_symbols):
+    type_name = node.spelling
+    if type_name in rem_provided_symbols:
+        rem_provided_symbols.remove(type_name)
+        stmt = ast1.Bind1tStatement(loc(node), type_name, translate_clang_type_to_ts(node.type, False))
+        yield stmt
 
 
 def loc(node):
@@ -243,7 +254,6 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
             f"Compilation failed for C type '{c_type.spelling}': could not determine size: undefined data-type used directly?",
             opt_file_path=c_type.translation_unit.spelling
         )
-
     if c_type.kind == TypeKind.VOID:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Void)
         ts.wb_type = types.VoidType.singleton
@@ -252,7 +262,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), ast1.BuiltinPrimitiveTypeIdentity.Bool)
         ts.wb_type = types.IntType.get(8, is_signed=False)
         return ts
-    elif c_type.kind in (TypeKind.CHAR_S, TypeKind.INT, TypeKind.LONG, TypeKind.LONGLONG):
+    elif c_type.kind in (TypeKind.CHAR_S, TypeKind.SCHAR, TypeKind.SHORT, TypeKind.INT, TypeKind.LONG, TypeKind.LONGLONG):
         builtin_primitive_type_id = {
             1: ast1.BuiltinPrimitiveTypeIdentity.Int8,
             2: ast1.BuiltinPrimitiveTypeIdentity.Int16,
@@ -262,7 +272,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
         ts.wb_type = types.IntType.get(8 * size_in_bytes, is_signed=True)
         return ts
-    elif c_type.kind in (TypeKind.UCHAR, TypeKind.UINT, TypeKind.ULONG, TypeKind.ULONGLONG):
+    elif c_type.kind in (TypeKind.UCHAR, TypeKind.USHORT, TypeKind.UINT, TypeKind.ULONG, TypeKind.ULONGLONG):
         builtin_primitive_type_id = {
             1: ast1.BuiltinPrimitiveTypeIdentity.UInt8,
             2: ast1.BuiltinPrimitiveTypeIdentity.UInt16,
@@ -318,14 +328,23 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         assert ts.wb_type is not None
         return ts
     elif c_type.kind == TypeKind.FUNCTIONPROTO:
-        args = [(None, translate_clang_type_to_ts(arg_type)) for arg_type in c_type.argument_types()]
+        arg_types = [translate_clang_type_to_ts(arg_type).wb_type for arg_type in c_type.argument_types()]
         ret_ts = translate_clang_type_to_ts(c_type.get_result())
         is_func_variadic = c_type.is_function_variadic()
         if is_func_variadic:
             raise NotImplementedError("Exposing variadic function type.")
-        return ast1.ProcSignatureTypeSpec(c_type_loc(c_type), args, ret_ts, takes_closure=False, is_c_variadic=False)
+        ts = ast1.ProcSignatureTypeSpec(c_type_loc(c_type), arg_types, ret_ts, takes_closure=False, is_c_variadic=is_func_variadic)
+        ts.wb_type = types.ProcedureType.new(arg_types, ret_ts.wb_type, has_closure_slot=False, is_c_variadic=is_func_variadic)
+        return ts
+    elif c_type.kind == TypeKind.CONSTANTARRAY:
+        element_type_spec = translate_clang_type_to_ts(c_type.element_type)
+        element_count = c_type.element_count
+        is_mut = c_type.element_type.is_const_qualified()
+        ts = ast1.ArrayTypeSpec(c_type_loc(c_type), element_type_spec, element_count, is_mut)
+        ts.wb_type = types.ArrayType.new(element_type_spec.wb_type, types.UniqueValueType(element_count), is_mut)
+        return ts
     else:
-        raise NotImplementedError(f"Unknown Clang canonical type kind for type: '{c_type.spelling}'")
+        raise NotImplementedError(f"Unknown Clang canonical type kind for type: '{c_type.spelling}' with kind={c_type.kind}")
 
 
 declaration_cache_map = {}
