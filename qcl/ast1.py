@@ -57,6 +57,7 @@ class BinaryOperator(enum.Enum):
 class BuiltinPrimitiveTypeIdentity(enum.Enum):
     Float32 = enum.auto()
     Float64 = enum.auto()
+    Float128 = enum.auto()
     Int64 = enum.auto()
     Int32 = enum.auto()
     Int16 = enum.auto()

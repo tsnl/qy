@@ -1,25 +1,18 @@
-#include "files.h"
+#include "file.h"
 
 #include <stdio.h>
-
-File open(void) {
-
-}
-File close(void) {
-
-}
 
 FileOpenFlag const FILE_OPEN__BINARY     = 0x1;
 FileOpenFlag const FILE_OPEN__TEXT       = 0x2;
 FileOpenFlag const FILE_OPEN__CAN_READ   = 0x4;
 FileOpenFlag const FILE_OPEN__CAN_WRITE  = 0x8;
 
-File THE_STDOUT = stdout;
-File THE_STDERR = stderr;
-
-File open(void) {
+File file_open1(StringView file_path, int file_open_flags) {
+    
+}
+File file_open2(String* file_path_ref, int file_open_flags) {
 
 }
-File close(void) {
+File file_close(File file) {
 
 }

@@ -3,7 +3,7 @@
 #include "../prim/integer.h"
 
 typedef void*(*AllocCb)(u64 size);
-typedef void(*FreeCb)(void* ptr, long sci);
+typedef void(*FreeCb)(void* ptr);
     
 struct {
     AllocCb alloc_cb;

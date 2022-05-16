@@ -5,6 +5,9 @@
     "files.associations": {
         "*.rkt": "racket",
         "*.purr": "racket",
-        "random": "cpp"
+        "random": "cpp",
+        "string.h": "c",
+        "iosfwd": "cpp",
+        "sstream": "cpp"
     }
 }

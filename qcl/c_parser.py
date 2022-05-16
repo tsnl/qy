@@ -82,6 +82,10 @@ def translate_tu_top_level_stmt(tu, node, rem_provided_symbols) -> t.Iterable[as
     elif node.kind == CursorKind.TYPEDEF_DECL:
         yield from translate_typedef_decl(tu, node, rem_provided_symbols)
 
+    elif node.kind in (CursorKind.STATIC_ASSERT,):
+        # do nothing
+        yield from iter(())
+
     else:
         # ignore this statement
         raise NotImplementedError(f"Compiler error: unknown statement in extern C code: {node.kind}")
@@ -282,10 +286,11 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
         ts.wb_type = types.IntType.get(8 * size_in_bytes, is_signed=False)
         return ts
-    elif c_type.kind in (TypeKind.FLOAT, TypeKind.DOUBLE):
+    elif c_type.kind in (TypeKind.FLOAT, TypeKind.DOUBLE, TypeKind.LONGDOUBLE):
         builtin_primitive_type_id = {
             4: ast1.BuiltinPrimitiveTypeIdentity.Float32,
-            8: ast1.BuiltinPrimitiveTypeIdentity.Float64
+            8: ast1.BuiltinPrimitiveTypeIdentity.Float64,
+            16: ast1.BuiltinPrimitiveTypeIdentity.Float128
         }[size_in_bytes]
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
         ts.wb_type = types.FloatType(8 * size_in_bytes)

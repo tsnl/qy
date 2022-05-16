@@ -759,6 +759,7 @@ class Emitter(base_emitter.BaseEmitter):
             cml_print(f"include_directories({output_path})")
             cml_print()
             cml_print(f"set(CMAKE_CXX_STANDARD 17)")
+            cml_print(f"set(CMAKE_C_STANDARD 11)")
             cml_print()
             cml_print(f"if (NOT MSVC)")
             cml_print(f"    set(CMAKE_CXX_FLAGS -Wno-parentheses-equality)")
