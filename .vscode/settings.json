@@ -4,10 +4,17 @@
     "python.analysis.autoImportCompletions": false,
     "files.associations": {
         "*.rkt": "racket",
-        "*.purr": "racket",
         "random": "cpp",
         "string.h": "c",
         "iosfwd": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "bit": "c",
+        "chrono": "c",
+        "condition_variable": "c",
+        "algorithm": "c",
+        "istream": "c",
+        "limits": "c",
+        "mutex": "c",
+        "streambuf": "c"
     }
 }

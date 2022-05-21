@@ -27,17 +27,6 @@ void dispose_string(String* string, FreeCb free_cb) {
     string->nt_data = NULL;
 }
 
-StringView new_string_view(String const* string, u64 beg, u64 end) {
-    StringView sv = {
-        .src = string,
-        .span = {
-            .beg = beg,
-            .end = MIN(end, string->count)
-        }
-    };
-    return sv;
-}
-
 size_t string_length(String const* string) {
     return string->count;
 }

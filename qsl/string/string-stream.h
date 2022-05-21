@@ -31,17 +31,22 @@ typedef struct StringStreamChunk StringStreamChunk;
 //
 
 enum StringStreamStrandKind {
-    STRING_REF, STRING_VIEW,
-    UNICODE_CHARACTER,
-    UINT, SINT,
-    F32, F64, F128
+    STRAND_KIND_STRING_REF, 
+    STRAND_KIND_STRING_VIEW,
+    STRAND_KIND_UNICODE_CHARACTER,
+    STRAND_KIND_UINT, 
+    STRAND_KIND_SINT,
+    STRAND_KIND_F32, 
+    STRAND_KIND_F64
 } typedef StringStreamStrandKind;
 union StringStreamStrandInfo {
-    size_t raw[2];
+    size_t raw[2];  // for size
     String* string_ref; StringView string_view;
     int unicode_character;
-    u64 uint; i64 sint;
-    f32 float_32; f64 float_64; f128 float_128;
+    struct { u64 v; i32 base; i32 flags; } uint; 
+    struct { i64 v; i32 base; i32 flags; } sint;
+    struct { f32 v; i32 base; i32 flags; } float_32; 
+    struct { f64 v; i32 base; i32 flags; } float_64; 
 };
 static_assert(sizeof(StringStreamStrandInfo) == 2*sizeof(size_t), "Invalid StringStreamStrandInfo size");
 
@@ -53,24 +58,30 @@ struct StringStreamStrand {
 #pragma pack(pop, Words)
 static_assert(sizeof(StringStreamStrand) == 3*sizeof(size_t), "Invalid StringStreamStrand size");
 
-#define STRING_BUILDER_STRANDS_PER_CHUNK (2)
+// Strands per chunk (k) must satisfy (3k+2) % 8 == 0 
+// Select k=2  then each StringStreamChunk is exactly the size of 1  cache lines (64   bytes, 8   words)
+// Select k=42 then each StringStreamChunk is exactly the size of 16 cache lines (1024 bytes, 128 words)
+#define STRING_BUILDER_STRANDS_PER_CHUNK (42)
 
 #pragma pack(push, Words, 8)
 struct StringStreamChunk {
     StringStreamStrand strands[STRING_BUILDER_STRANDS_PER_CHUNK];
-    size_t count;
+    size_t strands_count;
     StringStreamChunk* next;
 };
 #pragma pack(pop, Words)
-static_assert(sizeof(StringStreamChunk) == 8*sizeof(size_t), "Invalid StringStreamChunk size");
+static_assert(sizeof(StringStreamChunk) == 1024, "Invalid StringStreamChunk size");
+
+#define DEFAULT_F32_PRINT_LENGTH 6
+#define DEFAULT_F64_PRINT_LENGTH 9
 
 ///
 // Interface definitions:
 //
 
 struct StringStream {
-    StringStreamChunk* head;
-    StringStreamChunk* tail;
+    StringStreamChunk head;                 // first chunk is stored inline
+    StringStreamChunk* opt_external_tail;   // if NULL, implies inline 'head' is also tail
     Allocator allocator;
     size_t running_length;
 } typedef StringStream;
@@ -84,17 +95,10 @@ String string_stream_flush(StringStream* ss);
 
 /// Push formats a string piece and adds it to a string stream.
 void string_stream_push_string_view(StringStream* ss, StringView sv);
-void string_stream_push_number_i8(StringStream* ss, i8 v);
-void string_stream_push_number_i16(StringStream* ss, i16 v);
-void string_stream_push_number_i32(StringStream* ss, i32 v);
-void string_stream_push_number_i64(StringStream* ss, i64 v);
-void string_stream_push_number_u8(StringStream* ss, i8 v);
-void string_stream_push_number_u16(StringStream* ss, i16 v);
-void string_stream_push_number_u32(StringStream* ss, i32 v);
-void string_stream_push_number_u64(StringStream* ss, i64 v);
-void string_stream_push_number_f32(StringStream* ss, f32 v);
-void string_stream_push_number_f64(StringStream* ss, f64 v);
-void string_stream_push_number_f128(StringStream* ss, f128 v);
+void string_stream_push_number_sint(StringStream* ss, i64 v, i32 base, i32 flags);
+void string_stream_push_number_uint(StringStream* ss, u64 v, i32 base, i32 flags);
+void string_stream_push_number_f32(StringStream* ss, f32 v, i32 base, i32 flags);
+void string_stream_push_number_f64(StringStream* ss, f64 v, i32 base, i32 flags);
 void string_stream_push_string_ref(StringStream* ss, String* str);
 void string_stream_push_ascii_character(StringStream* ss, char ascii_code_point);
 void string_stream_push_unicode_character(StringStream* ss, int unicode_code_point);

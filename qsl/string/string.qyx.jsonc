@@ -8,6 +8,7 @@
             "c-flags": ["-Wall"],
             "sources": [
                 "./string.c", 
+                "./string-view.c",
                 "./string-stream.c"
             ],
             "headers": [
@@ -31,14 +32,8 @@
                     "provides": [
                         "StringStream", "new_string_stream", "string_stream_flush",
                         "string_stream_push_string_view",
-                        "string_stream_push_number_i8",
-                        "string_stream_push_number_i16",
-                        "string_stream_push_number_i32",
-                        "string_stream_push_number_i64",
-                        "string_stream_push_number_u8",
-                        "string_stream_push_number_u16",
-                        "string_stream_push_number_u32",
-                        "string_stream_push_number_u64",
+                        "string_stream_push_number_sint",
+                        "string_stream_push_number_uint",
                         "string_stream_push_number_f32",
                         "string_stream_push_number_f64",
                         "string_stream_push_string_ref",

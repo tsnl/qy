@@ -17,7 +17,7 @@ struct StringView {
 } typedef StringView;
 
 /// Construct/destroy:
-StringView new_string_view(String const* src, u64 beg, u64 end);
+StringView new_string_view(String const* src, u32 beg, u32 end);
 StringView to_string_view(String const* src);
 
 /// Const accessors:
