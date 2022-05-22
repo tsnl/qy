@@ -23,8 +23,7 @@ inline static size_t ilog(size_t v, size_t b) {
 StringStreamChunk new_string_stream_chunk() {
     return (StringStreamChunk) {
         .strands_count = 0,
-        .next = NULL,
-        .strands = {}
+        .next = NULL
     };
 }
 StringStreamChunk* string_stream_tail(StringStream* ss) {
@@ -64,6 +63,7 @@ inline static size_t unicode_code_point_length_in_utf8(int code_point) {
         return 4;
     }
     assert(0 && "Invalid Unicode code point");
+    return 0;   // not reachable
 }
 
 size_t int_strand_length(size_t number_len, bool has_base_prefix, bool is_signed) {
@@ -107,6 +107,10 @@ static size_t write_strand(char* buffer, size_t w_ix, StringStreamStrand strand)
         case STRAND_KIND_F32: return write_strand__sint(buffer, w_ix, strand);
         case STRAND_KIND_F64: return write_strand__sint(buffer, w_ix, strand);
         case STRAND_KIND_UNICODE_CHARACTER: return write_strand__unicode_char_utf8(buffer, w_ix, strand);
+        default: {
+            assert(0 && "Unknown strand.");
+            return 0;
+        }
     }
 }
 static size_t write_strand__string_ref(char* buffer, size_t w_ix, StringStreamStrand strand) {

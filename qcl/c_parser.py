@@ -243,7 +243,7 @@ def dbg_print_visit(tu, node, indent_count=1, tab_w=2):
         dbg_print_visit(tu, child, 1 + indent_count)
 
 
-def translate_clang_type_to_ts(c_type, is_direct_use=True) -> ast1.BaseTypeSpec:
+def translate_clang_type_to_ts(c_type: clang.cindex.Type, is_direct_use=True) -> ast1.BaseTypeSpec:
     ts = help_translate_clang_type_to_ts(c_type.get_canonical(), is_direct_use=is_direct_use)
     ts.wb_type.is_mut = not c_type.is_const_qualified()
     return ts
@@ -310,8 +310,24 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
             ts.wb_type = opt_cached_ts.wb_type
             return ts
         else:
-            fields = [(it.spelling, translate_clang_type_to_ts(it.type)) for it in c_type.get_fields()]
+            # NOTE: must declare this TS (with no fields, say) before translating
+            # child types.
+            # This way, any 'nested' references (which MUST be indirect uses) can
+            # refer to this instance with no fields, and we can retroactively
+            # push the fields into this instance.
+            fields = []
             ts = ast1.AdtTypeSpec(c_type_loc(c_type), lto_map[declaration.kind], fields)
+            ts.wb_type = type_ctor([], opt_name=type_name)  # temporary wb_type
+
+            declaration_cache_map[type_name] = ts
+
+            for it in c_type.get_fields():
+                field_key = (
+                    it.spelling, 
+                    translate_clang_type_to_ts(it.type, is_direct_use=is_direct_use)
+                )
+                fields.append(field_key)
+                ts.push_field(field_key)
             ts.wb_type = type_ctor(
                 [
                     (field_name, field_ts.wb_type)
@@ -319,7 +335,6 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
                 ],
                 opt_name=type_name
             )
-            declaration_cache_map[type_name] = ts
             return ts
     elif c_type.kind == TypeKind.POINTER:
         clang_pointee_ts = c_type.get_pointee()
@@ -333,8 +348,8 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         assert ts.wb_type is not None
         return ts
     elif c_type.kind == TypeKind.FUNCTIONPROTO:
-        arg_types = [translate_clang_type_to_ts(arg_type).wb_type for arg_type in c_type.argument_types()]
-        ret_ts = translate_clang_type_to_ts(c_type.get_result())
+        arg_types = [translate_clang_type_to_ts(arg_type, is_direct_use=False).wb_type for arg_type in c_type.argument_types()]
+        ret_ts = translate_clang_type_to_ts(c_type.get_result(), is_direct_use=False)
         is_func_variadic = c_type.is_function_variadic()
         if is_func_variadic:
             raise NotImplementedError("Exposing variadic function type.")
@@ -342,7 +357,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
         ts.wb_type = types.ProcedureType.new(arg_types, ret_ts.wb_type, has_closure_slot=False, is_c_variadic=is_func_variadic)
         return ts
     elif c_type.kind == TypeKind.CONSTANTARRAY:
-        element_type_spec = translate_clang_type_to_ts(c_type.element_type)
+        element_type_spec = translate_clang_type_to_ts(c_type.element_type, is_direct_use=False)
         element_count = c_type.element_count
         is_mut = c_type.element_type.is_const_qualified()
         ts = ast1.ArrayTypeSpec(c_type_loc(c_type), element_type_spec, element_count, is_mut)

@@ -57,6 +57,14 @@
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
             "args": ["qsl/qsl.qyp.jsonc"]
+        },
+        {
+            "name": "qc sandbox/sandbox.qyp.jsonc",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["sandbox/sandbox.qyp.jsonc"]
         }
     ]
 }

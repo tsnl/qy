@@ -478,6 +478,17 @@ class AdtTypeSpec(BaseTypeSpec):
             if arg_pair[0] is not None
         }
 
+    def push_field(self, field_key):
+        assert isinstance(field_key, tuple)
+        assert len(field_key) == 2
+        field_name, field_ts = field_key
+        assert isinstance(field_name, (type(None), str))
+        assert isinstance(field_ts, BaseTypeSpec)
+        assert field_name not in self.fields_dict
+        self.fields_list.append(field_key)
+        self.fields_dict[field_name] = field_ts
+
+
 
 class PtrTypeSpec(BaseTypeSpec):
     def __init__(self, loc: fb.ILoc, pointee_type_spec: BaseTypeSpec, is_mut: bool):

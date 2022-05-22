@@ -40,6 +40,9 @@ File file_open2(StringView file_path, int file_open_flags) {
     strncpy(path_buf, file_path.src->nt_data + file_path.span.beg, string_view_length(&file_path));
     return help_open_file(path_buf, file_open_flags);
 }
+void file_print(File file, String const* print_ref) {
+    fprintf(file, "%s", print_ref->nt_data);
+}
 void file_close(File file) {
     fclose(file);
 }

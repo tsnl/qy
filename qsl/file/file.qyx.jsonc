@@ -18,7 +18,8 @@
                         "FILE_OPEN_FLAG__CAN_READ",
                         "FILE_OPEN_FLAG__CAN_WRITE",
                         
-                        "file_open", "file_close"
+                        "file_open", "file_close",
+                        "file_print"
                     ]
                 },
                 {
