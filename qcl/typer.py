@@ -13,6 +13,22 @@ from . import ast2
 from . import interp
 
 
+def type_one_qyp_set(qyp_set: ast2.QypSet):
+    dto_list = DTOList()
+    new_ctx = Context(ContextKind.TopLevelOfQypSet, Context.builtin_root)
+    sub = Substitution.empty
+    
+    for _, _, source_file in qyp_set.iter_src_paths():
+        seed_one_source_file(source_file, new_ctx)
+    
+    for _, _, source_file in qyp_set.iter_src_paths():
+        sub = model_one_source_file(source_file, dto_list, sub)
+
+    dto_list.solve()
+
+    qyp_set.wb_root_ctx = new_ctx
+
+
 #
 # source file typing: part 1: seeding
 #
@@ -483,7 +499,9 @@ def help_model_one_exp(
         return Substitution.empty, types.FloatType.get(exp.width_in_bits)
 
     elif isinstance(exp, ast1.StringExpression):
-        return Substitution.empty, types.StringType.singleton
+        builtin_string_def = ctx.try_lookup("String")
+        assert isinstance(builtin_string_def, TypeDefinition)
+        return Substitution.empty, builtin_string_def.scheme.instantiate_monomorphically()
 
     elif isinstance(exp, ast1.ConstructExpression):
         made_ts_sub, made_type = model_one_type_spec(ctx, exp.made_ts, dto_list)
@@ -716,7 +734,6 @@ def help_model_one_type_spec(
             ast1.BuiltinPrimitiveTypeIdentity.UInt16: types.IntType.get(16, is_signed=False),
             ast1.BuiltinPrimitiveTypeIdentity.UInt32: types.IntType.get(32, is_signed=False),
             ast1.BuiltinPrimitiveTypeIdentity.UInt64: types.IntType.get(64, is_signed=False),
-            ast1.BuiltinPrimitiveTypeIdentity.String: types.StringType.singleton,
             ast1.BuiltinPrimitiveTypeIdentity.Void: types.VoidType.singleton
         }[ts.identity]
         

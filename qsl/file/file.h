@@ -13,6 +13,6 @@ extern FileOpenFlag const FILE_OPEN_FLAG__CAN_WRITE;
 File file_open1(String file_path, int file_open_flags);
 File file_open2(StringView file_path, int file_open_flags);
 
-void file_print(File file, String const* print_ref);
+void file_print(File file, String print);
 
 void file_close(File file);

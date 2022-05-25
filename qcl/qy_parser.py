@@ -546,8 +546,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
                     'U16': ast1.BuiltinPrimitiveTypeIdentity.UInt16,
                     'U8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
                     'Bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
-                    'Void': ast1.BuiltinPrimitiveTypeIdentity.Void,
-                    'String': ast1.BuiltinPrimitiveTypeIdentity.String
+                    'Void': ast1.BuiltinPrimitiveTypeIdentity.Void
                 }[ctx.tok.text]
             )
 

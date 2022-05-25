@@ -68,7 +68,6 @@ class BuiltinPrimitiveTypeIdentity(enum.Enum):
     UInt8 = enum.auto()
     Bool = enum.auto()
     Void = enum.auto()
-    String = enum.auto()
 
 
 class LinearTypeOp(enum.Enum):

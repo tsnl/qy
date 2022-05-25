@@ -50,14 +50,7 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
 
         # typing native source files:
         # - two distinct passes: seeding and modelling
-        dto_list = typer.DTOList()
-        new_ctx = typer.Context(typer.ContextKind.TopLevelOfQypSet, typer.Context.builtin_root)
-        sub = typer.Substitution.empty
-        for _, _, source_file in qyp_set.iter_src_paths():
-            typer.seed_one_source_file(source_file, new_ctx)
-        for _, _, source_file in qyp_set.iter_src_paths():
-            sub = typer.model_one_source_file(source_file, dto_list, sub)
-        dto_list.solve()
+        typer.type_one_qyp_set(qyp_set)
 
         # TODO: run post-typing checks
         # - e.g. check that 'main' has the correct signature.

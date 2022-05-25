@@ -45,8 +45,14 @@ class Emitter(base_emitter.BaseEmitter):
     
         # v-- used by emit_exp
         self.tmp_var_id_counter = 0
+        self.cached_builtin_string_type = None
 
     def emit_qyp_set(self, qyp_set: ast2.QypSet):
+        # caching builtin bindings from Qyp context:
+        builtin_string_type_def = qyp_set.wb_root_ctx.try_lookup("String")
+        assert isinstance(builtin_string_type_def, typer.TypeDefinition)
+        self.cached_builtin_string_type = builtin_string_type_def.scheme.instantiate_monomorphically()
+
         # cleaning old directories:
         # on macOS, Windows, with case-insensitive paths, renaming symbols with different case 
         # results in stale files being used instead.
@@ -422,14 +428,16 @@ class Emitter(base_emitter.BaseEmitter):
                 return "double"
             else:
                 raise NotImplementedError(f"Unknown float width in bits: {qy_type.width_in_bits}")
-        elif isinstance(qy_type, types.StringType):
-            return "String"
         elif isinstance(qy_type, types.BaseCompositeType):
             opt_existing_name = self.pub_type_to_header_name_map.get(qy_type)
             if opt_existing_name is not None:
                 return opt_existing_name
             else:
                 if isinstance(qy_type, (types.StructType, types.UnionType)):
+                    if qy_type.opt_name is not None:
+                        assert isinstance(qy_type.opt_name, str)
+                        return qy_type.opt_name
+
                     field_str_fragments = [
                         f"{self.translate_type(field_type)} {field_name};" 
                         for field_name, field_type in qy_type.fields
@@ -536,7 +544,7 @@ class Emitter(base_emitter.BaseEmitter):
             c_string_literal = json.dumps(exp.value)
             c_string_length = len(exp.value.encode("utf-8"))
             output_constructor = f"new_permanent_literal_string({c_string_literal}, {int(c_string_length)})"
-            return output_constructor, types.StringType.singleton
+            return output_constructor, self.cached_builtin_string_type
 
         elif isinstance(exp, ast1.UnaryOpExpression):
             operand_str, operand_type = self.translate_expression_with_type(exp.operand)

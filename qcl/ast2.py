@@ -144,6 +144,7 @@ class QypSet(object):
         super().__init__()
         self.qyp_name_map = qyp_name_map
         self.root_qyp = root_qyp
+        self.wb_root_ctx = None
 
     # def iter_native_src_paths(self) -> t.Iterable[t.Tuple[str, str, "QySourceFile"]]:
     #     for qyp_name, qyp in self.qyp_name_map.items():
