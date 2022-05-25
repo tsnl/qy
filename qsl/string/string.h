@@ -17,7 +17,8 @@ struct String {
 } typedef String;
 
 /// Create/destroy:
-String new_string_from_cstr(char const* cstr, int length_hint, AllocCb alloc);
+String new_permanent_literal_string(char const* cstr, i32 length);
+String new_string_from_cstr(char const* cstr, i32 length_hint, AllocCb alloc);
 void dispose_string(String* string, FreeCb free_cb);
 
 /// Const accessors:

@@ -32,7 +32,7 @@ FileOpenFlag const FILE_OPEN_FLAG__BINARY     = 0x1;
 FileOpenFlag const FILE_OPEN_FLAG__CAN_READ   = 0x2;
 FileOpenFlag const FILE_OPEN_FLAG__CAN_WRITE  = 0x4;
 
-File file_open1(String* file_path_ref, int file_open_flags) {
+File file_open1(String const* file_path_ref, int file_open_flags) {
     return help_open_file(file_path_ref->nt_data, file_open_flags);
 }
 File file_open2(StringView file_path, int file_open_flags) {

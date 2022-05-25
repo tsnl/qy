@@ -423,7 +423,7 @@ class Emitter(base_emitter.BaseEmitter):
             else:
                 raise NotImplementedError(f"Unknown float width in bits: {qy_type.width_in_bits}")
         elif isinstance(qy_type, types.StringType):
-            return "std::string"
+            return "String"
         elif isinstance(qy_type, types.BaseCompositeType):
             opt_existing_name = self.pub_type_to_header_name_map.get(qy_type)
             if opt_existing_name is not None:
@@ -533,7 +533,10 @@ class Emitter(base_emitter.BaseEmitter):
             return ''.join(fragments), types.FloatType.get(exp.width_in_bits)
 
         elif isinstance(exp, ast1.StringExpression):
-            return json.dumps(exp.value), types.StringType.singleton
+            c_string_literal = json.dumps(exp.value)
+            c_string_length = len(exp.value.encode("utf-8"))
+            output_constructor = f"new_permanent_literal_string({c_string_literal}, {int(c_string_length)})"
+            return output_constructor, types.StringType.singleton
 
         elif isinstance(exp, ast1.UnaryOpExpression):
             operand_str, operand_type = self.translate_expression_with_type(exp.operand)
@@ -782,11 +785,13 @@ class Emitter(base_emitter.BaseEmitter):
 
                     native_source_file_paths.append(f"impl/{qyp_name}.{CppFileWriter.doc_file_path_suffix[DocType.MainHeader]}")
                     native_source_file_paths.append(f"impl/{qyp_name}.{CppFileWriter.doc_file_path_suffix[DocType.MainSource]}")
+
                 elif isinstance(qyp, ast2.CQyx):
                     for c_source_file in qyp.c_source_files:
                         if not c_source_file.is_header:
                             file_path = self.relpath(c_source_file.file_path)
                             extern_source_file_paths.append(file_path)
+
                 else:
                     raise NotImplementedError(f"emit_cmake_lists: Unknown Qyp of type {qyp.__class__.__name__}")
 
@@ -919,12 +924,12 @@ class StringWriter(object):
         return '\n'.join(output)
 
     def add_common_stdlib_header_includes(self):
-        self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="string"))
+        # C/C++ stdlib:
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="functional"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="array"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdint"))
         self.include_specs.append(IncludeSpec(use_angle_brackets=True, include_path="cstdlib"))
-        
+
     def inject_manual_main_preamble(self):
         # FIXME: allow cross-compilation via args, not current platform
         if os.name == 'nt':

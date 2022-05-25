@@ -7,6 +7,12 @@
 
 #define MIN(x, y) (x < y ? x : y)
 
+String new_permanent_literal_string(char const* cstr, i32 length) {
+    return (String) {
+        .nt_data = (char*)cstr,     // should never be disposed
+        .count = length
+    };
+}
 String new_string_from_cstr(char const* cstr, int length_hint, AllocCb alloc) {
     int count = length_hint;
     if (count < 0) {

@@ -39,7 +39,7 @@ bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
 type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
 constStatement: 'const' ':' type_spec=typeSpec b=constBlock ;
 returnStatement: 'return' ret_exp=expression ;
-discardStatement: 'eval' discarded_exp=expression ;
+discardStatement: 'run' discarded_exp=expression ;
 loopStatement
     : while_do='while' cond=expression 'do' body=block
     | do_while='do' body=block 'while' cond=expression 

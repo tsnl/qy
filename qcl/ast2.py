@@ -17,6 +17,7 @@ import functools
 import os.path
 import json
 import typing as t
+import sys
 from collections import OrderedDict
 
 from . import panic
@@ -103,6 +104,7 @@ class QypSet(object):
                 qyp_name_map[loaded_qyp.js_name] = loaded_qyp
 
             # adding all dependency paths:
+            # NOTE: 'qsl' or Qy standard library is always a dependency
             for dep_index, dep_path in enumerate(loaded_qyp.js_dep_path_list):
                 if dep_path.startswith("https://"):
                     panic.because(
@@ -117,12 +119,18 @@ class QypSet(object):
                         f"Dependency path cannot start with '/': see 'deps' item {1 + dep_index}: {dep_path}",
                         qyp_path_to_load
                     )
+                elif dep_path.startswith("$"):
+                    # builtin path
+                    p = dep_path[1:]
+                    assert os.path.isfile(p)
+                    target_path = os.path.abspath(p)
                 else:
                     # relative path
                     target_path = os.path.abspath(os.path.join(loaded_qyp.dir_path, dep_path))
-                    if target_path not in qyp_path_queue:
-                        qyp_path_queue_parent_list.append(qyp_path_to_load)
-                        qyp_path_queue.append(target_path)
+                
+                if target_path not in qyp_path_queue:
+                    qyp_path_queue_parent_list.append(qyp_path_to_load)
+                    qyp_path_queue.append(target_path)
 
             # incrementing the index into the path queue:
             qyp_path_index += 1
@@ -275,6 +283,9 @@ class NativeQyp(BaseQyp):
         """
         super().__init__(qyp_file_path, dir_path, name, author, project_help, qy_src_path_list, dep_path_list, qy_src_map)
         
+        # every native Qyp depends on QSL
+        self.js_dep_path_list.append(qsl_qyp_dep_path)
+
     def iter_native_src_paths(self):
         return iter(self.src_path_list)
 
@@ -698,3 +709,16 @@ class CSourceFile(BaseSourceFile):
     @classmethod
     def get_extern_str(cls) -> t.Optional[str]:
         return "C"
+
+
+#
+#
+# Reference to Qy Standard Library (QSL)
+#
+#
+
+
+qc_dir = os.path.dirname(sys.argv[0])
+qsl_dir = os.path.join(qc_dir, "qsl")
+qsl_qyp_filepath = os.path.join(qsl_dir, "qsl.qyp.jsonc")
+qsl_qyp_dep_path = f"${qsl_qyp_filepath}"

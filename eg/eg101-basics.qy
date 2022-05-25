@@ -30,7 +30,9 @@ type Point = (pos: Vec3F);
 type Vec3F = (x: F32, y: F32, z: F32);
 
 // function definitions:
-// NOTE: type inference fills in holes.
+// NOTE: type inference fills in holes, so any arg/ret typespec can be completely
+// omitted.
+
 def vec3f (x: F32, y: F32, z: F32): Vec3F = do {
     new Vec3F(x, y, z)
 };
