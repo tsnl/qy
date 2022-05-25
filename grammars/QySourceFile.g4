@@ -208,9 +208,9 @@ fragment ANY_ESC: (
     ('\\u' H H H H)
     ('\\U' H H H H H H H H)
 );
+fragment BASIC_ID: ((L|'_') (L|D|'_')*) ;
 fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
-fragment BASIC_ID: ((L|'_') (L|D|'_')*) ;
 
 MACRO_ID: BASIC_ID '!';
 ID: BASIC_ID;

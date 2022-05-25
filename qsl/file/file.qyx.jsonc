@@ -14,11 +14,12 @@
                         "File", 
                         "FileOpenFlag", 
                         "FILE_OPEN_FLAG__BINARY", 
-                        "FILE_OEPN_FLAG__TEXT",
                         "FILE_OPEN_FLAG__CAN_READ",
                         "FILE_OPEN_FLAG__CAN_WRITE",
                         
-                        "file_open", "file_close",
+                        "file_open1", 
+                        "file_open2", 
+                        "file_close",
                         "file_print"
                     ]
                 },

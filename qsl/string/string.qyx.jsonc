@@ -16,7 +16,7 @@
                     "path": "string.h", 
                     "provides": [
                         "String", 
-                        "new_string", "new_string_from_cstr", "string_dispose", 
+                        "new_string_from_cstr", "string_dispose", 
                         "string_length", "string_is_empty"
                     ]
                 },

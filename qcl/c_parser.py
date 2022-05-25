@@ -36,7 +36,7 @@ CursorKind = clang.cindex.CursorKind
 TypeKind = clang.cindex.TypeKind
 
 
-def parse_one_file(source_file_path, rem_provided_symbols: t.Set[str], is_header: bool) -> t.Tuple[t.List[ast1.BaseStatement], t.Set[str]]:
+def parse_one_file(source_file_path, all_provided_symbols: t.Set[str], is_header: bool) -> t.Tuple[t.List[ast1.BaseStatement], t.Set[str]]:
     print(f"\t{source_file_path}")
     
     tu = index.parse(
@@ -45,18 +45,19 @@ def parse_one_file(source_file_path, rem_provided_symbols: t.Set[str], is_header
     )
     # dbg_print_visit(tu, tu.cursor)
 
-    all_provided_symbols = set(rem_provided_symbols)
+    # making a copy of 'provided_symbols', then popping as symbols are discovered:
+    rem_provided_symbols = set(all_provided_symbols)
     if rem_provided_symbols:
         stmt_list = translate_tu(tu, rem_provided_symbols)
     else:
         stmt_list = []
-    exposed_symbols = all_provided_symbols - rem_provided_symbols
 
+    # finding which symbols were discovered:
+    exposed_symbols = all_provided_symbols - rem_provided_symbols
     return stmt_list, exposed_symbols
 
 
 def translate_tu(tu, rem_provided_symbols) -> t.List[ast1.BaseStatement]:
-    # FIXME: change iter_list into an iterable when `itertools.chain` is used correctly.
     iter_list = []
     for child_node in tu.cursor.get_children():
         iter_list += list(translate_tu_top_level_stmt(tu, child_node, rem_provided_symbols))

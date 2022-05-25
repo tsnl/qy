@@ -1,6 +1,6 @@
 def main() = do {
-    val a = "Hello";
-    val f = file_open("hello.txt");
-    run file_print(f, "Hi");
+    val abc_1 = "Hello";
+    run file_open1("hello.txt", 0);
+    // run file_print(f, "Hi");
     0
 };

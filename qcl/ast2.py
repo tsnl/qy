@@ -702,8 +702,18 @@ class CSourceFile(BaseSourceFile):
                 "source file path does not refer to an existing file:",
                 source_file_path
             )
-        stmt_list, this_provided_symbol_set = c_parser.parse_one_file(source_file_path, set(provided_symbol_list), is_header)
+
+        provided_symbol_set = set(provided_symbol_list)
+        stmt_list, this_provided_symbol_set = c_parser.parse_one_file(source_file_path, provided_symbol_set, is_header)
         assert isinstance(stmt_list, list)
+
+        if this_provided_symbol_set != provided_symbol_set:
+            missing_symbol_set = provided_symbol_set - this_provided_symbol_set
+            panic.because(
+                panic.ExitCode.ExternCompileFailed,
+                f"exported symbols were not found in C code: {', '.join(sorted(missing_symbol_set))}"
+            )
+
         return CSourceFile(source_file_path, stmt_list, this_provided_symbol_set, is_header)
 
     @classmethod

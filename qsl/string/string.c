@@ -25,7 +25,7 @@ String new_string_from_cstr(char const* cstr, int length_hint, AllocCb alloc) {
     memcpy(s.nt_data, cstr, count+1);
     return s;
 }
-void dispose_string(String* string, FreeCb free_cb) {
+void string_dispose(String* string, FreeCb free_cb) {
     if (free_cb) {
         free_cb(string->nt_data);
     } 
