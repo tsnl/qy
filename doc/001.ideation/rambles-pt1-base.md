@@ -7,7 +7,7 @@ _Oct 29, 2021_
 When writing prototypes...
 - must be able to write code quickly-- want **duck typing**
     - (REVISION) duck-typing is inefficient, because all data must resolve core attributes at run-time via a 
-      type-independent interface
+      type-independent interface (late binding)
     - instead, aim for manifest typing with interfaces and implementation (like Go)
     - interfaces are also too static! Can we build automatic interfaces? Yes! (See rambles-pt4)
 - want low-level memory access

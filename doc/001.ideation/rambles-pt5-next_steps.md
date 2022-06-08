@@ -31,16 +31,16 @@
                 In effect, compile C++ to C++.
 
             -   see: https://github.com/llvm/llvm-project/tree/main/clang/bindings/python/
-        -   TODO: add builtin support for using C libraries
+        -   ~~TODO: add builtin support for using C libraries~~
             -   C++ code can always expose C interfaces.
-            -   eliminates need for namespaces
+                -   eliminates need for namespaces
         -   TODO (FUTURE): add builtin support for **reflection**
             -   ~~investigate C++'s run-time type info system (since we need to interop with C++ anyway)~~
             -   ~~can fill in C++ RTTI using libclang, but means we link with C++ with source-only.~~
             -   use this + emitting CMake objects as 'module' to control loading from within our language
             -   bump this into a future release
 
-    -   Propose **qc-v2.1 the fork test**: does this branch...
+    -   Propose **the qc-v2.1 fork test**: does this branch...
         -   produce correct C++ output given valid input?
         -   detect all cases of invalid input correctly?
         -   crash/indefinitely loop/produce inadequate error messages?
