@@ -32,6 +32,14 @@ FileOpenFlag const FILE_OPEN_FLAG__BINARY     = 0x1;
 FileOpenFlag const FILE_OPEN_FLAG__CAN_READ   = 0x2;
 FileOpenFlag const FILE_OPEN_FLAG__CAN_WRITE  = 0x4;
 
+File file_stdout = NULL;
+File file_stderr = NULL;
+__attribute__((constructor))
+static void __file_init() {
+    file_stdout = stdout;
+    file_stderr = stderr;
+}
+
 File file_open1(String file_path, int file_open_flags) {
     return help_open_file(file_path.nt_data, file_open_flags);
 }

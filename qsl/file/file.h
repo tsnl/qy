@@ -5,6 +5,9 @@
 
 typedef void* File;
 
+extern File file_stdout;
+extern File file_stderr;
+
 typedef int FileOpenFlag;
 extern FileOpenFlag const FILE_OPEN_FLAG__BINARY;
 extern FileOpenFlag const FILE_OPEN_FLAG__CAN_READ;
