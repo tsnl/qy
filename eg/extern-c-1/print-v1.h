@@ -7,24 +7,24 @@
 // FIXME: move this to 'qyl' library
 // #define QY_FUNC __declspec(dllexport)
 
-struct File;
+struct PV1_File;
 
-enum FileAccess {
+enum PV1_FileAccess {
     FILE_ACCESS__READ,
     FILE_ACCESS__WRITE
 };
-enum FileType {
+enum PV1_FileType {
     FILE_TYPE__TEXT,
     FILE_TYPE__BINARY
 };
 
-extern struct File* fh1;
-extern struct File* fh2;
+extern struct PV1_File* fh1;
+extern struct PV1_File* fh2;
 
-void printLine(void);
-void printTab(void);
-void printInt(int v);
-void printLong(long long v);
+void pv1_printLine(void);
+void pv1_printTab(void);
+void pv1_printInt(int v);
+void pv1_printLong(long long v);
 // struct File* openFile(char const* path, enum FileAccess access, enum FileType file_type);
 // () closeFile(struct File* handle);
 // int readCharFromFile(struct File* f);

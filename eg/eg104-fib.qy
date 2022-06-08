@@ -2,10 +2,10 @@ pub printFibUntil: (I32) -> Void;
 def printFibUntil (n: I32): Void = do {
     run if (n > 0) {
         run printFibUntil(n - 1);
-        run printInt(n);
-        run printTab();
-        run printInt(fibonacci(n));
-        run printLine();
+        run pv1_printInt(n);
+        run pv1_printTab();
+        run pv1_printInt(fibonacci(n));
+        run pv1_printLine();
     };
 };
 
@@ -13,7 +13,8 @@ const: I64 { n = 90L; };
 const: I32 { n32 = 90; };
 def fastPrintFibUntilN (): I32 = do {
     // TODO: replace with ArrayBox, make 'n' dynamic
-    
+    // TODO: switch to QSL
+
     // TODO: implement 'assert' based on symbolic logic
     // assert n > 1;
 
@@ -23,10 +24,10 @@ def fastPrintFibUntilN (): I32 = do {
     val i = push mut I64(2);
     while (*i < n) do {
         run a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
-        run printLong(*i);
-        run printTab();
-        run printLong(a.get(*i));
-        run printLine();
+        run pv1_printLong(*i);
+        run pv1_printTab();
+        run pv1_printLong(a.get(*i));
+        run pv1_printLine();
         run i := *i+1L;
     };
     a.get(n-1L)

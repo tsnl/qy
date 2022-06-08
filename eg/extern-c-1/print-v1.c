@@ -2,18 +2,18 @@
 
 #include <stdio.h>
 
-void printLine(void) {
+void pv1_printLine(void) {
     printf("\n");
 }
-void printTab(void) {
+void pv1_printTab(void) {
     printf("\t");
 }
-void printInt(int v) {
+void pv1_printInt(int v) {
     printf("%d", v);
 }
-void printLong(long long v) {
+void pv1_printLong(long long v) {
     printf("%llu", v);
 }
 
-struct File* fh1 = NULL;
-struct File* fh2 = NULL;
+struct PV1_File* fh1 = NULL;
+struct PV1_File* fh2 = NULL;

@@ -13,8 +13,8 @@
             ],
             "headers": [
                 {"path": "print-v1.h", "provides": [
-                    "File", "FileAccess", "FileType",
-                    "printInt", "printLong", "printLine", "printTab",
+                    "PV1_File", "PV1_FileAccess", "PV1_FileType",
+                    "pv1_printInt", "pv1_printLong", "pv1_printLine", "pv1_printTab",
                     // "openFile", "closeFile",
                     // "readCharFromFile",
                     "fh1", "fh2"
