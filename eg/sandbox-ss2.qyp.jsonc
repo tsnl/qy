@@ -1,5 +1,4 @@
 {
-    "name": "sandbox_ss2",
     "author": "https://github.com/tsnl",
     "help": "This module contains a minimum reproduction of a bug.",
     "src": [

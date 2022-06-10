@@ -1,6 +1,5 @@
 {
-  "name": "sandbox_ss7",
-  "author": "https://github.com/tsnl",
-  "help": "This module contains a scratch file about pointers & mutability.",
-  "src": ["eg104-fib.qy"]
+    "author": "https://github.com/tsnl",
+    "help": "This module contains a scratch file about pointers & mutability.",
+    "src": ["eg104-fib.qy"]
 }
