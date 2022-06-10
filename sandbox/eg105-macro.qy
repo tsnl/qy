@@ -1,4 +1,4 @@
-/// WARNING: none of these features are implemented yet.
+/// WARNING: none of these features are implemented (yet?).
 
 def RsArray! [T: Ts]: Ts = {
     struct {

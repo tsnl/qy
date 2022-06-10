@@ -59,7 +59,7 @@ class QypSet(object):
         qyp_path_queue: t.List[str] = [os.path.abspath(path_to_root_qyp_file)]
         qyp_path_queue_parent_list = [None]
         qyp_path_index: int = 0
-        qyp_queue: t.List[NativeQyp] = []
+        qyps: t.List[NativeQyp] = []
         qyp_name_map: t.OrderedDict[str, "NativeQyp"] = OrderedDict()
         all_loaded_ok = True
         while qyp_path_index < len(qyp_path_queue):
@@ -67,7 +67,7 @@ class QypSet(object):
             opt_parent_path = qyp_path_queue_parent_list[qyp_path_index]
             qyp_path_to_load = qyp_path_queue[qyp_path_index]
             
-            # loading the qyp:
+            # loading the qyp at this path:
             loader_map = {
                 config.QYP_FILE_EXTENSION: NativeQyp.load,
                 config.QYX_FILE_EXTENSION: CQyx.load
@@ -92,10 +92,10 @@ class QypSet(object):
                     f"Dependency '{qyp_path_to_load}' does not have a valid extension.\n{more}",
                     opt_file_path=opt_parent_path
                 )
-            qyp_queue.append(loaded_qyp)
+            qyps.append(loaded_qyp)
 
             # complaining if the loaded qyp has the same name as another we've already loaded;
-            # otherwise, adding the Qyp to the `qyp_name_map`
+            # otherwise, adding the loaded Qyp to the `qyp_name_map`
             if loaded_qyp.js_name in qyp_name_map:
                 old_qyp = qyp_name_map[loaded_qyp.js_name]
                 print(f"ERROR: qyp {repr(loaded_qyp.js_name)} already exists at path {old_qyp.js_name}")
@@ -103,7 +103,7 @@ class QypSet(object):
             else:
                 qyp_name_map[loaded_qyp.js_name] = loaded_qyp
 
-            # adding all dependency paths:
+            # adding all dependency paths to the BFS queue:
             # NOTE: 'qsl' or Qy standard library is always a dependency
             for dep_index, dep_path in enumerate(loaded_qyp.js_dep_path_list):
                 if dep_path.startswith("https://"):
@@ -136,7 +136,7 @@ class QypSet(object):
             qyp_path_index += 1
 
         if all_loaded_ok:
-            return QypSet(qyp_queue[0], qyp_name_map)
+            return QypSet(qyps[0], qyp_name_map)
         else:
             return None
 
@@ -162,7 +162,7 @@ class BaseQyp(object, metaclass=abc.ABCMeta):
     def __init__(
         self,
         qyp_file_path: str, dir_path: str,
-        name: str, author: str, project_help: str,
+        author: str, project_help: str,
         any_src_path_list: t.List[str],
         dep_path_list: t.List[str],
         src_map: t.Dict[str, "BaseSourceFile"]
@@ -174,7 +174,7 @@ class BaseQyp(object, metaclass=abc.ABCMeta):
         super().__init__()
         self.file_path = qyp_file_path
         self.dir_path = dir_path
-        self.js_name = name
+        self.js_name = self.extract_qyp_name(self.file_path)
         self.js_author = author
         self.js_help = project_help
         self.src_path_list = any_src_path_list
@@ -199,10 +199,21 @@ class BaseQyp(object, metaclass=abc.ABCMeta):
             fb.FileSpan(fb.FilePos(exc.lineno-1, exc.colno-1)) if isinstance(exc, json.JSONDecodeError) else None
         )
 
+    @classmethod
+    def extract_qyp_name(cls, qyp_file_path):
+        basename = os.path.basename(qyp_file_path)
+        
+        if issubclass(cls, NativeQyp):
+            return basename[:-len(config.QYP_FILE_EXTENSION)]
+        elif issubclass(cls, BaseQyx):
+            return basename[:-len(config.QYX_FILE_EXTENSION)]
+        else:
+            raise NotImplementedError("Unknown BaseQyp subclass")
+
     @abc.abstractmethod
     def iter_native_src_paths(self):
         pass
-    
+
 
 class NativeQyp(BaseQyp):
     @staticmethod
@@ -260,20 +271,19 @@ class NativeQyp(BaseQyp):
 
         # create a Qy project (Qyp)
         return NativeQyp(
-            path_to_root_qyp_file,
-            qyp_dir_path,
-            js_map["name"],
-            js_map["author"],
-            js_map["help"],
-            js_map["src"],
-            js_map.get("deps", []),
-            src_map
+            qyp_file_path=path_to_root_qyp_file,
+            dir_path=qyp_dir_path,
+            author=js_map["author"],
+            project_help=js_map["help"],
+            qy_src_path_list=js_map["src"],
+            dep_path_list=js_map.get("deps", []),
+            qy_src_map=src_map
         )
 
     def __init__(
         self,
         qyp_file_path: str, dir_path: str,
-        name: str, author: str, project_help: str,
+        author: str, project_help: str,
         qy_src_path_list: t.List[str],
         dep_path_list: t.List[str],
         qy_src_map: t.Dict[str, "QySourceFile"]
@@ -282,7 +292,7 @@ class NativeQyp(BaseQyp):
         WARNING: Do not instantiate this class directly.
         Instead, invoke `Qyp.load`
         """
-        super().__init__(qyp_file_path, dir_path, name, author, project_help, qy_src_path_list, dep_path_list, qy_src_map)
+        super().__init__(qyp_file_path, dir_path, author, project_help, qy_src_path_list, dep_path_list, qy_src_map)
         
         # every native Qyp depends on QSL
         self.js_dep_path_list.append(qsl_qyp_dep_path)
@@ -350,7 +360,7 @@ class BaseQyx(BaseQyp, metaclass=abc.ABCMeta):
     def __init__(
         self,
         qyp_file_path: str, dir_path: str,
-        name: str, author: str, project_help: str,
+        author: str, project_help: str,
         src_list: t.List[str],
         dep_path_list: t.List[str],
         src_map
@@ -359,7 +369,7 @@ class BaseQyx(BaseQyp, metaclass=abc.ABCMeta):
         WARNING: Do not instantiate this class directly.
         Instead, invoke `<Lang>Qyx.load`
         """
-        super().__init__(qyp_file_path, dir_path, name, author, project_help, src_list, dep_path_list, src_map)
+        super().__init__(qyp_file_path, dir_path, author, project_help, src_list, dep_path_list, src_map)
 
 
 
@@ -370,14 +380,13 @@ class CQyx(BaseQyx):
         self, 
         qyp_file_path: str, 
         dir_path: str, 
-        name: str, 
         author: str, 
         project_help: str, 
         src_path_list: t.List[str], 
         dep_path_list: t.List[str],
         c_source_files: t.List["CSourceFile"]
     ) -> None:
-        super().__init__(qyp_file_path, dir_path, name, author, project_help, src_path_list, dep_path_list, dict(zip(src_path_list, c_source_files)))
+        super().__init__(qyp_file_path, dir_path, author, project_help, src_path_list, dep_path_list, dict(zip(src_path_list, c_source_files)))
         self.c_source_files = c_source_files
 
     @classmethod
@@ -454,14 +463,13 @@ class CQyx(BaseQyx):
         
         # returning:
         return CQyx(
-            path_to_root_qyx_file,
-            qyx_dir_path,
-            js_map["name"],
-            js_map["author"],
-            js_map["help"],
-            src_path_list,
-            js_map.get("deps", []),
-            c_source_files
+            qyp_file_path=path_to_root_qyx_file,
+            dir_path=qyx_dir_path,
+            author=js_map["author"],
+            project_help=js_map["help"],
+            src_path_list=src_path_list,
+            dep_path_list=js_map.get("deps", []),
+            c_source_files=c_source_files
         )
 
     @staticmethod
@@ -602,7 +610,7 @@ class CQyxV1_CompilerArgs_Header(object):
 
 
 base_qyp_required_keys = {
-    "name", "author", "help"
+    "author", "help"
 }
 base_qyp_optional_keys = {
     "deps"
@@ -731,5 +739,5 @@ class CSourceFile(BaseSourceFile):
 
 qc_dir = os.path.dirname(sys.argv[0])
 qsl_dir = os.path.join(qc_dir, "qsl")
-qsl_qyp_filepath = os.path.join(qsl_dir, "qsl.qyp.jsonc")
-qsl_qyp_dep_path = f"${qsl_qyp_filepath}"
+qsl_qyp_file_path = os.path.join(qsl_dir, "qsl.qyp.jsonc")
+qsl_qyp_dep_path = f"${qsl_qyp_file_path}"

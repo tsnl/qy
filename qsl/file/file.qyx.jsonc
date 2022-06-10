@@ -18,8 +18,8 @@
                         "FILE_OPEN_FLAG__CAN_WRITE",
                         
                         "file_stdout", "file_stderr",
-                        "file_open1", "file_open2", 
-                        "file_close",
+                        "file_open1", "file_open2", "file_close",
+                        "file_read_bytes",
                         "file_print"
                     ]
                 },

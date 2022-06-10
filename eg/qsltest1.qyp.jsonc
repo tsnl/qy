@@ -1,12 +1,8 @@
 {
-    "name": "sandbox",
     "author": "https://github.com/tsnl",
     "help": "This module contains several Qy examples being used as tests to develop the compiler.",
     "src": [
-        // "./eg105-macro.qy",
-        "./eg107-qsltest2.qy"
+        "./eg106-qsltest1.qy"
     ],
-    "deps": [
-        "../qsl/qsl.qyp.jsonc"
-    ]
+    "deps": []
 }

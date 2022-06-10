@@ -48,6 +48,9 @@ File file_open2(StringView file_path, int file_open_flags) {
     strncpy(path_buf, file_path.src->nt_data + file_path.span.beg, string_view_length(&file_path));
     return help_open_file(path_buf, file_open_flags);
 }
+i32 file_read_bytes(File file, i32 byte_count, u8* data) {
+    return fread(data, 1, byte_count, file);
+}
 void file_print(File file, String print) {
     fprintf(file, "%s", print.nt_data);
 }

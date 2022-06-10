@@ -27,7 +27,7 @@ statement
     | ret=returnStatement
     | discard=discardStatement
     | loop=loopStatement
-    | 'test' ID '=' ID macroArgBlock
+    // | 'test' ID '=' ID macroArgBlock
     ;
 bind1vStatement
     : 'val' b1v_term=bind1vTerm
@@ -69,7 +69,7 @@ lambdaExpression
 postfixExpression
     : through=primaryExpression                                       #throughPostfixExpression
     | proc=postfixExpression '(' args=csExpressionList ')'            #procCallExpression
-    | (kw='new'|(kw='push'|kw='heap') (is_mut='mut')?) 
+    | ((kw='new'|kw='push'|kw='heap') (is_mut='mut')?) 
         made_ts=typeSpec '(' args=csExpressionList ')'                #constructorExpression
     | container=postfixExpression '.' key=ID                          #dotIdExpression
     | container=postfixExpression '.' 'get' '(' index=expression ')'  #indexExpression
@@ -140,19 +140,10 @@ typeSpec
     ;
 primaryTypeSpec
     : id_tok=ID
-    | tok='F32'
-    | tok='F64'
-    | tok='I64'
-    | tok='I32'
-    | tok='I16'
-    | tok='I8'
-    | tok='U64'
-    | tok='U32'
-    | tok='U16'
-    | tok='U8'
-    | tok='Bool'
-    | tok='Void'
-    | tok='String'
+    | tok='F32' | tok='F64'
+    | tok='I8'  | tok='I16' | tok='I32' | tok='I64'
+    | tok='U8'  | tok='U16' | tok='U32' | tok='U64'
+    | tok='Bool' | tok='Void' | tok='String'
     ;
 adtTypeSpec
     : through=primaryTypeSpec               #throughAdtTypeSpec
