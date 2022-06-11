@@ -146,10 +146,11 @@ class Emitter(base_emitter.BaseEmitter):
                 type_decl_file.print(f"struct {type_name};")
             elif qy_type.kind() == types.TypeKind.Union:
                 type_decl_file.print(f"union {type_name};")
-            elif qy_type.kind() == types.TypeKind.Procedure:
-                type_decl_file.print(f"using {type_name} = {self.translate_type(qy_type)};")
             else:
-                raise NotImplementedError(f"Unknown composite def_type in emitter for Bind1tStatement:forward: {qy_type}")
+                # NOTE: forcing 'anonymous' representation to avoid just using the name
+                # we are trying to define.
+                rhs_t = self.translate_type(qy_type, anonymous_form=True)
+                type_decl_file.print(f"using {type_name} = {rhs_t};")
         else:
             raise NotImplementedError("Unknown def type in emitter for Bind1tStatement")
         
@@ -394,7 +395,7 @@ class Emitter(base_emitter.BaseEmitter):
         for stmt in block:
             self.emit_statement_impl(s, stmt, is_top_level=False)
 
-    def translate_type(self, qy_type: types.BaseType) -> str:
+    def translate_type(self, qy_type: types.BaseType, anonymous_form=False) -> str:
         """
         Emits the C++ translation of a given Qy type.
         NOTE: only usable in the context of defining a _single_ variable.
@@ -407,9 +408,11 @@ class Emitter(base_emitter.BaseEmitter):
                 f"Typer failed: residual type variables found in emitter: {qy_type}"
             )
 
-        opt_named_pub_type = self.pub_type_to_header_name_map.get(qy_type, None)
-        if opt_named_pub_type is not None:
-            return opt_named_pub_type
+        if not anonymous_form:
+            opt_named_pub_type = self.pub_type_to_header_name_map.get(qy_type, None)
+            if opt_named_pub_type is not None:
+                return opt_named_pub_type
+                
         if isinstance(qy_type, types.VoidType):
             return "void"
         elif isinstance(qy_type, types.IntType):
@@ -429,42 +432,43 @@ class Emitter(base_emitter.BaseEmitter):
             else:
                 raise NotImplementedError(f"Unknown float width in bits: {qy_type.width_in_bits}")
         elif isinstance(qy_type, types.BaseCompositeType):
-            opt_existing_name = self.pub_type_to_header_name_map.get(qy_type)
-            if opt_existing_name is not None:
-                return opt_existing_name
-            else:
-                if isinstance(qy_type, (types.StructType, types.UnionType)):
-                    if qy_type.opt_name is not None:
-                        assert isinstance(qy_type.opt_name, str)
-                        return qy_type.opt_name
+            if isinstance(qy_type, (types.StructType, types.UnionType)):
+                if qy_type.opt_name is not None:
+                    assert isinstance(qy_type.opt_name, str)
+                    return qy_type.opt_name
 
-                    field_str_fragments = [
-                        f"{self.translate_type(field_type)} {field_name};" 
-                        for field_name, field_type in qy_type.fields
-                    ]
-                    fields_str = ' '.join(field_str_fragments)
-                    if isinstance(qy_type, types.StructType):
-                        return f"struct {{ {fields_str} }}"
-                    else:
-                        assert isinstance(qy_type, types.UnionType)
-                        return f"union {{ {fields_str} }}"
-                elif isinstance(qy_type, (types.ProcedureType)):
-                    ret_type = self.translate_type(qy_type.ret_type)
-                    cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
-                    if qy_type.has_closure_slot:
-                        assert isinstance(qy_type, types.ProcedureType)
-                        if qy_type.has_closure_slot:
-                            return f"std::function<{ret_type}({cs_arg_str})>"
-                        else:
-                            return f"{ret_type}(*)({cs_arg_str})"
-                    else:
-                        return f"{self.translate_type(ret_type)}(*)({cs_arg_str})"
-                elif isinstance(qy_type, types.PointerType):
-                    return f"{self.translate_type(qy_type.pointee_type)}*"
-                elif isinstance(qy_type, types.ArrayType):
-                    return f"std::array< {self.translate_type(qy_type.element_type)}, {qy_type.count} >"
+                field_str_fragments = [
+                    f"{self.translate_type(field_type)} {field_name};" 
+                    for field_name, field_type in qy_type.fields
+                ]
+                fields_str = ' '.join(field_str_fragments)
+                if isinstance(qy_type, types.StructType):
+                    return f"struct {{ {fields_str} }}"
                 else:
-                    raise NotImplementedError(f"Unknown compound type in 'translate_type': {qy_type}")
+                    assert isinstance(qy_type, types.UnionType)
+                    return f"union {{ {fields_str} }}"
+            elif isinstance(qy_type, (types.ProcedureType)):
+                ret_type = self.translate_type(qy_type.ret_type)
+                cs_arg_str = ', '.join(map(self.translate_type, qy_type.arg_types))
+                if qy_type.has_closure_slot:
+                    assert isinstance(qy_type, types.ProcedureType)
+                    if qy_type.has_closure_slot:
+                        return f"std::function<{ret_type}({cs_arg_str})>"
+                    else:
+                        return f"{ret_type}(*)({cs_arg_str})"
+                else:
+                    return f"{self.translate_type(ret_type)}(*)({cs_arg_str})"
+            elif isinstance(qy_type, types.PointerType):
+                return f"{self.translate_type(qy_type.pointee_type)}*"
+            elif isinstance(qy_type, types.ArrayType):
+                return f"std::array< {self.translate_type(qy_type.element_type)}, {qy_type.count} >"
+            elif isinstance(qy_type, types.ArrayBoxType):
+                # FIXME: ArrayBox should be immutable in size?
+                # Maybe 'ArrayBox' should map to 'std::vector'
+                # And 'Vector' should map to 'struct<T> { size_t len; T* data; }
+                return f"std::vector< {self.translate_type(qy_type.element_type)} >"
+            else:
+                raise NotImplementedError(f"Unknown compound type in 'translate_type': {qy_type}")
         else:
             raise NotImplementedError(f"Don't know how to translate type to C++: {qy_type}")
             # print(f"WARNING: Don't know how to translate type to C++: {qy_type}")

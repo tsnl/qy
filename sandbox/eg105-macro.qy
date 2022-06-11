@@ -1,18 +1,12 @@
 /// WARNING: none of these features are implemented (yet?).
 
-def RsArray! [T: Ts]: Ts = {
-    struct {
-        data: ArrayBox[T],
-        size: I64,
-        capacity: I64
-    } with {
-        def push(e: T): Void = {
-            // ...
-        }
-    };
+struct RsArray [T] {
+    data: ArrayBox[T],
+    size: I64,
+    capacity: I64
 };
 
-def HashTable! [K: Ts, V: Ts, hash: Expr]: Ts = {
+struct HashTable [K, V, hash] = {
     type KvPair = (key: K, val: V) in
     struct {
         slots: RsArray![KvPair]

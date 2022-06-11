@@ -3,52 +3,60 @@
     "configurations": [
 
         {
-            "name": "qc eg/sandbox.qyp.jsonc",
+            "name": "qc eg/matmul/matmul.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox.qyp.jsonc"]
+            "args": ["eg/matmul/matmul.qyp.jsonc"]
         },
         {
-            "name": "qc eg/sandbox-ss1.qyp.jsonc",
+            "name": "qc eg/debug/sandbox.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox-ss1.qyp.jsonc"]
+            "args": ["eg/debug/sandbox.qyp.jsonc"]
         },
         {
-            "name": "qc eg/sandbox-ss2.qyp.jsonc",
+            "name": "qc eg/debug/sandbox-ss1.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox-ss2.qyp.jsonc"]
+            "args": ["eg/debug/sandbox-ss1.qyp.jsonc"]
         },
         {
-            "name": "qc eg/sandbox-ss3.qyp.jsonc",
+            "name": "qc eg/debug/sandbox-ss2.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox-ss3.qyp.jsonc"]
+            "args": ["eg/debug/sandbox-ss2.qyp.jsonc"]
         },
         {
-            "name": "qc eg/sandbox-ss4.qyp.jsonc",
+            "name": "qc eg/debug/sandbox-ss3.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox-ss4.qyp.jsonc"]
+            "args": ["eg/debug/sandbox-ss3.qyp.jsonc"]
         },
         {
-            "name": "qc eg/sandbox-ss6.qyp.jsonc",
+            "name": "qc eg/debug/sandbox-ss4.qyp.jsonc",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/qc.py",
             "console": "integratedTerminal",
-            "args": ["eg/sandbox-ss6.qyp.jsonc"]
+            "args": ["eg/debug/sandbox-ss4.qyp.jsonc"]
+        },
+        {
+            "name": "qc eg/debug/sandbox-ss6.qyp.jsonc",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/qc.py",
+            "console": "integratedTerminal",
+            "args": ["eg/debug/sandbox-ss6.qyp.jsonc"]
         },
         {
             "name": "qc qsl/qsl.qyp.jsonc",

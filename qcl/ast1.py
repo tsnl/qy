@@ -505,9 +505,10 @@ class ArrayTypeSpec(BaseTypeSpec):
 
 
 class ArrayBoxTypeSpec(BaseTypeSpec):
-    def __init__(self, loc: fb.ILoc, element_type_spec: BaseTypeSpec):
+    def __init__(self, loc: fb.ILoc, element_type_spec: BaseTypeSpec, is_mut: bool):
         super().__init__(loc)
         self.element_type_spec = element_type_spec
+        self.is_mut = is_mut
 
 
 class ProcSignatureTypeSpec(BaseTypeSpec):

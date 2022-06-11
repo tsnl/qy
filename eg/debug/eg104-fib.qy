@@ -1,11 +1,11 @@
 pub printFibUntil: (I32) -> Void;
 def printFibUntil (n: I32): Void = do {
-    run if (n > 0) {
-        run printFibUntil(n - 1);
-        run pv1_printInt(n);
-        run pv1_printTab();
-        run pv1_printInt(fibonacci(n));
-        run pv1_printLine();
+    if (n > 0) {
+        printFibUntil(n - 1);
+        pv1_printInt(n);
+        pv1_printTab();
+        pv1_printInt(fibonacci(n));
+        pv1_printLine();
     };
 };
 
@@ -19,16 +19,16 @@ def fastPrintFibUntilN (): I32 = do {
     // assert n > 1;
 
     val a = new MutArray[I64, n]();
-    run a.ptr(0) := 0L;
-    run a.ptr(1) := 1L;
+    a.ptr(0) := 0L;
+    a.ptr(1) := 1L;
     val i = push mut I64(2);
     while (*i < n) do {
-        run a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
-        run pv1_printLong(*i);
-        run pv1_printTab();
-        run pv1_printLong(a.get(*i));
-        run pv1_printLine();
-        run i := *i+1L;
+        a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
+        pv1_printLong(*i);
+        pv1_printTab();
+        pv1_printLong(a.get(*i));
+        pv1_printLine();
+        i := *i+1L;
     };
     a.get(n-1L)
 };
@@ -40,10 +40,10 @@ def main () = do {
     // val w = new Vec2f(13, 0);
     val f = fibonacci(new I32(w.x));
     
-    // run printInt(f);
+    // printInt(f);
     val short_run = false;
-    // run printFibUntil(if (short_run) {10} else {42});
-    run fastPrintFibUntilN();
+    // printFibUntil(if (short_run) {10} else {42});
+    fastPrintFibUntilN();
     // val _ = printFibUntil(n32);
 
     0

@@ -1,0 +1,8 @@
+type Matrix = MutArrayBox[F32];
+
+def main () = do {
+    file_print(file_stdout, "Hello, world!\n");
+    val m = new Matrix();
+    val w = m.get(0);
+    0
+};
