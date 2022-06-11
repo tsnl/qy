@@ -507,19 +507,16 @@ def help_model_one_exp(
         made_ts_sub, made_type = model_one_type_spec(ctx, exp.made_ts, dto_list)
         args_sub = Substitution.empty
         initializer_type_list = []
+        initializer_locs_list = []
         for initializer_arg_exp in exp.initializer_list:
             initializer_arg_sub, initializer_arg_type = model_one_exp(ctx, initializer_arg_exp, dto_list)
             args_sub = initializer_arg_sub.compose(args_sub, exp.loc)
             initializer_type_list.append(initializer_arg_type)
+            initializer_locs_list.append(initializer_arg_exp.loc)
         
-        # TODO: check the arguments against the made type, maybe using a deferred query or unification?
-        # - different types admit different constructors, e.g.
-        #   - most datatypes accept an instance of the value or a value that can be cast to the target
-        #   - arrays accept a single 'init_fill' argument OR a 'fill' predicate mapping indices to objects
-        #   - dynamic arrays accept two arguments: length and a 'fill' value OR a 'fill' predicate mapping indices to objects
-        #   - slices accept four arguments: a backing array or buffer or slice, offset, count, stride
-        #     - elem-size inferred from element-type
-        #     - offset, count, and stride have same dimension as array key, i.e. 1
+        # setting up a DTO to constrain actual arg types based on constructed type
+        # i.e. ensuring the signature of the constructor function is satisfied 
+        dto_list.add_dto(ConstructorArgCheckDTO(exp.loc, made_type, initializer_type_list, initializer_locs_list))
         
         # the constructed instance can be referenced directly or via a pointer:
         # preparing the return type:
@@ -692,7 +689,7 @@ def help_model_one_exp(
         sub = index_dto_sub.compose(sub, exp.loc)
 
         res_type = types.VarType("res-type", opt_loc=exp.loc)
-        get_item_dto_sub = dto_list.add_dto(ArrayLikeElementDTO(exp.loc, container_type, res_type, exp.ret_ref))
+        get_item_dto_sub = dto_list.add_dto(GetArrayLikeElementDTO(exp.loc, container_type, res_type, exp.ret_ref))
         sub = get_item_dto_sub.compose(sub, exp.loc)
 
         return sub, res_type
@@ -1173,19 +1170,30 @@ class DotIdDTO(BaseDTO):
             )
         else:
             assert isinstance(self.container_type, types.BaseCompositeType)
-            for field_name, field_type in self.container_type.fields:
-                if field_name == self.key_name:
-                    break
+            if isinstance(self.container_type, types.BaseAlgebraicType):
+                field_type = self.query_field(self.container_type)
+            elif isinstance(self.container_type, types.PointerType) and isinstance(self.container_type.pointee_type, types.BaseAlgebraicType):
+                field_type = self.query_field(self.container_type.pointee_type)
             else:
                 panic.because(
                     panic.ExitCode.TyperDtoSolverFailedError,
-                    f"Undefined field `{self.key_name}` in composite container type: {self.container_type}"
-                )
+                    f"Undefined field `{self.key_name}` in composite container type: {self.container_type}"                )
+            
             sub = unify(self.proxy_ret_type, field_type, self.loc)
             return True, sub
 
     def prefix_str(self):
         return f"DOT({self.container_type}, {self.key_name}, {self.proxy_ret_type})"
+
+    def query_field(self, container_type):
+        for field_name, field_type in container_type.fields:
+            if field_name == self.key_name:
+                break
+        else:
+            return None
+        
+        # returning the last bound field type before terminating with a match
+        return field_type
 
 
 class IsIntTypeDTO(BaseDTO):
@@ -1222,7 +1230,7 @@ class IsIntTypeDTO(BaseDTO):
                 )
 
 
-class ArrayLikeElementDTO(BaseDTO):
+class GetArrayLikeElementDTO(BaseDTO):
     def __init__(self, loc, container_type, res_type, ret_ref):
         super().__init__(loc, [container_type, res_type])
         self.ret_ref = ret_ref
@@ -1256,7 +1264,47 @@ class ArrayLikeElementDTO(BaseDTO):
         return False, Substitution.empty
 
     def prefix_str(self):
-        return f"ARRAYLIKE_ELEMENT({self.container_type}, {self.res_type})"
+        return f"GET_ARRAYLIKE_ELEMENT({self.container_type}, {self.res_type})"
+
+
+class ConstructorArgCheckDTO(BaseDTO):
+    def __init__(self, loc, constructor_type, actual_arg_types, actual_arg_locs):
+        super().__init__(loc, [constructor_type] + list(actual_arg_types))
+        self.actual_arg_locs = actual_arg_locs
+
+    @property
+    def constructor_type(self):
+        return self.arg_type_list[0]
+
+    @property
+    def actual_arg_type_list(self):
+        return self.arg_type_list[1:]
+
+    def increment_solution(self) -> t.Tuple[bool, "Substitution"]:
+        if any((t.is_var for t in [self.constructor_type] + self.actual_arg_type_list)):
+            return False, Substitution.empty
+
+        assert isinstance(self.constructor_type, types.BaseConcreteType)
+        sub = Substitution.empty
+        formal_arg_type_list = list(self.constructor_type.constructor_arg_type_tuple())
+        
+        formal_arg_count = len(formal_arg_type_list)
+        actual_arg_count = len(self.actual_arg_type_list)
+        if formal_arg_count != actual_arg_count:
+            panic.because(
+                panic.ExitCode.TyperDtoSolverFailedError,
+                f"Invalid argument count: expected {formal_arg_count}, got {actual_arg_count}",
+                opt_loc=self.loc
+            )
+
+        args_iterator = zip(formal_arg_type_list, self.actual_arg_type_list, self.actual_arg_locs)
+        for formal_type, actual_type, actual_loc in args_iterator:
+            sub = unify(formal_type, actual_type, actual_loc).compose(sub, actual_loc)
+
+        return True, sub
+
+    def prefix_str(self):
+        return f"GET_ARRAYLIKE_ELEMENT({self.constructor_type}, {self.res_type})"
 
 
 #
@@ -1305,7 +1353,11 @@ def unify(
         #   recursively
         # cf https://en.wikipedia.org/wiki/Occurs_check
         if var_type in replacement_type.iter_free_vars():
-            raise_unification_error(t1, t2, "occurs check failed (see https://en.wikipedia.org/wiki/Occurs_check)")
+            raise_unification_error(
+                t1, t2, 
+                "occurs check failed: this is probably a compiler/language bug",
+                opt_loc=opt_loc
+            )
 
         return Substitution.get({var_type: replacement_type})
 
@@ -1316,11 +1368,11 @@ def unify(
         if t1.has_user_defined_field_names():
             # ensure field names & field counts are identical:
             if t1.field_names != t2.field_names:
-                raise_unification_error()
+                raise_unification_error(opt_loc=opt_loc)
         else:
             # just check field counts (optimization)
             if len(t1.field_names) != len(t2.field_names):
-                raise_unification_error(t1, t2)
+                raise_unification_error(t1, t2, opt_loc=opt_loc)
 
         # checking that other type properties match:
         if t1.kind() == types.TypeKind.Procedure:
@@ -1328,7 +1380,14 @@ def unify(
             assert isinstance(t2, types.ProcedureType)
             closure_slots_ok = t1.has_closure_slot == t2.has_closure_slot
             if not closure_slots_ok:
-                raise_unification_error(t1, t2, opt_more="Cannot unify a procedure type with a closure slot with a procedure type without one", opt_loc=opt_loc)
+                raise_unification_error(
+                    t1, t2, 
+                    opt_more=(
+                        "Cannot unify a procedure type with a closure slot with "
+                        "a procedure type without one"
+                    ), 
+                    opt_loc=opt_loc
+                )
 
         # generate a substitution by unifying matching fields:
         s = Substitution.empty
@@ -1347,11 +1406,28 @@ def unify(
 
 def raise_unification_error(t: types.BaseType, u: types.BaseType, opt_more=None, opt_loc=None):
     tab_w = 4
-    msg_chunks = [f"UNIFICATION_ERROR: Cannot unify {t} and {u}"]
+    first_chunk = '\n'.join((
+        f"Unification error: expected two types to be equal",
+        f"... first: {t}",
+        f"... later: {u}"
+    ))
+    msg_chunks = [first_chunk]
     if opt_more is not None:
         assert isinstance(opt_more, str)
-        msg_chunks.append(textwrap.indent(opt_more, ' '*tab_w))
+        msg_chunks.append(textwrap.indent(opt_more, "... "))
     
+    # special hint: function calls
+    if isinstance(t, types.ProcedureType) and isinstance(u, types.ProcedureType):
+        if t.arg_count != u.arg_count:
+            t_s = 's' if t.arg_count != 1 else ''
+            u_s = 's' if u.arg_count != 1 else ''
+            chunk = '\n'.join((
+                f"... HINT: First type is a procedure with {t.arg_count} argument{t_s}",
+                f"...       Later type is a procedure with {u.arg_count} argument{u_s}",
+                f"...       did you pass too few or too many arguments?"
+            ))
+            msg_chunks.append(chunk)
+
     panic.because(panic.ExitCode.TyperUnificationError, '\n'.join(msg_chunks), opt_loc=opt_loc)
 
 

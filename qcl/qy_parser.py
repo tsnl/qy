@@ -582,7 +582,7 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             is_mut = {
                 "Ptr": False,
                 "MutPtr": True
-            }[ctx.ptrName]
+            }[ctx.ptrName.text]
             return ast1.PtrTypeSpec(self.loc(ctx), self.visit(ctx.pointee), is_mut)
 
     def visitSignatureTypeSpec(self, ctx: antlr.QySourceFileParser.SignatureTypeSpecContext):

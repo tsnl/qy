@@ -117,12 +117,15 @@ class VarType(BaseType):
 # Concrete Types:
 #
 
-class BaseConcreteType(BaseType):
-    pass
+class BaseConcreteType(BaseType, metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def constructor_arg_type_tuple(self):
+        """argument types expected by new/push/heap"""
 
 
 class AtomicConcreteType(BaseConcreteType):
-    pass
+    def constructor_arg_type_tuple(self):
+        return (self,)
 
 
 class SingletonAtomicConcreteType(AtomicConcreteType):
@@ -232,6 +235,7 @@ class BaseCompositeType(BaseConcreteType):
             else:
                 self.field_names = []
                 self.field_types = []
+        
         assert all((isinstance(t, BaseType) for t in self.field_types))
         assert all((isinstance(n, (str, type(None))) for n in self.field_names))
         self.opt_name = opt_name
@@ -269,6 +273,8 @@ class BaseCompositeType(BaseConcreteType):
     def __eq__(self, o: object) -> bool:
         return self.kind == o.kind and self.fields == o.fields
 
+    def constructor_arg_type_tuple(self):
+        return (self,)
 
 
 class PointerType(BaseCompositeType):
@@ -356,6 +362,10 @@ class BaseAlgebraicType(BaseCompositeType):
         else:
             return self.opt_name
 
+    def constructor_arg_type_tuple(self):
+        return tuple(self.field_types)
+
+
 class StructType(BaseAlgebraicType):
     def prefix(cls):
         return "struct"
@@ -400,6 +410,9 @@ class ArrayType(BaseCompositeType):
     def kind(cls):
         return TypeKind.Array
 
+    def constructor_arg_type_tuple(self):
+        return (self.element_type,)
+
 
 class ArrayBoxType(BaseCompositeType):
     @property
@@ -417,6 +430,9 @@ class ArrayBoxType(BaseCompositeType):
     @classmethod
     def kind(cls):
         return TypeKind.ArrayBox
+
+    def constructor_arg_type_tuple(self):
+        return (IntType.get(64, is_signed=True),)
 
 
 class UniqueValueType(BaseType):
@@ -436,6 +452,9 @@ class UniqueValueType(BaseType):
     @classmethod
     def kind(cls):
         return TypeKind.UniqueValue
+
+    def constructor_arg_type_tuple(self):
+        raise NotImplementedError("Cannot construct a unique-value-type (using 'new', 'heap', 'push')")
 
 
 def get_id_str_suffix(it, id_suffix_w=4):

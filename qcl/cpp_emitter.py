@@ -648,14 +648,25 @@ class Emitter(base_emitter.BaseEmitter):
             return ret_str, ret_type
         
         elif isinstance(exp, ast1.DotIdExpression):
-            container_str, container_type = self.translate_expression_with_type(exp.container)
+            container_str, raw_container_type = self.translate_expression_with_type(exp.container)
+            
+            if isinstance(raw_container_type, types.BaseAlgebraicType):
+                container_type = raw_container_type
+            elif isinstance(raw_container_type, types.PointerType) and isinstance(raw_container_type.pointee_type, types.BaseAlgebraicType):
+                container_type = raw_container_type.pointee_type
+                container_str = f"(*{container_str})"
+            else:
+                raise NotImplementedError(f"Unknown container type when emitting DotIdExpression C++ code: {raw_container_type}")
+
             ret_str = f"{container_str}.{exp.key}"
             ret_type = None
-            assert isinstance(container_type, types.BaseAlgebraicType)
             for field_name, field_type in container_type.fields:
                 if field_name == exp.key:
                     ret_type = field_type
                     break
+            else:
+                raise RuntimeError("Expected field checks to resolve in typer, but could not lookup field in emitter.")
+        
             assert ret_type is not None
             return ret_str, ret_type
 
@@ -671,20 +682,28 @@ class Emitter(base_emitter.BaseEmitter):
                 initializer_exp_strs = [self.translate_expression(exp) for exp in exp.initializer_list]
                 initializer_list_str = ','.join(initializer_exp_strs)
                 
+                def make_constructor_str(made_type):
+                    made_ts_str = self.translate_type(made_type)
+                    use_initializer_list = not isinstance(res_type, types.ArrayBoxType)
+                    return made_ts_str, (
+                        f"{made_ts_str}{{{initializer_list_str}}}"
+                        if use_initializer_list else
+                        f"{made_ts_str}({initializer_list_str})"
+                    )
+
                 if exp.construct_frontend == ast1.ConstructFrontend.New:
-                    constructor_ts_str = self.translate_type(res_type)
-                    constructor_str = constructor_ts_str + "{" + initializer_list_str + "}"
+                    _, constructor_str = make_constructor_str(res_type)
                     return constructor_str, exp.made_ts.wb_type
                 else:
                     assert isinstance(res_type, types.PointerType)
-                    constructor_ts_str = self.translate_type(res_type.pointee_type)
-                    constructor_str = constructor_ts_str + "{" + initializer_list_str + "}"
+                    constructor_ts_str, constructor_str = make_constructor_str(res_type.pointee_type)
                 
                     if exp.construct_frontend == ast1.ConstructFrontend.Push:
                         address_str = f"alloca(sizeof({constructor_ts_str}))"
                     else:
                         assert exp.construct_frontend == ast1.ConstructFrontend.Heap
                         address_str = f"malloc(sizeof({constructor_ts_str}))"
+                    
                     constructor_str = f"new({address_str}) {constructor_str}"
                     return constructor_str, exp.made_ts.wb_type
         
