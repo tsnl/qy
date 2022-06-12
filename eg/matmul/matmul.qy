@@ -34,10 +34,7 @@ def print_matrix (m: Ptr[Matrix]) = do {
         val j = push mut 0L;    
         file_print(file_stdout, "[");
         while (*j < m.cols) do {
-            // TODO: write to a StringStream instead, then print all at once.
-            val v = matrix_get(m, *i, *j);
-
-            file_print(file_stdout, "#");
+            string_stream_push_number_f32(ss, matrix_get(m, *i, *j), 10, 0);
             if (*j < m.cols - 1L) {
                 file_print(file_stdout, ", ");
             };

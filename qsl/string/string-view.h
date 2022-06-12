@@ -18,7 +18,7 @@ struct StringView {
 
 /// Construct/destroy:
 StringView new_string_view(String const* src, u32 beg, u32 end);
-StringView to_string_view(String const* src);
+inline static StringView to_string_view(String const* src);
 
 /// Const accessors:
 bool string_view_is_empty(StringView const* sv);
@@ -27,3 +27,12 @@ size_t string_view_length(StringView const* sv);
 /// Sizing guarantees:
 static_assert(sizeof(void*), "Expected to only be running on 64-bit systems.");
 static_assert(sizeof(StringView) == 2*sizeof(size_t), "Expected 'StringView' to be 16B in size.");
+
+
+///
+/// Inline defs
+///
+
+inline static StringView to_string_view(String const* src) {
+    return new_string_view(src, 0, src->count);
+}

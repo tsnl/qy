@@ -699,17 +699,23 @@ class Emitter(base_emitter.BaseEmitter):
             assert isinstance(res_type, types.PointerType)
             
             copied_type = res_type.pointee_type
+            copied_type_str = self.translate_type(copied_type)
             ptr_type_str = self.translate_type(res_type)
 
             if exp.allocator == ast1.CopyExpression.Allocator.Push:
-                address_str = f"alloca(sizeof({copied_type}))"
+                address_str = f"alloca(sizeof({copied_type_str}))"
             else:
                 assert exp.allocator == ast1.CopyExpression.Allocator.Heap
-                address_str = f"malloc(sizeof({copied_type}))"
+                address_str = f"malloc(sizeof({copied_type_str}))"
             
             copied_val_str = self.translate_expression(exp.copied_val)
 
-            constructor_str = f"(*(({ptr_type_str})({address_str})) = {copied_val_str})"
+            constructor_str = (
+                f"([] ({ptr_type_str} p, {copied_type_str} v) -> {ptr_type_str} " "{ "
+                    f"*p = v; "
+                    f"return p; "
+                "} " f"(({ptr_type_str})({address_str}), {copied_val_str}))"
+            )
             return constructor_str, res_type
     
         elif isinstance(exp, ast1.IfExpression):
