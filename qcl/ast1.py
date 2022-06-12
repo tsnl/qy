@@ -376,18 +376,31 @@ class ProcCallExpression(BaseExpression):
         self.arg_exps = arg_exps
 
 
-class ConstructFrontend(enum.Enum):
-    New = enum.auto()   # allocates object on the stack, returns value
-    Push = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
-    Heap = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
-
-
 class ConstructExpression(BaseExpression):
-    def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression], construct_frontend: ConstructFrontend, is_mut: bool):
+    """
+    Constructs an expression's value, implicitly placing constructed expression on the stack.
+    Returns the value de-referencing this stack pointer.
+    """
+
+    def __init__(self, loc: fb.ILoc, made_ts: BaseTypeSpec, initializer_list: t.List[BaseExpression]):
         super().__init__(loc)
         self.made_ts = made_ts
         self.initializer_list = initializer_list
-        self.construct_frontend = construct_frontend
+    
+
+class CopyExpression(BaseExpression):
+    """
+    Allocates memory, then copies a value to this memory. Returns the pointer to memory.
+    """
+
+    class Allocator(enum.Enum):
+        Push = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
+        Heap = enum.auto()  # allocates object on the stack, returns [possibly mutable] pointer
+    
+    def __init__(self, loc: fb.ILoc, copied_val: BaseExpression, allocator: Allocator, is_mut: bool):
+        super().__init__(loc)
+        self.copied_val = copied_val
+        self.allocator = allocator
         self.is_mut = is_mut
 
 

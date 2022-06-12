@@ -197,10 +197,12 @@ String string_stream_flush(StringStream* ss) {
     char* buffer = ss->allocator.alloc_cb(1 + ss->running_length);
     {
         size_t w_ix = 0;
-        for (StringStreamChunk* chunk = &ss->head; chunk; chunk = chunk->next) {
+        for (StringStreamChunk* chunk = &ss->head; chunk;) {
             for (size_t i = 0; i < chunk->strands_count; i++) {
                 w_ix += write_strand(buffer, w_ix, chunk->strands[i]);
             }
+            chunk = chunk->next;
+            ss->allocator.free_cb(chunk);
         }
         assert(w_ix == ss->running_length);
         buffer[w_ix] = '\0';

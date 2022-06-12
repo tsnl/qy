@@ -4,35 +4,34 @@ type Matrix = (
     cols: I64
 );
 
-// Not implemented, planned:
-// stx matrix (r, c) = do {
-//     push Matrix(new MutArrayBox[F32](r * c), r, c)
-// };
+def matrix (r: I64, c: I64) = (
+    new Matrix(new MutArrayBox[F32](r * c), r, c)
+);
 
-def matrix_index (m, ir, ic) = do {
+def matrix_index (m, ir, ic) = (
     // NOTE: all matrices store indices in COLUMN MAJOR format
     ic * m.rows + ir
-};
-def matrix_ptr(m: Ptr[Matrix], ir, ic) = do {
+);
+def matrix_ptr (m: Ptr[Matrix], ir, ic) = (
     m.data.ptr(matrix_index(m, ir, ic))
-};
-def matrix_get(m: Ptr[Matrix], ir, ic) = do {
+);
+def matrix_get (m: Ptr[Matrix], ir, ic) = (
     *matrix_ptr(m, ir, ic)
-};
+);
 
 def print_matrix (m: Ptr[Matrix]) = do {
-    val i = push mut I64(0L);
+    val i = push mut 0L;
     
-    // TODO: string_stream requires an allocator!
-    // val ss = new_string_stream(default_allocator);
+    val ss = push new_string_stream(default_heap_allocator);
     while (*i < m.rows) do {
-        if (*i == 0L) {
-            file_print(file_stdout, "[");
+        val prefix_sv = if (*i == 0L) {
+            to_string_view(push "[")
         } else {
-            file_print(file_stdout, " ");
+            to_string_view(push " ")
         };
+        string_stream_push_string_view(ss, prefix_sv);
 
-        val j = push mut I64(0L);    
+        val j = push mut 0L;    
         file_print(file_stdout, "[");
         while (*j < m.cols) do {
             // TODO: write to a StringStream instead, then print all at once.
@@ -45,7 +44,7 @@ def print_matrix (m: Ptr[Matrix]) = do {
             j := 1L + *j;
         };
         file_print(file_stdout, "]");
-        
+
         if (*i == m.rows-1L) {
             file_print(file_stdout, "]\n");
         } else {
@@ -60,7 +59,7 @@ def main () = do {
     file_print(file_stdout, "2D Matrices!\n");
     val rows = 2L;
     val cols = 4L;
-    val m = push Matrix(
+    val m = push new Matrix(
         new MutArrayBox[F32](rows * cols),
         rows, cols
     );

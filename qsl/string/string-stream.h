@@ -91,6 +91,7 @@ StringStream new_string_stream(Allocator allocator);
 
 /// Flush restores the stringstream to an 'empty' state and
 /// returns a string whose contents match each piece pushed in.
+/// Any strand allocations are cleaned up here.
 String string_stream_flush(StringStream* ss);
 
 /// Push formats a string piece and adds it to a string stream.

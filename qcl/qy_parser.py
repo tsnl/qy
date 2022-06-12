@@ -45,6 +45,7 @@ def parse_one_file_without_caching(abs_file_path: str) -> t.List[ast1.BaseStatem
     antlr_token_stream = antlr.CommonTokenStream(antlr_lexer)
     antlr_parser = antlr.QySourceFileParser(antlr_token_stream)
     antlr_parser.removeErrorListeners()
+    antlr_parser._interp.predictionMode = antlr.PredictionMode.LL_EXACT_AMBIG_DETECTION
     antlr_parser.addErrorListener(error_listener)
 
     visitor = AstConstructorVisitor(abs_file_path)
@@ -343,17 +344,16 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         return ast1.ProcCallExpression(self.loc(ctx), self.visit(ctx.proc), self.visit(ctx.args) if ctx.args else [])
 
     def visitConstructorExpression(self, ctx: antlr.QySourceFileParser.ConstructorExpressionContext):
-        construct_frontend = {
-            "new": ast1.ConstructFrontend.New,
-            "heap": ast1.ConstructFrontend.Heap,
-            "push": ast1.ConstructFrontend.Push
+        return ast1.ConstructExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args) if ctx.args else [])
+
+    def visitCopyExpression(self, ctx: antlr.QySourceFileParser.CopyExpressionContext):
+        allocator = {
+            "push": ast1.CopyExpression.Allocator.Push,
+            "heap": ast1.CopyExpression.Allocator.Heap,
         }[ctx.kw.text]
         is_mut = ctx.is_mut is not None
-
-        if construct_frontend == ast1.ConstructFrontend.New:
-            assert not is_mut
-
-        return ast1.ConstructExpression(self.loc(ctx), self.visit(ctx.made_ts), self.visit(ctx.args) if ctx.args else [], construct_frontend, is_mut)
+        copied = self.visit(ctx.src)
+        return ast1.CopyExpression(self.loc(ctx), copied, allocator, is_mut)
 
     def visitDotIdExpression(self, ctx: antlr.QySourceFileParser.DotIdExpressionContext):
         return ast1.DotIdExpression(self.loc(ctx), self.visit(ctx.container), ctx.key.text)

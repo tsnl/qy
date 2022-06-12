@@ -6,14 +6,15 @@
     "cc-args": {
         "*": {
             "c-flags": ["-Wall"],
-            "sources": [],
+            "sources": ["alloc.c"],
             "headers": [
                 {
                     "path": "alloc.h", 
                     "provides": [
                         "AllocCb", 
                         "FreeCb", 
-                        "Allocator"
+                        "Allocator",
+                        "default_heap_allocator"
                     ]
                 }
             ]

@@ -521,15 +521,14 @@ def help_model_one_exp(
         # the constructed instance can be referenced directly or via a pointer:
         # preparing the return type:
         sub = args_sub.compose(made_ts_sub, exp.loc)
-        if exp.construct_frontend == ast1.ConstructFrontend.New:
-            assert not exp.is_mut
-            ret_type = sub.rewrite_type(made_type)
-        elif exp.construct_frontend in (ast1.ConstructFrontend.Heap, ast1.ConstructFrontend.Push):
-            ret_type = types.PointerType.new(sub.rewrite_type(made_type), is_mut=exp.is_mut)
-        else:
-            raise NotImplementedError("ConstructExpression: Unknown frontend: how was this constructor used, and what does the user expect in return?")
-
+        ret_type = sub.rewrite_type(made_type)
+        
         return sub, ret_type
+
+    elif isinstance(exp, ast1.CopyExpression):
+        copied_sub, copied_type = model_one_exp(ctx, exp.copied_val, dto_list)
+        ret_type = types.PointerType.new(pointee_type=copied_type, is_mut=exp.is_mut)
+        return copied_sub, ret_type
 
     elif isinstance(exp, ast1.UnaryOpExpression):
         res_type = types.VarType(f"unary_op_{exp.operator.name.lower()}_res", exp.loc)
@@ -860,7 +859,8 @@ class DTOList(object):
                 panic.because(
                     panic.ExitCode.TyperDtoSolverStalledError,
                     f"TYPER: DTOList solution stalled with {len(new_dto_list)} constraints remaining:\n" +
-                    '\n'.join(map(str, new_dto_list))
+                    '\n'.join(map(str, new_dto_list)) + "\n"
+                    "... HINT: This could be due to a syntax error OR insufficient type hints."
                 )
 
             # applying the substitution:
@@ -1304,7 +1304,7 @@ class ConstructorArgCheckDTO(BaseDTO):
         return True, sub
 
     def prefix_str(self):
-        return f"GET_ARRAYLIKE_ELEMENT({self.constructor_type}, {self.res_type})"
+        return f"CONSTRUCT({self.constructor_type}, ({', '.join(map(str, self.actual_arg_type_list))}))"
 
 
 #

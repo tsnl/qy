@@ -9,3 +9,5 @@ struct {
     AllocCb alloc_cb;
     FreeCb free_cb;
 } typedef Allocator;
+
+extern Allocator default_heap_allocator;

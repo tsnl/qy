@@ -691,22 +691,27 @@ class Emitter(base_emitter.BaseEmitter):
                         f"{made_ts_str}({initializer_list_str})"
                     )
 
-                if exp.construct_frontend == ast1.ConstructFrontend.New:
-                    _, constructor_str = make_constructor_str(res_type)
-                    return constructor_str, exp.made_ts.wb_type
-                else:
-                    assert isinstance(res_type, types.PointerType)
-                    constructor_ts_str, constructor_str = make_constructor_str(res_type.pointee_type)
-                
-                    if exp.construct_frontend == ast1.ConstructFrontend.Push:
-                        address_str = f"alloca(sizeof({constructor_ts_str}))"
-                    else:
-                        assert exp.construct_frontend == ast1.ConstructFrontend.Heap
-                        address_str = f"malloc(sizeof({constructor_ts_str}))"
-                    
-                    constructor_str = f"new({address_str}) {constructor_str}"
-                    return constructor_str, exp.made_ts.wb_type
-        
+                _, constructor_str = make_constructor_str(res_type)
+                return constructor_str, exp.made_ts.wb_type
+
+        elif isinstance(exp, ast1.CopyExpression):
+            res_type = exp.wb_type
+            assert isinstance(res_type, types.PointerType)
+            
+            copied_type = res_type.pointee_type
+            ptr_type_str = self.translate_type(res_type)
+
+            if exp.allocator == ast1.CopyExpression.Allocator.Push:
+                address_str = f"alloca(sizeof({copied_type}))"
+            else:
+                assert exp.allocator == ast1.CopyExpression.Allocator.Heap
+                address_str = f"malloc(sizeof({copied_type}))"
+            
+            copied_val_str = self.translate_expression(exp.copied_val)
+
+            constructor_str = f"(*(({ptr_type_str})({address_str})) = {copied_val_str})"
+            return constructor_str, res_type
+    
         elif isinstance(exp, ast1.IfExpression):
             # NOTE: If expressions are regular functions in this language, and must invoke their 'then' or 'else' branches 
             # based on the result of 'cond'.

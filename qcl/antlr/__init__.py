@@ -1,4 +1,4 @@
-from antlr4 import FileStream, CommonTokenStream
+from antlr4 import FileStream, CommonTokenStream, PredictionMode
 from antlr4 import ParserRuleContext
 from antlr4.error.ErrorListener import ErrorListener as ANTLR4ErrorListener
 

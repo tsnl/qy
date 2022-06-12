@@ -21,7 +21,7 @@ def fastPrintFibUntilN (): I32 = do {
     val a = new MutArray[I64, n]();
     a.ptr(0) := 0L;
     a.ptr(1) := 1L;
-    val i = push mut I64(2);
+    val i = push mut 2L;
     while (*i < n) do {
         a.ptr(*i) := a.get(*i-1L) + a.get(*i-2L);
         pv1_printLong(*i);
