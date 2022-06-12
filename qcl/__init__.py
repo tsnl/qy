@@ -15,8 +15,8 @@ from . import main
 
 @dataclass
 class TranspileOptions:
-    print_summary_after_run: bool = False
-    run_debug_routine_after_compilation: bool = False
+    print_summary_after_run: bool = config.COMPILER_IN_DEBUG_MODE
+    run_debug_routine_after_compilation: bool = config.COMPILER_IN_DEBUG_MODE
 
 
 def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_emitter.BaseEmitter, transpile_opts: TranspileOptions):
@@ -25,8 +25,8 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
 
     # FIXME: auto-detect target platform
     target_platform = platform.core_linux_amd64
-    target_platform = platform.core_windows_amd64
-    target_platform = platform.core_macos_amd64
+    # target_platform = platform.core_windows_amd64
+    # target_platform = platform.core_macos_amd64
 
     qyp_set = ast2.QypSet.load(path_to_input_root_qyp_file, target_platform)
     if qyp_set is None:
@@ -61,17 +61,17 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
         emitter.emit_qyp_set(qyp_set)
     except panic.PanicException as exc:
         caught_exc = exc
-    finally:
-        # (post-compilation) print types:
-        if transpile_opts.print_summary_after_run:
-            print("(POST-MORTEM)")
-            print_qyp_set_summary(qyp_set)
-            print_contexts(qyp_set)
+    
+    # (post-compilation) print types:
+    if transpile_opts.print_summary_after_run:
+        print("(POST-MORTEM)")
+        print_qyp_set_summary(qyp_set)
+        print_contexts(qyp_set)
 
-        # (post-compilation) debug routine:
-        if transpile_opts.run_debug_routine_after_compilation:
-            print("(POST-MORTEM)")
-            debug_routine_after_compilation(qyp_set)
+    # (post-compilation) debug routine:
+    if transpile_opts.run_debug_routine_after_compilation:
+        print("(POST-MORTEM)")
+        debug_routine_after_compilation(qyp_set)
 
     if caught_exc is not None:
         raise caught_exc

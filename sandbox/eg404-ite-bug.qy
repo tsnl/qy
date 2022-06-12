@@ -1,0 +1,8 @@
+def hello () = do {
+    val x = if (true) {
+        42
+    } else {
+        43
+    };
+    42
+};
