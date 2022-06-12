@@ -294,7 +294,7 @@ def help_translate_clang_type_to_ts(c_type, is_direct_use) -> ast1.BaseTypeSpec:
             16: ast1.BuiltinPrimitiveTypeIdentity.Float128
         }[size_in_bytes]
         ts = ast1.BuiltinPrimitiveTypeSpec(c_type_loc(c_type), builtin_primitive_type_id)
-        ts.wb_type = types.FloatType(8 * size_in_bytes)
+        ts.wb_type = types.FloatType.get(8 * size_in_bytes)
         return ts
     elif c_type.kind == TypeKind.RECORD:
         # struct or union: must recurse

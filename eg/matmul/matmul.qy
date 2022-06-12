@@ -24,32 +24,27 @@ def print_matrix (m: Ptr[Matrix]) = do {
     
     val ss = push new_string_stream(default_heap_allocator);
     while (*i < m.rows) do {
-        val prefix_sv = if (*i == 0L) {
-            to_string_view(push "[")
-        } else {
-            to_string_view(push " ")
-        };
-        string_stream_push_string_view(ss, prefix_sv);
+        string_stream_push_string_view(ss, 
+            to_string_view(push if (*i == 0L) { "[" } else { " " }));
 
         val j = push mut 0L;    
-        file_print(file_stdout, "[");
+        string_stream_push_string_view(ss, to_string_view(push "["));
         while (*j < m.cols) do {
             string_stream_push_number_f32(ss, matrix_get(m, *i, *j), 10, 0);
             if (*j < m.cols - 1L) {
-                file_print(file_stdout, ", ");
+                string_stream_push_string_view(ss, to_string_view(push ", "));
             };
             j := 1L + *j;
         };
-        file_print(file_stdout, "]");
+        string_stream_push_string_view(ss, to_string_view(push "]"));
 
-        if (*i == m.rows-1L) {
-            file_print(file_stdout, "]\n");
-        } else {
-            file_print(file_stdout, "\n");
-        };
+        string_stream_push_string_view(ss,
+            to_string_view(push if (*i == m.rows-1L) {"]\n"} else {"\n"}));
 
         i := 1L + *i;
     };
+
+    file_print(file_stdout, string_stream_flush(ss));
 };
 
 def main () = do {
