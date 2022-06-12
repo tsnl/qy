@@ -4,7 +4,7 @@
     "src": [
         // "./eg105-macro.qy",
         // "./eg107-qsltest2.qy"
-        "eg404-ite-bug.qy"
+        // "eg404-ite-bug.qy"
     ],
     "deps": [
         "../qsl/qsl.qyp.jsonc"

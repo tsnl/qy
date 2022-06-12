@@ -319,7 +319,7 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
                 )
             else:
                 def_sub, def_type = definition.scheme.instantiate()
-                return def_sub
+                return def_sub.compose(exp_sub, stmt.loc)
 
     elif isinstance(stmt, ast1.Bind1fStatement):
         args_sub = Substitution.empty
