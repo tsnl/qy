@@ -269,7 +269,7 @@ def model_one_lambda_body(
     # solving any prefix statements:
     #   - any 'return' statements are associated with the nearest 'return_type' attribute, set above.
     if body_prefix_stmt_list:
-        sub = model_one_block(ctx, body_prefix_stmt_list, dto_list)
+        sub = model_one_block(ctx, body_prefix_stmt_list, dto_list).compose(sub, loc)
 
     # solving the tail expression:
     tail_return_type = types.VoidType.singleton
@@ -576,8 +576,13 @@ def help_model_one_exp(
         return add_dto_sub.compose(container_sub, exp.loc), proxy_src_type
 
     elif isinstance(exp, ast1.IfExpression):
-        def help_model_branch_type(branch_exp):
-            nonlocal ctx, dto_list, sub
+        # first, modelling the 'cond':
+        cond_sub, cond_type = model_one_exp(ctx, exp.cond_exp, dto_list)
+        sub = cond_sub
+
+        # modelling 'then', and 'else' branch expressions:
+        def help_model_branch_type(branch_exp, sub):
+            nonlocal ctx, dto_list
             
             # first, ensuring this branch is a 0-ary lambda:
             assert isinstance(branch_exp, ast1.LambdaExpression)
@@ -599,13 +604,9 @@ def help_model_one_exp(
 
             # returning:
             return sub, branch_type
-
-        # first, modelling the 'cond', 'then', and 'else' branch expressions:
-        cond_sub, cond_type = model_one_exp(ctx, exp.cond_exp, dto_list)
-        sub = cond_sub
-        sub, then_type = help_model_branch_type(exp.then_exp)
+        sub, then_type = help_model_branch_type(exp.then_exp, sub)
         sub, else_type = (
-            help_model_branch_type(exp.else_exp)
+            help_model_branch_type(exp.else_exp, sub)
             if exp.else_exp is not None else
             (Substitution.empty, types.VoidType.singleton)
         )
@@ -641,6 +642,8 @@ def help_model_one_exp(
 
         sub, ret_type = model_one_lambda_body(ctx, exp.loc, arg_name_type_list, prefix_stmt_list, opt_tail_exp, dto_list)
         
+        ret_type = sub.rewrite_type(ret_type)
+        arg_type = [sub.rewrite_type(arg_type) for arg_type in arg_types]
         return sub, types.ProcedureType.new(arg_types, ret_type, has_closure_slot=has_closure_slot, is_c_variadic=False)
     
     elif isinstance(exp, ast1.UpdateExpression):

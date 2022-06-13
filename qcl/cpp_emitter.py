@@ -733,7 +733,7 @@ class Emitter(base_emitter.BaseEmitter):
             return ite_str, exp.wb_type
 
         elif isinstance(exp, ast1.LambdaExpression):
-            # TODO: review if '=' is a viable strategy to clone: would be safe, but costly: prefer '&', but then need to solve closure lifetimes...
+            # TODO: review if '&' is a viable strategy to clone: would be safe, but costly: prefer '&', but then need to solve closure lifetimes...
             # FIXME: issue with LambdaExpression's wb_type: see 'if exp.opt_body_tail is not None' guard
 
             s = StringWriter()

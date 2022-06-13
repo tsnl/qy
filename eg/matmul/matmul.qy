@@ -22,24 +22,31 @@ def matrix_get (m: Ptr[Matrix], ir, ic) = (
 def print_matrix (m: Ptr[Matrix]) = do {
     val i = push mut 0L;
     
+    val comma = push ", ";
+    val lsqbrk = push "[";
+    val lpad = push " ";
+    val rsqbrk = push "]";
+    val rsqbrk_row_end = push "]\n";
+    val lfeed_row_end = push "\n";
+
     val ss = push new_string_stream(default_heap_allocator);
     while (*i < m.rows) do {
         string_stream_push_string_view(ss, 
-            to_string_view(push if (*i == 0L) { "[" } else { " " }));
+            to_string_view(if (*i == 0L) { lsqbrk } else { lpad }));
 
-        val j = push mut 0L;    
-        string_stream_push_string_view(ss, to_string_view(push "["));
+        val j = push mut 0L;
+        string_stream_push_string_view(ss, to_string_view(lsqbrk));
         while (*j < m.cols) do {
             string_stream_push_number_f32(ss, matrix_get(m, *i, *j), 10, 0);
             if (*j < m.cols - 1L) {
-                string_stream_push_string_view(ss, to_string_view(push ", "));
+                string_stream_push_string_view(ss, to_string_view(comma));
             };
             j := 1L + *j;
         };
-        string_stream_push_string_view(ss, to_string_view(push "]"));
+        string_stream_push_string_view(ss, to_string_view(rsqbrk));
 
         string_stream_push_string_view(ss,
-            to_string_view(push if (*i == m.rows-1L) {"]\n"} else {"\n"}));
+            to_string_view(if (*i == m.rows-1L) { rsqbrk_row_end } else { lfeed_row_end }));
 
         i := 1L + *i;
     };

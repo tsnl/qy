@@ -81,7 +81,7 @@ size_t float_strand_length(size_t number_len, bool has_base_prefix) {
     if (has_base_prefix) {
         length += 2;
     }
-    bool is_signed = true;
+    bool is_signed = false;
     if (is_signed) {
         length += 1;
     }
@@ -104,8 +104,8 @@ static size_t write_strand(char* buffer, size_t w_ix, StringStreamStrand strand)
         case STRAND_KIND_STRING_VIEW: return write_strand__string_view(buffer, w_ix, strand);
         case STRAND_KIND_UINT: return write_strand__uint(buffer, w_ix, strand);
         case STRAND_KIND_SINT: return write_strand__sint(buffer, w_ix, strand);
-        case STRAND_KIND_F32: return write_strand__sint(buffer, w_ix, strand);
-        case STRAND_KIND_F64: return write_strand__sint(buffer, w_ix, strand);
+        case STRAND_KIND_F32: return write_strand__f32(buffer, w_ix, strand);
+        case STRAND_KIND_F64: return write_strand__f64(buffer, w_ix, strand);
         case STRAND_KIND_UNICODE_CHARACTER: return write_strand__unicode_char_utf8(buffer, w_ix, strand);
         default: {
             assert(0 && "Unknown strand.");
