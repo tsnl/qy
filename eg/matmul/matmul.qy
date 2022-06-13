@@ -56,7 +56,7 @@ def print_matrix (m: Ptr[Matrix]) = do {
 
 def main () = do {
     file_print(file_stdout, "2D Matrices!\n");
-    val rows = 2L;
+    val rows = 4L;
     val cols = 4L;
     val m = push new Matrix(
         new MutArrayBox[F32](rows * cols),

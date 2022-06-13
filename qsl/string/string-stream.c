@@ -1,5 +1,6 @@
 #include "string-stream.h"
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -81,7 +82,7 @@ size_t float_strand_length(size_t number_len, bool has_base_prefix) {
     if (has_base_prefix) {
         length += 2;
     }
-    bool is_signed = false;
+    bool is_signed = true;
     if (is_signed) {
         length += 1;
     }
@@ -201,8 +202,14 @@ String string_stream_flush(StringStream* ss) {
             for (size_t i = 0; i < chunk->strands_count; i++) {
                 w_ix += write_strand(buffer, w_ix, chunk->strands[i]);
             }
-            chunk = chunk->next;
-            ss->allocator.free_cb(chunk);
+            
+            // iterating to next chunk, freeing current chunk
+            StringStreamChunk* next_chunk = chunk->next;
+            StringStreamChunk* curr_chunk = chunk;
+            if (curr_chunk != &ss->head) {
+                ss->allocator.free_cb(curr_chunk);
+            }
+            chunk = next_chunk;
         }
         assert(w_ix == ss->running_length);
         buffer[w_ix] = '\0';
@@ -246,7 +253,7 @@ void string_stream_push_number_f32(StringStream* ss, f32 v, i32 base, i32 flags)
     string_stream_push_basic_strand(ss, strand, float_strand_length(DEFAULT_F32_PRINT_LENGTH, base != 10));
 }
 void string_stream_push_number_f64(StringStream* ss, f64 v, i32 base, i32 flags) {
-    assert(base == 10 && "Invalid base for 'string_stream_push_number_f32'");
+    assert(base == 10 && "Invalid base for 'string_stream_push_number_f64'");
     StringStreamStrand strand = {
         .kind = STRAND_KIND_F64,
         .as = {.float_64 = {.v=v, .base=base, .flags=flags}}

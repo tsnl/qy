@@ -72,7 +72,7 @@ struct StringStreamChunk {
 #pragma pack(pop, Words)
 static_assert(sizeof(StringStreamChunk) == 1024, "Invalid StringStreamChunk size");
 
-#define DEFAULT_F32_PRINT_LENGTH 6
+#define DEFAULT_F32_PRINT_LENGTH 5
 #define DEFAULT_F64_PRINT_LENGTH 9
 
 ///
