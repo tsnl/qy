@@ -1,0 +1,12 @@
+(define (fibonacci x)
+  (cond 
+    [ (or (= x 0) (= x 1)) => 
+      x ]
+    [ else =>
+      (+ (fibonacci (- x 1)) (fibonacci (- x 2))) ]))
+
+(define-type Pos-Int
+  (refine Int (lambda (x) (and (>= x 0) (#t)))))
+
+;; Use '->' to type functions, '=>' to type closures.
+(: fibonacci (-> Pos-Int Pos-Int))

@@ -1,0 +1,17 @@
+;;; C, with S-expressions, with macros from Scheme.
+;;; - keep base semantics as close to C as possible, at most 1 or 2 deviations to simplify
+;;;   - manual memory management like C, can improve this by building language features
+;;;   - support for closures first-class, revised array semantics
+;;; - focus on improving the C experience using inference
+;;;   - Qy-2.1's best features (type inference) were held back by my 'innovations'
+;;;   - I don't want to use C/C++/Rust for low-level prototypes anymore... I am ready for
+;;;     something usable so I can move on to other projects.
+;;;   - simplify at the expense of implementation complexity
+;;;     - Qy-2.1 was really complicated in the end... C's beautiful simplicity had been ruined
+;;;       by 'safe' abstractions.
+;;; - S-expressions for macros, extensibility, even custom readers in the future (cf Racket).
+
+;;; So why use Q7 over C?
+;;; - type inference lets you focus on the ideas, not the types (can display in-line with editor)
+;;;   - can still specify types as code matures
+;;; - macros make common operations much more concise

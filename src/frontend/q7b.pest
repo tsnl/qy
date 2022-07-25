@@ -1,0 +1,56 @@
+//
+// Misc
+//
+
+file = { SOI ~ form* ~ EOI } 
+
+//
+// Form
+//
+
+form = { list | atom | quote | quasiquote }
+
+atom = { symbol | integer | float | string | boolean }
+
+list = { 
+    "(" ~ ")" | "(" ~ list_content ~ ")" | 
+    "[" ~ "]" | "[" ~ list_content ~ "]" |
+    "{" ~ "}" | "{" ~ list_content ~ "}" 
+}
+list_content = _{ form+ }   // we do not support improper because list =/=> linked-list.
+
+quote = { "'" ~ form }
+
+quasiquote = { "`" ~ qq_form }
+qq_form = { list | atom | quote | qq_escape }
+qq_escape = { "," ~ form }
+
+symbol = @{ 
+    (LETTER | NUMBER 
+    | "_" | "~" | "$" | "@" | "^" | "&" | "\\" | ":"
+    | "*" | "%" | "/" 
+    | "+" | "-" 
+    | "<" | ">" | "=" | "!")+ 
+}
+integer = @{ 
+    "-"? 
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
+float = @{
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+    ~ ("." ~ ASCII_DIGIT*)?
+    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? 
+}
+
+string = { "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}) 
+}
+
+boolean = { "#t" | "#f" }
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ ";" ~ (!"\n" ~ ANY)* }

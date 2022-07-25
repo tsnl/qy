@@ -1,0 +1,6 @@
+; (: f (-> Int Int))
+; (define (f x) x)
+
+(a b 2)
+(list 1 2)
+(list 1 2)
