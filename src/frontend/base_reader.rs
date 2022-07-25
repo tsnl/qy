@@ -40,7 +40,13 @@ impl<'a> AstBuilder<'a> {
             }
         }
 
-        Ok(ast::File { lang: vec!{}, forms: forms })
+        Ok(ast::File { 
+            lang: vec!{
+                self.im.insert("q7".to_string()),
+                self.im.insert("base".to_string())
+            },
+            forms: forms 
+        })
     }
     pub fn parse_qq_form(&mut self, form: Pair) -> Result<ast::Form> {
         // println!("qq-form: {:?}", &form);

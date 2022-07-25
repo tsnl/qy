@@ -1,6 +1,33 @@
-; (: f (-> Int Int))
-; (define (f x) x)
+(Define [Vec3 (type T)] ->
+  [Struct (val x T) (val y T) (val z T)])
 
-(a b 2)
-(list 1 2)
-(list 1 2)
+(Define [Vec (type T) (val n (Positive i32))] ->
+  (Static-Array T n))
+
+(Define [Positive (type T)] ->
+  (Refine T (lambda (v) (> v ([convert T] 0)))))
+
+;;; NOTE: case-sensitivity: 'Define' for types, 'define' for values.
+;;; - so 'Define', 'define' are separate bindings following this convention
+;;; - not enforced by compiler, though
+;;; - '->' is only supported arrow for 'Define', for symmetry with 'define'
+
+;;; '[convert T]' is a built-in that offers dynamic dispatch
+;;; to handle generic type conversions OR produce errors.
+;;; In general, a lot of 'higher-order' functions are 
+;;; provided in-langauge via macros.
+
+;;; By convention, we use [...] to indicate polytype or AoT compiler
+;;; applications, but it can be used for other things too (e.g. branches
+;;; of cond)
+
+;;; The 'define' forms are also specialized in de-sugared form.
+;;; - '(define x <body>)' binds a single variable
+;;; - '(define (f ...) ->|=> <body>)' binds a function or closure based on arrow.
+;;; - unlike in Scheme, '=>' is mandatory in 'cond'
+
+(define (fibonacci n) ->
+  (cond
+    [ (or (= n 0) (= n 1)) => n ]
+    [ else =>
+      (+ (fibonacci (- n 1)) (fibonacci (- n 2))) ]))

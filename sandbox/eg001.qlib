@@ -1,4 +1,8 @@
-(define (fibonacci x)
+;;
+;; with lots of syntax sugar!
+;;
+
+(define (fibonacci x) ->
   (cond 
     [ (or (= x 0) (= x 1)) => 
       x ]
