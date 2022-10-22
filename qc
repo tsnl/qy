@@ -1,9 +1,8 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
-SCRIPT_PATH=$(realpath $0)
-SCRIPT_DIR_PATH=$(dirname $SCRIPT_PATH)
+ROOT_PATH=$(dirname $(realpath $0))
 
-python3 $SCRIPT_DIR_PATH/qc.py $@
+python3.10 "$ROOT_PATH/qc.py" $@
 
 # TODO: for release, switch to `python -O`
 # python3.9 -O qc.py $@

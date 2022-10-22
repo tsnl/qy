@@ -4,18 +4,21 @@ Qy is a systems programming language that compiles to C++ and consumes C.
 
 ## Setup
 
-- Install Python 3.9
+- Install Python 3.10
 - Install a recent version of the Java Runtime Environment (JRE)-- used to build the grammar.
-- Install Python dependencies
-    ```
-    $ python3 -m pip install -r requirements.txt
-    ```
-- Build parser from grammar (requires Java)
-    ```
-    $ ./scripts/build-grammar.sh
-    ```
+- Run setup
+
+  ```
+  $ bash scripts/setup.sh
+  ```
   
-...and that's it, you're all set.
+  For developers, you can also run
+
+  ```
+  $ source scripts/setup.sh
+  ```
+
+...and that's it, you're all set to run `qc`, the Qy compiler.
 
 ## Usage
 

@@ -135,31 +135,31 @@ main (args: StringList) = {
 # example 3: templates, fixed-size arrays
 
 List [ElemType] = (
-    data: UnsafePointer[ElemType],
-    count: ISize
+  data: UnsafePointer[ElemType],
+  count: ISize
 );
 
 NamedList [ElemType] = (
-    slots: List[ElemType],
-    name_index_map: HashMap[String, ISize]
+  slots: List[ElemType],
+  name_index_map: HashMap[String, ISize]
 );
 
 Vector [ElemType, elem_count: ISize] = (
-    slots: *Array[ElemType, elem_count]
+  slots: *Array[ElemType, elem_count]
 );
 
 # note that template arguments for the 'self' type are automatically introduced
 # into scope here
 NamedArray.push (self) (name: String, v: ElemType) = {
-    assert !self.name_index_map.contains_key(name);
-    self.name_index_map.insert(name, self.slots.length);
-    self.slots.push(v);
+  assert !self.name_index_map.contains_key(name);
+  self.name_index_map.insert(name, self.slots.length);
+  self.slots.push(v);
 };
 
 # note that methods can also take template arguments
 # the `.convert_to[T]()` method is used to cast.
 NamedArray.map_convert_to [T] (self) () = {
-    # ...
+  # ...
 };
 ```
 
@@ -167,9 +167,9 @@ NamedArray.map_convert_to [T] (self) () = {
 # example 4: weak references
 
 DoublyLinkedList [T] = {
-    prev: weak DoublyLinkedList[T],
-    next: DoublyLinkedList[T],
-    head: T
+  prev: weak DoublyLinkedList[T],
+  next: DoublyLinkedList[T],
+  head: T
 };
 ```
 
@@ -193,6 +193,8 @@ constructors.
 At this stage, there is no way to protect against reference cycles or to enforce
 immutability. We could provide `Any`, `weak Any`, `weak mut Any`, etc. but this
 would require type-checking which is a non-goal for ths phase.
+
+TODO: add support for exceptions and exception handling at this stage.
 
 **PHASE 2: monomorphic gradual typing**
 

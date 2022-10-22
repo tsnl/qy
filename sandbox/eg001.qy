@@ -1,0 +1,11 @@
+x = 0;
+
+Color = (r, g, b);
+
+Color.new_black () = {
+    Color.new(0, 0, 0)
+};
+
+main () = {
+    0
+};

@@ -10,13 +10,15 @@ stmt: useStmt | bindValStmt | bindTypeStmt | defMethodStmt | defMainStmt;
 useStmt: 'use' modulePrefix;
 bindValStmt: bound=pattern '=' rhs=expr ;
 bindTypeStmt: bound=TID template_args_pattern=templateArgsPattern? '=' body=typeExpr ;
-defMethodStmt: ts=TID '.' name=VID '(' args=csFormalArgList? ')' ;
+defMethodStmt: ts=TID '.' name=VID '(' args=csFormalArgList? ')' '=' body=expr ;
 defMainStmt: 'main' '(' args=csFormalArgList? ')' '=' body=expr ;
 
 expr: binaryExpr ;
 csExprList: items+=expr (',' items+=expr)* ;
 
-primaryExpr: idRefExpr | literalExpr | ifElseExpr | forExpr | parenExpr | tupleExpr | chainExpr ;
+primaryExpr
+  : idRefExpr | literalExpr | ifElseExpr | forExpr | parenExpr | tupleExpr | chainExpr | arrayExpr 
+  ;
 idRefExpr: local_vid=VID | container=contentTypeSpec '.' extern_vid=VID ;
 literalExpr: intLiteral | floatLiteral | charLiteral | stringLiteral ;
 ifElseExpr: 'if' '(' cond=expr ')' then=chainExpr 'else' (else_=chainExpr | elif_=ifElseExpr) ;
@@ -24,6 +26,7 @@ forExpr: 'for' '(' key=pattern 'in' iterable=expr ')' body=chainExpr ;
 parenExpr: '(' expr ')' ;
 tupleExpr: '(' items+=expr ',' ')' | '(' items+=expr (',' items+=expr)+ ')' ;
 chainExpr: '{' (prefix+=stmt ';')* tail=expr '}' ;
+arrayExpr: '[' items=csExprList ','? ']' ;
 
 postfixExpr
   : through=primaryExpr                             #throughPostfixExpr
@@ -31,17 +34,20 @@ postfixExpr
   | container=postfixExpr '[' key=expr ']'          #postfixGetItemExpr
   ;
 
-unaryExpr
-  : through=postfixExpr
-  | operator=unaryExprOp operand=unaryExpr
-  ;
+unaryExpr: through=postfixExpr | operator=unaryExprOp operand=unaryExpr ;
 unaryExprOp: '*' | '!' | '~' ;
 
-// TODO: finish this
-// binaryExpr: logicalOrBinaryExpr ;
-// mulBinaryExpr:  ;
-// logicalAndBinaryExpr:  ;
-// logicalOrBinaryExpr: logicalAndBinaryExpr | logicalOrBinaryExpr 'or' logicalAndBinaryExpr;
+binaryExpr: logicalOrExpr ;
+mulExpr: through=unaryExpr | l=mulExpr op=('*'|'/'|'//'|'%') r=unaryExpr;
+addExpr: through=mulExpr | l=addExpr op=('+'|'-') r=mulExpr ;
+shiftExpr: through=addExpr | l=shiftExpr op=('<<'|'>>') r=addExpr ;
+relExpr: through=shiftExpr | l=relExpr op=('<'|'>'|'<='|'>=') r=shiftExpr ;
+eqExpr: through=relExpr | l=eqExpr op=('=='|'!=') r=relExpr ;
+bitwiseAndExpr: through=eqExpr | l=bitwiseAndExpr op='&' r=eqExpr ;
+bitwiseXOrExpr: through=bitwiseAndExpr | l=bitwiseAndExpr op='^' r=bitwiseAndExpr ;
+bitwiseOrExpr: through=bitwiseXOrExpr | l=bitwiseOrExpr op='|' r=bitwiseXOrExpr ;
+logicalAndExpr: through=bitwiseOrExpr | l=logicalAndExpr op='&&' r=bitwiseOrExpr;
+logicalOrExpr: logicalAndExpr | logicalOrExpr '||' logicalAndExpr;
 
 typeSpec: unaryTypeSpec ;
 contentTypeSpec: postfixTypeSpec ;
@@ -88,8 +94,8 @@ fragment ANY_ESC: (
 fragment IS: [uUlLsS]+ ;
 fragment FS: [fFdD]+ ;
 
-VID: '_'* (L|'_') (L|D|'_')* ;
-TID: '_'* (U)     (L|D|'_')* ;
+VID: '_'* L (L|D|'_')* ;
+TID: '_'* U (L|D|'_')* ;
 LIT_DEC_INT:      D+ IS? ;
 LIT_HEX_INT: '0x' H+ IS? ;
 LIT_FLOAT: LIT_DEC_INT '.' LIT_DEC_INT FS? ;
