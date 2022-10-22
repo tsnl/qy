@@ -1,3 +1,0 @@
-const: Bool {
-    import_test_qyp_2_imported = true;
-};

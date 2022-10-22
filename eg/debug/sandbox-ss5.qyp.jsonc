@@ -1,6 +1,0 @@
-{
-    "author": "https://github.com/tsnl",
-    "help": "This module contains a scratch file about pointers & mutability.",
-    "src": [],
-    "deps": ["eg198-scratch2.qy"]
-}

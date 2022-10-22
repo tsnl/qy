@@ -1,6 +1,0 @@
-val w = 0;
-
-def main () = do {
-    val w = 1;
-    return 0;
-};

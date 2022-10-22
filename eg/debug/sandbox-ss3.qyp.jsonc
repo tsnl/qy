@@ -1,7 +1,0 @@
-{
-    "author": "https://github.com/tsnl",
-    "help": "This module contains a minimum reproduction of a bug.",
-    "src": [
-        "./eg402-scoping.qy"
-    ]
-}

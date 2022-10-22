@@ -1,8 +1,0 @@
-{
-    "author": "https://github.com/tsnl",
-    "help": "Matrix multiplication with a console",
-    "src": [
-        "matmul.qy"
-    ],
-    "deps": []
-}

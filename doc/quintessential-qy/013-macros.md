@@ -1,6 +1,0 @@
-TODO: implement...
--   macro facilities: may just do call-by-name like Scala
-
-TODO: document...
--   macros, macro expansion
--   languages that can grow

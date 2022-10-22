@@ -1,7 +1,0 @@
-{
-    "author": "https://github.com/tsnl",
-    "help": "A helper module for `sandbox`.",
-    "src": [
-        "hello.qy"
-    ]
-}
