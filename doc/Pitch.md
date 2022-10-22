@@ -21,9 +21,9 @@ better.
 In summary...
 - Shift to gradual typing and a universally boxed object model where the 
   compiler decides where to allocate memory based on escape analysis.
-  - there is an 'Any' datatype which does not have most methods, must be cast to
-    a destination type at runtime.
-    - supports `is` which is like `eq?`, `convert_to[T]()` method for casts.
+  - there is an 'Any' datatype which offers dynamic typing via duck-dispatch,
+    i.e. using a hash-map like Python.
+    - this can be optimized in the future with compile-time interfaces.
   - the unary `*` type operator unboxes an instance while the unary `*` value
     operator creates a shallow copy. 
     - All data-types are boxed by default, including primitives like `Int`, 
@@ -33,12 +33,12 @@ In summary...
       this only unboxes similar to C++ `std::vector<T>* -> std::vector<T>`.
     - Compiler does not optimize referential transparency into unboxing; let the
       user do it, maybe provide a warning/hint.
-    - `Any` cannot be unboxed.
+    - `Any` cannot be unboxed. `weak T` cannot be unboxed.
   - if type-specifier not provided, then compiler uses type-inference to guess,
     defaulting to the `Any` datatype on join, adding a `*` prefix only in cases
     of referential transparency and non-`Any`
 - Shift to first-class reference-counting with support for weak references and
-  mutability specifiers as type-level properties
+  mutability specifiers as **variable-level properties** (instead of type)
   - assignment always re-binds slots, so `mut` only controls slot mutability,
     not exterior mutability via slot/interior mutability of boxed instance.
     `mut` is the opposite of C#'s `readonly`
@@ -50,19 +50,27 @@ In summary...
   - the user only defines methods that operate on a specific piece of state
     - these may also behave like properties
     - cannot define methods on union datatypes
-  - there are no global variables: top-level definitions either types or methods
+  - there are no global variables: top-level definitions either types, methods,
+    or immutable constant bindings.
   - `self` is a built-in keyword argument
+- Interfaces will be supported in a future version of the language to enable
+  dynamic dispatch without duck dispatch.
 
 ```
 # example 1
 
+# note that there is a global namespace, module names must start with uppercase
+# letters, and each file is a singleton type that may contain other types.
+# note the TId/vid distinction.
 use Math;
 use Gfx;
+
+pi = 3.14159;
 
 Vec2F = (x: Float, y: Float);
 Robot = (position: *Vec2F, angle_deg: Float, pen_down: Bool);
 
-Robot.new () = {
+Robot.new_default () = {
   Robot(Vec2F(0, 0), 0, Bool.False);
 };
 Robot.pen_down (self) () = {
@@ -76,8 +84,8 @@ Robot.walk (self) (distance_px) = {
   src_y = self.y;
   dst_x = self.x + distance_px * Math.cos(Math.radians(self.angle));
   dst_y = self.y + distance_px * Math.sin(Math.radians(self.angle));
-  src_pt = Vec2f(src_x, src_y);
-  dst_pt = Vec2f(dst_x, dst_y);
+  src_pt = Vec2f.new(src_x, src_y);
+  dst_pt = Vec2f.new(dst_x, dst_y);
   if (self.pen_down) {
     Gfx.draw_line(src_pt, dst_pt);
   };
@@ -88,7 +96,7 @@ Robot.turn (self) (angle_offset_deg) = {
 };
 
 Robot.draw_square (side_length_in_px) = {
-  robot = Robot.new();
+  robot = Robot.new_default();
   robot.pen_down();
   for i in range(4) {
     robot.walk(side_length_in_px);
@@ -128,16 +136,16 @@ main (args: StringList) = {
 
 List [ElemType] = (
     data: UnsafePointer[ElemType],
-    count: USize
+    count: ISize
 );
 
 NamedList [ElemType] = (
     slots: List[ElemType],
-    name_index_map: HashMap[String, USize]
+    name_index_map: HashMap[String, ISize]
 );
 
-Vector [ElemType, ElemCount: USize] = (
-    slots: *Array[ElemType, ElemCount]
+Vector [ElemType, elem_count: ISize] = (
+    slots: *Array[ElemType, elem_count]
 );
 
 # note that template arguments for the 'self' type are automatically introduced
@@ -164,3 +172,42 @@ DoublyLinkedList [T] = {
     head: T
 };
 ```
+
+Weak reference instances have a method called `acquire()` that returns an
+`Option[T]` instance where the `Some` case is a strong reference.
+
+Weak references cannot be unboxed.
+
+---
+
+## Implementation plan
+
+**PHASE 1: pure dynamic**
+
+Implement a purely duck-typed language, so every instance is an instance of 
+`Any`. Every dynamic dispatch hash-map key is an IntStr.
+
+User can still bind type expressions for ADTs, these are used to define 
+constructors.
+
+At this stage, there is no way to protect against reference cycles or to enforce
+immutability. We could provide `Any`, `weak Any`, `weak mut Any`, etc. but this
+would require type-checking which is a non-goal for ths phase.
+
+**PHASE 2: monomorphic gradual typing**
+
+Support type annotations, including `weak mut T`, `*T`.
+
+Implement checked type conversions. Conversions from `Any` to a non-`Any` type
+are checked at run-time, including implicit conversions at function call 
+boundaries. 
+
+Support a few built-in polymorphic datatypes like `List[T]`, `Array[T,n]`,
+`Span[T]`, `HashMap[K, V]`, and `HashSet[T]`.
+
+**PHASE 3: templates**
+
+Support template type arguments.
+
+Support literals and global constants for template values. No evaluation.
+
