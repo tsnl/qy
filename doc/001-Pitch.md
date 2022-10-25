@@ -190,11 +190,11 @@ Implement a purely duck-typed language, so every instance is an instance of
 User can still bind type expressions for ADTs, these are used to define 
 constructors.
 
-At this stage, there is no way to protect against reference cycles or to enforce
-immutability. We could provide `Any`, `weak Any`, `weak mut Any`, etc. but this
-would require type-checking which is a non-goal for ths phase.
+At this stage, we will be able to provide 'weak' and 'mut' implementations for 
+'Any'. Mutability requires some compile-time checks that are orthogonal to 
+type-checking.
 
-TODO: add support for exceptions and exception handling at this stage.
+Also add support for exceptions and exception handling at this stage.
 
 **PHASE 2: monomorphic gradual typing**
 
