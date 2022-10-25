@@ -2,7 +2,7 @@ import argparse
 import cProfile as profile
 import pstats
 
-from . import panic
+from ..core import panic
 from . import settings
 from . import parser
 

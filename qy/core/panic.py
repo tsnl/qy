@@ -3,7 +3,7 @@ import typing as t
 import enum
 import os
 
-from . import feedback as feedback
+from ..compiler import feedback as feedback
 
 
 class Exception(BaseException):
@@ -41,7 +41,8 @@ def because(
     opt_msg: t.Optional[str] = None, 
     opt_file_path: t.Optional[str] = None,
     opt_file_region: t.Optional[feedback.BaseFileRegion] = None,
-    opt_loc: t.Optional[feedback.ILoc] = None
+    opt_loc: t.Optional[feedback.ILoc] = None,
+    outer_exc=None
 ):
     """
     Halts program execution after printing a helpful error message with a reference to the error.
@@ -77,4 +78,8 @@ def because(
         # this is OK! sometimes, we have a global error: just ensure message includes locations.
         pass
 
-    raise Exception(exit_code, msg)
+    if outer_exc is None:
+        raise Exception(exit_code, msg)
+    else:
+        raise Exception(exit_code, msg) from outer_exc
+

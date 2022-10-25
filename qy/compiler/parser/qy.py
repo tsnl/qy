@@ -1,6 +1,8 @@
 import os.path
 
-from .. import panic, feedback
+from ...core import panic
+
+from .. import feedback
 from . import antlr
 
 

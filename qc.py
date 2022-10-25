@@ -1,4 +1,4 @@
-import qcl
+import qy.compiler
 import sys
 
 expected_python_version = "3.10"
@@ -13,4 +13,4 @@ def exit_if_bad_python_version():
 
 if __name__ == "__main__":
     exit_if_bad_python_version()
-    exit(qcl.cli.main(profiling=False))
+    exit(qy.compiler.cli.main(profiling=False))
