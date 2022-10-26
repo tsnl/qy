@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+ROOT_PATH=$(dirname $(realpath $0))
+
+python3.10 "$ROOT_PATH/qbert.py" $@
