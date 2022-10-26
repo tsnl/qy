@@ -11,10 +11,6 @@ ERROR_HEADER="[QY] [ERROR] "
 type -P $PYTHON 1> /dev/null 2> /dev/null
 PYTHON_FIND_EC=$?
 
-if [ ! -d ".git" ]; then
-    echo "$ERROR_HEADER Expected to run this script in the repository root."
-    exit $NZEC_WRONG_CWD
-fi
 if [ $PYTHON_FIND_EC != 0 ]; then
     echo "$ERROR_HEADER Could not find appropriate Python interpreter: $PYTHON."
     echo "              Please ensure such an executable is on PATH or edit 'setup.sh'"

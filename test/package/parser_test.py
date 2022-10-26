@@ -1,6 +1,8 @@
 import unittest
 
-class TestStringMethods(unittest.TestCase):
+class TestRequirementVersionConstraintParser(unittest.TestCase):
+    # TODO: replace this with real tests
+    
     def test_upper(self):
         self.assertEqual('foo'.upper(), 'FOO')
 
