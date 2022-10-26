@@ -2,4 +2,4 @@
 
 ROOT_PATH=$(dirname $(realpath $0))
 
-python3.10 "$ROOT_PATH/qbert.py" $@
+python3.10 "$ROOT_PATH/qbt.py" $@

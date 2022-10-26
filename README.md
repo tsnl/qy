@@ -1,11 +1,20 @@
-# Qy v2.1
+# Qy Lang
 
-Qy is a systems programming language that compiles to C++ and consumes C.
+Qy is a gradually-typed programming, message-based programming language that 
+aims to provide the convenience of Python without compromising on control or
+performance.
+
+Gradual typing is the union of dynamic and static typing. Variables lacking any
+user type specifiers rely on type inference or dynamic typing to be determined.
+
+It is compiled ahead-of-time and can be deployed anywhere that languages like
+C, C++, Rust, Swift, or Zig can be deployed.
 
 ## Setup
 
 - Install Python 3.10
-- Install a recent version of the Java Runtime Environment (JRE)-- used to build the grammar.
+- Install a recent version of the Java Runtime Environment (JRE)-- used to build 
+  the grammar.
 - Run setup
 
   ```
@@ -18,7 +27,7 @@ Qy is a systems programming language that compiles to C++ and consumes C.
   $ source scripts/setup.sh
   ```
 
-...and that's it, you're all set to run `qc`, the Qy compiler.
+...and that's it, you're all set to run `qbt`, the Qy build tool.
 
 NOTE: if you are a Windows user, please use WSL or a Virtual Machine to run `qc`.
 Since `qc` is just a C++ code generator (similar to `cfront`), the generated source files can then

@@ -83,8 +83,8 @@ def parse_version(qy_package_json_path: str, raw_version_str: str, context_desc:
     assert isinstance(raw_version_str, str)
 
     raw_version_list = raw_version_str.split('.')
-    min_component_count = 1
-    max_component_count = 4
+    min_component_count = Version.min_component_count
+    max_component_count = Version.max_component_count
 
     parse_version__check_component_count(
         qy_package_json_path, 
@@ -326,7 +326,7 @@ def parse_requirement_version_constraint_string(
             (version_constraint_str[len('<'):], False)
         )
         version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
-        return MinVersionConstraint(version_point, is_closed)
+        return MaxVersionConstraint(version_point, is_closed)
 
     if version_constraint_str.startswith('>'):
         raw_version_point, is_closed = (
@@ -335,7 +335,12 @@ def parse_requirement_version_constraint_string(
             (version_constraint_str[len('>'):], False)
         )
         version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
-        return MaxVersionConstraint(version_point, is_closed)
+        return MinVersionConstraint(version_point, is_closed)
+
+    if version_constraint_str.startswith('='):
+        raw_version_point = version_constraint_str[len('='):]
+        version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
+        return ExactVersionConstraint(version_point)
 
     panic.because(
         panic.ExitCode.BadProjectFile,
