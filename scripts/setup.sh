@@ -3,6 +3,8 @@
 if [ ! -d ".git" ]; then
     echo "$ERROR_HEADER Expected to run this script in the repository root."
     exit 1
+else
+    export PATH="$PATH:$(pwd)"
 fi
 
 source ./scripts/config.sh

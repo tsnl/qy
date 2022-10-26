@@ -1,13 +1,41 @@
+import os.path
+
 import json5
 
 from ..core import panic
-from .package import Manifest
+from ..core import const
+
+from .package import Package
 from .version import Version
 from .version_constraint import ExactVersionConstraint, MinVersionConstraint, MaxVersionConstraint
 from .requirement import GitRequirement, FilesystemRequirement
 
 
-def parse_project_from_filepath(qy_package_json_path: str):
+#
+# parse_package_from_dirpath, parse_package_from_filepath, parse_package_from_json_object
+#
+
+def parse_package_from_dirpath(qy_package_dir_path: str) -> Package:
+    qy_package_json_filepath = os.path.join(qy_package_dir_path, const.QY_PACKAGE_FILENAME)
+    
+    if not os.path.isdir(qy_package_dir_path):
+        panic.because(
+            panic.ExitCode.BadProjectFile,
+            f"Invalid project directory: this directory does not exist.",
+            opt_file_path=qy_package_dir_path
+        )
+
+    if not os.path.isfile(qy_package_json_filepath):
+        panic.because(
+            panic.ExitCode.BadProjectFile,
+            f"Invalid project directory: missing a '{const.QY_PACKAGE_FILENAME}' file",
+            opt_file_path=qy_package_json_filepath
+        )
+    
+    return parse_package_from_filepath(qy_package_json_filepath)
+
+
+def parse_package_from_filepath(qy_package_json_path: str) -> Package:
     qy_package_json = None
     with open(qy_package_json_path) as qy_package_json_file:
         try:
@@ -24,15 +52,15 @@ def parse_project_from_filepath(qy_package_json_path: str):
                 f"Duplicate keys detected in 'qy-package.json5' file: {exc}"
             )
     assert qy_package_json is not None
-    return parse_project_from_json_object(
+    return parse_package_from_json_object(
         qy_package_json_path,
         qy_package_json
     )
 
 
-def parse_project_from_json_object(qy_package_json_path: str, qy_package_json: object):
+def parse_package_from_json_object(qy_package_json_path: str, qy_package_json: object) -> Package:
     extractor = Extractor(qy_package_json_path, qy_package_json)
-    return Manifest(
+    return Package(
         author=extractor.get("author", str),
         description=extractor.get("description", str),
         version=parse_version(
@@ -47,22 +75,27 @@ def parse_project_from_json_object(qy_package_json_path: str, qy_package_json: o
     )
 
 
+#
+# parse_version
+#
+
 def parse_version(qy_package_json_path: str, raw_version_str: str, context_desc: str):
     assert isinstance(raw_version_str, str)
 
-    expected_max_len = 4
     raw_version_list = raw_version_str.split('.')
+    min_component_count = 1
+    max_component_count = 4
 
-    parse_version__check_length(
+    parse_version__check_component_count(
         qy_package_json_path, 
-        raw_version_list, 
-        expected_max_len, 
+        raw_version_list,
+        min_component_count, max_component_count,
         context_desc
     )
     parse_version__check_elem_type(
         qy_package_json_path, 
         raw_version_list, 
-        expected_max_len, 
+        min_component_count, max_component_count,
         context_desc
     )
     return Version(
@@ -73,10 +106,10 @@ def parse_version(qy_package_json_path: str, raw_version_str: str, context_desc:
     )
 
 
-def parse_version__check_length(
+def parse_version__check_component_count(
     qy_package_json_path, 
-    raw_version_list, 
-    expected_max_len, 
+    raw_version_list,
+    min_component_count, max_component_count,
     context_desc
 ):
     if len(raw_version_list) == 0:
@@ -86,12 +119,13 @@ def parse_version__check_length(
             f"expected a non-empty string.",
             opt_file_path=qy_package_json_path
         )
-    if len(raw_version_list) > expected_max_len:
+    component_count_ok = min_component_count <= len(raw_version_list) <= max_component_count
+    if not component_count_ok:
         list_len = len(raw_version_list)
         panic.because(
             panic.ExitCode.BadProjectFile,
             f"Invalid version specifier for {context_desc}: "
-            f"expected a string with {expected_max_len} components, "
+            f"expected a string with {min_component_count} to {max_component_count} components, "
             f"but got length {list_len} components instead.",
             opt_file_path=qy_package_json_path
         )
@@ -100,10 +134,10 @@ def parse_version__check_length(
 def parse_version__check_elem_type(
     qy_package_json_path, 
     raw_version_list, 
-    expected_len, 
+    min_component_count, max_component_count, 
     context_desc
 ):
-    assert len(raw_version_list) == expected_len
+    assert min_component_count <= len(raw_version_list) <= max_component_count
     for i, x in enumerate(raw_version_list):
         try:
             int(x)
@@ -111,12 +145,16 @@ def parse_version__check_elem_type(
             panic.because(
                 panic.ExitCode.BadProjectFile,
                 f"Invalid version specifier for {context_desc}: "
-                f"In component #{1+i}/{expected_len}, expected an integer number, "
-                f"but instead got: {x}",
+                f"In component {1+i} of {max_component_count}, expected an integer number, "
+                f"but instead got: {repr(x)}",
                 opt_file_path=qy_package_json_path,
                 outer_exc=exc
             )
 
+
+#
+# parse_requirements_list, parse_requirement
+#
 
 def parse_requirements_list(qy_package_json_path: str, raw_requirements_list: list):
     assert isinstance(raw_requirements_list, list)
@@ -125,10 +163,10 @@ def parse_requirements_list(qy_package_json_path: str, raw_requirements_list: li
     
     total_requirement_count = len(raw_requirements_list)
     return [
-        parse_requirement_obj(
+        parse_requirement(
             qy_package_json_path, 
             raw_requirement_obj,
-            f"requirement #{1+i}/{total_requirement_count}"
+            f"requirement {1+i} of {total_requirement_count}"
         )
         for i, raw_requirement_obj in enumerate(raw_requirements_list)
     ]
@@ -142,26 +180,26 @@ def parse_requirements_list__check_elem_type(
         if not isinstance(raw_requirement_obj, dict):
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"In requirement #{1+i}/{len(raw_requirements_list)}, expected a JSON object, "
+                f"In requirement {1+i} of {len(raw_requirements_list)}, expected a JSON object, "
                 f"but got: {raw_requirement_obj}",
                 opt_file_path=qy_package_json_path
             )
 
 
-def parse_requirement_obj(
+def parse_requirement(
     qy_package_json_path: str, 
     raw_requirement_obj: object,
     this_requirement_desc: str
 ):
-    extractor = Extractor(raw_requirement_obj)
+    extractor = Extractor(qy_package_json_path, raw_requirement_obj)
 
-    provider = extractor.get("extractor", str)
+    provider = extractor.get("provider", str)
 
     if provider == 'git':
-        return parse_requirement_obj__git_provider(extractor)
+        return parse_requirement__git_provider(extractor, this_requirement_desc)
 
     elif provider == 'filesystem':
-        return parse_requirement_obj__filesystem_provider(extractor)
+        return parse_requirement__filesystem_provider(extractor, this_requirement_desc)
 
     else:
         panic.because(
@@ -172,10 +210,11 @@ def parse_requirement_obj(
         )
 
 
-def parse_requirement_obj__git_provider(extractor):
+def parse_requirement__git_provider(extractor: "Extractor", this_requirement_desc):
     version_constraint_list = parse_requirement_version_constraints(
-        extractor.qy_package_json_path,
-        extractor.get("version")
+        extractor.json_path,
+        extractor.get("version") if "version" in extractor.json else "*",
+        this_requirement_desc
     )
     return GitRequirement(
         location=extractor.get("location", str),
@@ -183,16 +222,21 @@ def parse_requirement_obj__git_provider(extractor):
     )
 
 
-def parse_requirement_obj__filesystem_provider(extractor):
+def parse_requirement__filesystem_provider(extractor: "Extractor", this_requirement_desc):
     version_constraint_list = parse_requirement_version_constraints(
-        extractor.qy_package_json_path,
-        extractor.get("version")
+        extractor.json_path,
+        extractor.get("version") if "version" in extractor.json else "*",
+        this_requirement_desc
     )
     return FilesystemRequirement(
         location=extractor.get("location", str),
         version_constraints=version_constraint_list
     )
 
+
+#
+# parse_requirement_version_constraints
+#
 
 def parse_requirement_version_constraints(
     qy_package_json_path, 
@@ -223,7 +267,7 @@ def parse_requirement_version_constraints(
             panic.ExitCode.BadProjectFile,
             f"In {this_requirement_desc}, "
             f"expected a list or a string for version constraints, "
-            f"but instead got: {raw_version_obj}",
+            f"but instead got: {repr(raw_version_obj)}",
             opt_file_path=qy_package_json_path
         )
 
@@ -259,6 +303,10 @@ def parse_requirement_version_constraints__list_of_string_constraints(
     ]
 
 
+#
+# parse_requirement_version_constraint_string
+#
+
 def parse_requirement_version_constraint_string(
     qy_package_json_path: str,
     version_constraint_str: str,
@@ -268,7 +316,7 @@ def parse_requirement_version_constraint_string(
 ):
     context_desc = (
         f"{this_requirement_desc}, version constraint "
-        f"#{1+version_constraint_index}/{version_constraint_count}"
+        f"{1+version_constraint_index} of {version_constraint_count}"
     )
 
     if version_constraint_str.startswith('<'):
@@ -283,7 +331,7 @@ def parse_requirement_version_constraint_string(
     if version_constraint_str.startswith('>'):
         raw_version_point, is_closed = (
             (version_constraint_str[len('>='):], True)
-            if version_constraint_str.startswith('<=') else
+            if version_constraint_str.startswith('>=') else
             (version_constraint_str[len('>'):], False)
         )
         version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
@@ -302,12 +350,12 @@ def parse_requirement_version_constraint_string(
 
 class Extractor(object):
     def __init__(self, qy_package_json_path: str, qy_package_json: object) -> None:
-        self.qy_package_json_path = qy_package_json_path
-        self.qy_package_json = qy_package_json
+        self.json_path = qy_package_json_path
+        self.json = qy_package_json
 
-    def get(self, key, expected_datatype) -> object:
-        file_path = self.qy_package_json_path
-        obj = self.qy_package_json
+    def get(self, key, expected_datatype=object) -> object:
+        file_path = self.json_path
+        obj = self.json
         
         if key not in obj:
             panic.because(
@@ -319,13 +367,16 @@ class Extractor(object):
         res = obj[key]
 
         # typechecking:
-        if issubclass(expected_datatype, (int, float)):
+        if expected_datatype is object:
+            # no checks required here
+            pass
+        elif issubclass(expected_datatype, (int, float)):
             try:
                 res = expected_datatype(res)
             except ValueError:
                 panic.because(
                     panic.ExitCode.BadProjectFile,
-                    f"Expected key '{key}' to map to a number, instead got: {res}",
+                    f"Expected key '{key}' to map to a number, instead got: {repr(res)}",
                     opt_file_path=file_path
                 )
         elif not isinstance(res, expected_datatype):
@@ -337,7 +388,8 @@ class Extractor(object):
             }[expected_datatype]
             panic.because(
                 panic.ExitCode.BadProjectFile,
-                f"Expected key '{key}' to map to {expected_datatype_name}, instead got: {res}"
+                f"Expected key '{key}' to map to {expected_datatype_name}, instead got: {repr(res)}",
+                opt_file_path=file_path
             )
             
         return res

@@ -1,7 +1,7 @@
 
 {
   author: "Nikhil Idiculla",
-  version: [0, 0, 0, 0],
+  version: "0.0",
   description: "An example of a Qy package",
   requires: []
 }

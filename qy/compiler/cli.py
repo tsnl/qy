@@ -1,8 +1,12 @@
+import os.path
 import argparse
 import cProfile as profile
 import pstats
 
 from ..core import panic
+from ..core import const
+from .. import package
+
 from . import settings
 from . import parser
 
@@ -10,15 +14,11 @@ from . import parser
 def main_impl():
     args_obj = parse_args()
     compiler_settings = settings.CompilerSettings(
-        tmp_root_module_path=args_obj.tmp_root_qy_module_path,
-        output_dir_path=args_obj.output_dir_path
+        root_package_dir=args_obj.root_package_dir
     )
-    
-    # TODO: parse a project file, acquire list of source files by scanning a specified source
-    # directory, cf Cargo.toml
-    # This is just a debug routine.
-    res = parser.qy.parse_file(compiler_settings.tmp_root_module_path)
 
+    root_package = package.parse(compiler_settings.root_package_dir)
+    
     # emitter = cpp_emitter.Emitter(output_dir_path)
     # root_qyp = qcl.transpile_one_package_set(root_qyp_path, emitter, transpile_opts)
     # del root_qyp
@@ -29,13 +29,9 @@ def main_impl():
 def parse_args():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
-        "tmp_root_qy_module_path", metavar="<DEBUG:path-to-module.qy>",
-        help="The path to the project file which contains a map of all source files in use."
-    )
-    arg_parser.add_argument(
-        "-o", "--output-dir-path", metavar="<output-dir-path>",
-        help="The directory to which output is written. If it does not exist, it will be created.",
-        default="./qc-build"
+        "-d", "--dir", metavar="<root-package-dirpath>", dest='root_package_dir',
+        help="The path to the directory containing the package to build.",
+        default="."
     )
     arg_parser.add_argument(
         "-v", "--verbose", action="count",
