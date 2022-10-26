@@ -1,9 +1,9 @@
 import json5
 
 from ..core import panic
-from .package import Package
+from .package import Manifest
 from .version import Version
-from .version_constraint import ExactVersionConstraint
+from .version_constraint import ExactVersionConstraint, MinVersionConstraint, MaxVersionConstraint
 from .requirement import GitRequirement, FilesystemRequirement
 
 
@@ -32,7 +32,7 @@ def parse_project_from_filepath(qy_package_json_path: str):
 
 def parse_project_from_json_object(qy_package_json_path: str, qy_package_json: object):
     extractor = Extractor(qy_package_json_path, qy_package_json)
-    return Package(
+    return Manifest(
         author=extractor.get("author", str),
         description=extractor.get("description", str),
         version=parse_version(
@@ -243,12 +243,57 @@ def parse_requirement_version_constraints__singleton_string(
 
 def parse_requirement_version_constraints__list_of_string_constraints(
     qy_package_json_path: str, 
-    raw_version_obj: list,
+    raw_version_list: list,
     this_requirement_desc: str
 ):
-    assert isinstance(raw_version_obj, list)
-    # TODO: parse strings beginning with '>', '<', '>=', or '<='
-    raise NotImplementedError()
+    assert isinstance(raw_version_list, list)
+    return [
+        parse_requirement_version_constraint_string(
+            qy_package_json_path,
+            version_constraint_str,
+            this_requirement_desc,
+            version_constraint_index,
+            len(raw_version_list)
+        )
+        for version_constraint_index, version_constraint_str in enumerate(raw_version_list)
+    ]
+
+
+def parse_requirement_version_constraint_string(
+    qy_package_json_path: str,
+    version_constraint_str: str,
+    this_requirement_desc: str,
+    version_constraint_index: int,
+    version_constraint_count: int
+):
+    context_desc = (
+        f"{this_requirement_desc}, version constraint "
+        f"#{1+version_constraint_index}/{version_constraint_count}"
+    )
+
+    if version_constraint_str.startswith('<'):
+        raw_version_point, is_closed = (
+            (version_constraint_str[len('<='):], True)
+            if version_constraint_str.startswith('<=') else
+            (version_constraint_str[len('<'):], False)
+        )
+        version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
+        return MinVersionConstraint(version_point, is_closed)
+
+    if version_constraint_str.startswith('>'):
+        raw_version_point, is_closed = (
+            (version_constraint_str[len('>='):], True)
+            if version_constraint_str.startswith('<=') else
+            (version_constraint_str[len('>'):], False)
+        )
+        version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
+        return MaxVersionConstraint(version_point, is_closed)
+
+    panic.because(
+        panic.ExitCode.BadProjectFile,
+        f"In {context_desc}, found invalid version constraint: {version_constraint_str}",
+        opt_file_path=qy_package_json_path
+    )
 
 
 #

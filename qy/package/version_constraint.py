@@ -9,13 +9,13 @@ class VersionConstraint(abc.ABC):
         self.point = version_point
 
 
-class MinimumVersionConstraint(VersionConstraint):
+class MinVersionConstraint(VersionConstraint):
     def __init__(self, version_point: "Version", closed_endpoint: bool):
         super().__init__(version_point)
         self.closed = closed_endpoint
 
 
-class MaximumVersionConstraint(VersionConstraint):
+class MaxVersionConstraint(VersionConstraint):
     def __init__(self, version_point: "Version", closed_endpoint: bool):
         super().__init__(version_point)
         self.closed = closed_endpoint
