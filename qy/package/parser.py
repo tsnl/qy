@@ -243,11 +243,6 @@ def parse_requirement_version_constraints(
     raw_version_obj: object,
     this_requirement_desc: str
 ):
-    # check that raw_version_obj is either...
-    # - a string denoting a version number (exact constraint specifier)
-    # - a list of >=, >, <=, < version constraints
-    # - the wild-card version specifier, namely '*' (default)
-    
     if isinstance(raw_version_obj, str):
         return parse_requirement_version_constraints__singleton_string(
             qy_package_json_path,
@@ -336,11 +331,6 @@ def parse_requirement_version_constraint_string(
         )
         version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
         return MinVersionConstraint(version_point, is_closed)
-
-    if version_constraint_str.startswith('='):
-        raw_version_point = version_constraint_str[len('='):]
-        version_point = parse_version(qy_package_json_path, raw_version_point, context_desc)
-        return ExactVersionConstraint(version_point)
 
     panic.because(
         panic.ExitCode.BadProjectFile,

@@ -10,7 +10,8 @@ class VersionConstraint(abc.ABC):
 
 
 class ExactVersionConstraint(VersionConstraint):
-    pass
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, ExactVersionConstraint) and self.point == o.point
 
 
 @abc.abstractmethod
@@ -29,6 +30,13 @@ class RelVersionConstraint(VersionConstraint):
             self.ordering_string() +
             ("" if not self.closed else "=") +
             str(self.point)
+        )
+
+    def __eq__(self, o: object) -> bool:
+        return (
+            isinstance(o, self.__class__) and 
+            self.point == o.point and
+            self.closed == o.closed
         )
 
 
