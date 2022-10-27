@@ -1,4 +1,4 @@
-PYTHON="python3.10"
+PYTHON="python3.9"
 VENV_PATH="venv"
 
 NZEC_WRONG_CWD=1

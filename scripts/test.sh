@@ -5,4 +5,4 @@ if [ ! -d ".git" ]; then
     exit $NZEC_WRONG_CWD
 fi
 
-python3.10 -m unittest discover -s test -p *_test.py
+python3.9 -m unittest discover -s test -p *_test.py

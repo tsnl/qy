@@ -12,10 +12,11 @@ C, C++, Rust, Swift, or Zig can be deployed.
 
 ## Setup
 
-- Install Python 3.10
+- Install Python 3.9 or PyPy3.9 including the Pip package manager
+  - first try `python -m ensurepip`, else need to use OS' package manager.
 - Install a recent version of the Java Runtime Environment (JRE)-- used to build 
   the grammar.
-- Run setup
+- Run setup (requires an internet connection for first-time setup)
 
   ```
   $ bash scripts/setup.sh

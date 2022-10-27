@@ -62,115 +62,121 @@ In summary...
 # note that there is a global namespace, module names must start with uppercase
 # letters, and each file is a singleton type that may contain other types.
 # note the TId/vid distinction.
-use Math;
-use Gfx;
+use Math
+use Gfx
 
-pi = 3.14159;
+pi = 3.14159
 
-Vec2F = (x: Float, y: Float);
-Robot = (position: *Vec2F, angle_deg: Float, pen_down: Bool);
+Vec2F = 
+  x: Float
+  y: Float
 
-Robot.new_default () = {
-  Robot(Vec2F(0, 0), 0, Bool.False);
-};
-Robot.pen_down (self) () = {
-  self.pen_down = Bool.True;
-};
-Robot.pen_up (self) () = {
-  self.pen_down = Bool.false;
-};
-Robot.walk (self) (distance_px) = {
-  src_x = self.x;
-  src_y = self.y;
-  dst_x = self.x + distance_px * Math.cos(Math.radians(self.angle));
-  dst_y = self.y + distance_px * Math.sin(Math.radians(self.angle));
-  src_pt = Vec2f.new(src_x, src_y);
-  dst_pt = Vec2f.new(dst_x, dst_y);
-  if (self.pen_down) {
-    Gfx.draw_line(src_pt, dst_pt);
-  };
-  self.position = dst_pt;
-};
-Robot.turn (self) (angle_offset_deg) = {
-  self.angle_deg += angle_offset_deg;
-};
+Robot = 
+  position: *Vec2F
+  angle_deg: Float 
+  pen_down: Bool
 
-Robot.draw_square (side_length_in_px) = {
-  robot = Robot.new_default();
-  robot.pen_down();
-  for i in range(4) {
-    robot.walk(side_length_in_px);
-    robot.turn(90);
-  };
-};
+Robot.new_default () =
+  Robot(Vec2F(0, 0), 0, Bool.False)
+
+Robot.pen_down (self) () =
+  self.pen_down := Bool.True
+
+Robot.pen_up (self) () =
+  self.pen_down := Bool.false
+
+Robot.walk (self) (distance_px) =
+  src_x = self.x
+  src_y = self.y
+  dst_x = self.x + distance_px * Math.cos(Math.radians(self.angle))
+  dst_y = self.y + distance_px * Math.sin(Math.radians(self.angle))
+  src_pt = Vec2f.new(src_x, src_y)
+  dst_pt = Vec2f.new(dst_x, dst_y)
+  if (self.pen_down)
+    Gfx.draw_line(src_pt, dst_pt)
+  self.position := dst_pt
+
+Robot.turn (self) (angle_offset_deg) =
+  self.angle_deg += angle_offset_deg
+
+Robot.draw_square (side_length_in_px) =
+  robot = Robot.new_default()
+  robot.pen_down()
+  for i in range(4)
+    robot.walk(side_length_in_px)
+    robot.turn(90)
 ```
 
 ```
 # example 2
 
-Bool = {True, False};
+Bool = 
+  True 
+  False
 
-Friend = {
-  BestFriend,
-  Friend(index: Int, name: String)
-};
-RegularFriendInfo = (email_id: String, phone_number: PhoneNumber);
-RegularFriendInfoList = List[RegularFriendInfo];
-PhoneNumber = (international_code: UByte, area_code: UShort, suffix: UInt);
+Friend = 
+  BestFriend
+  RegularFriend
+    index: Int
+    name: String
 
-Program = (
-  regular_friend_info_list: RegularFriendInfoList,
+RegularFriendInfo = 
+  email_id: String
+  phone_number: PhoneNumber
+
+RegularFriendInfoList = List[RegularFriendInfo]
+
+PhoneNumber = 
+  international_code: UByte
+  area_code: UShort
+  suffix: UInt
+
+Program = 
+  regular_friend_info_list: RegularFriendInfoList
   former_friends_count: Int
-);
 
 # entry points are special; 'main' is a built-in keyword, and is the only 
 # function you can define at a top-level.
-StringList = List[String];
-main (args: StringList) = {
-    # ...
-};
+StringList = List[String]
+
+main (args: StringList) =
+  # ...
 ```
 
 ```
 # example 3: templates, fixed-size arrays
 
-List [ElemType] = (
-  data: UnsafePointer[ElemType],
+List [ElemType] = 
+  data: UnsafePointer[ElemType]
   count: ISize
-);
 
-NamedList [ElemType] = (
-  slots: List[ElemType],
+NamedList [ElemType] = 
+  slots: List[ElemType]
   name_index_map: HashMap[String, ISize]
-);
 
-Vector [ElemType, elem_count: ISize] = (
+Vector [ElemType, elem_count: ISize] = 
   slots: *Array[ElemType, elem_count]
-);
 
 # note that template arguments for the 'self' type are automatically introduced
 # into scope here
-NamedArray.push (self) (name: String, v: ElemType) = {
-  assert !self.name_index_map.contains_key(name);
-  self.name_index_map.insert(name, self.slots.length);
-  self.slots.push(v);
-};
+NamedArray.push (self) (name: String, v: ElemType) =
+  assert !self.name_index_map.contains_key(name)
+  self.name_index_map.insert(name, self.slots.length)
+  self.slots.push(v)
 
 # note that methods can also take template arguments
 # the `.convert_to[T]()` method is used to cast.
-NamedArray.map_convert_to [T] (self) () = {
+NamedArray.map_convert_to [T] (self) () =
   # ...
-};
 ```
 
 ```
 # example 4: weak references
 
-DoublyLinkedList [T] = {
-  prev: weak DoublyLinkedList[T],
-  next: DoublyLinkedList[T],
+DoublyLinkedList [T] = 
+  prev: weak DoublyLinkedList[T]
+  next: DoublyLinkedList[T]
   head: T
-};
 ```
 
 Weak reference instances have a method called `acquire()` that returns an
@@ -212,4 +218,3 @@ Support a few built-in polymorphic datatypes like `List[T]`, `Array[T,n]`,
 Support template type arguments.
 
 Support literals and global constants for template values. No evaluation.
-

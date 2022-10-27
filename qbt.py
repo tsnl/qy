@@ -1,7 +1,7 @@
 import qy.compiler
 import sys
 
-expected_python_version = "3.10"
+expected_python_version = "3.9"
 
 
 def exit_if_bad_python_version():

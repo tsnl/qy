@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+$PYTHON -m pip install --upgrade pip
 $PYTHON -m pip install virtualenv
 if [ $? != 0 ]; then
     echo "$ERROR_HEADER failed to install virtualenv. Terminating."
@@ -18,4 +19,5 @@ fi
 
 source "$VENV_PATH/bin/activate"
 
+$PYTHON -m pip install --upgrade pip
 $PYTHON -m pip install -r requirements.txt
