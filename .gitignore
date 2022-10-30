@@ -27,3 +27,7 @@ build.ninja
 
 # Qy build:
 qc-build
+
+# Added by cargo
+
+/target

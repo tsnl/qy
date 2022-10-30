@@ -174,7 +174,7 @@ NamedArray.map_convert_to [T] (self) () =
 # example 4: weak references
 
 DoublyLinkedList [T] = 
-  prev: weak DoublyLinkedList[T]
+  weak prev: DoublyLinkedList[T]
   next: DoublyLinkedList[T]
   head: T
 ```

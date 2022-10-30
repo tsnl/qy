@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-ROOT_PATH=$(dirname $(realpath $0))
-
-python3.9 "$ROOT_PATH/qbt.py" $@

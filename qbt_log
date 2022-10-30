@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-# Display the current date in UTC and ISO 8601 format:
-./qbt $@ > "logs/$(date -u +'%Y-%m-%dT%H.%M.%S').txt"
