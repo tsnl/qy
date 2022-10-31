@@ -69,11 +69,18 @@ impl Reader {
     }
     return false;
   }
-  pub fn eof(&self) -> bool {
+}
+impl Reader {
+  pub fn at_eof(&self) -> bool {
     if let Some(_) = self.peek() {
       true
     } else {
       false
     }
+  }
+}
+impl Reader {
+  pub fn cursor(&self) -> feedback::Cursor {
+    feedback::Cursor::new(self.line_index, self.column_index)
   }
 }

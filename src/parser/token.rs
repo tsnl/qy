@@ -1,16 +1,16 @@
 use super::*;
 
 pub struct Token {
-  loc: feedback::Span,
+  span: feedback::Span,
   info: TokenInfo
 }
 
 impl Token {
-  pub fn new(loc: feedback::Span, info: TokenInfo) -> Token {
-    Token { loc, info }
+  pub fn new(span: feedback::Span, info: TokenInfo) -> Token {
+    Token { span, info }
   }
   pub fn loc(&self) -> feedback::Span {
-    self.loc
+    self.span
   }
   pub fn info(&self) -> &TokenInfo {
     &self.info
@@ -37,7 +37,7 @@ pub enum TokenInfo {
   UseKeyword,
 
   Asterisk, Divide, Quotient, Modulo,
-  Plus, Minus, Bang,
+  Plus, Minus, ExclamationPoint,
   LeftShift, RightShift,
   LessThan, GreaterThan, LessThanOrEquals, GreaterThanOrEquals,
   Equals, NotEquals,
