@@ -1,13 +1,13 @@
-x = 0;
+x = 0
 
-Color = (r, g, b);
+Color = (r, g, b)
 
-Color.new_black () = Color.new(0, 0, 0);
-Color.new_white () = Color.new(1, 1, 1);
+Color.new_black () = Color.new(0, 0, 0)
+Color.new_white () = Color.new(1, 1, 1)
 
-main () = {
-  x = 0;
-  y = 32;
-  (a, b) = (42, 45);
+main () =
+  x = 0
+  y = 32
+  (a, b) = (42, 45)
   0
-};
+
