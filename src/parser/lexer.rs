@@ -12,6 +12,10 @@ pub enum CursorState {
   InFile(Token)
 }
 
+const DEFAULT_IDENTIFIER_CAPACITY: usize = 10;
+const DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+
 impl<'a> Lexer<'a> {
   pub fn new(intern_manager: &'a mut intern::Manager, source_text: String) -> Self {
     let mut lexer = Self {
@@ -188,7 +192,7 @@ impl<'a> Lexer<'a> {
     let opt_first_char = self.reader.peek();
     if self.reader.match_byte_if(|b| b.is_ascii_alphabetic() || b == b'_') {
       let first_char = opt_first_char.unwrap();
-      let mut chars = Vec::with_capacity(10);
+      let mut chars = Vec::with_capacity(DEFAULT_IDENTIFIER_CAPACITY);
       chars.push(first_char);
       loop {
         let opt_later_char = self.reader.peek();
@@ -234,14 +238,105 @@ impl<'a> Lexer<'a> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
     
-    // TODO: finish this
     // If '0x' or '0X' detected, then should scan a hex integer chunk, no
     // hex floating point numbers.
     // Else should scan a decimal integer chunk;
     // decimal suffix is '[.<decimal-integer-chunk>][(e|E)<decimal-integer-chunk>]',
     // if suffix empty then just an integer, else float.
     
-    None
+    match opt_first_char {
+      Some(first_char) =>
+        Some(self.scan_nonempty_number(first_pos, first_char)),
+      None =>
+        None
+    }
+  }
+  fn scan_nonempty_number(&mut self, first_pos: feedback::Cursor, first_char: u8) -> Token {
+    let is_hex_number = 
+      first_char == b'0' && 
+      self.reader.match_byte_if(|b| b == b'x' || b == b'X');
+    if is_hex_number {
+      self.scan_nonempty_hex_number(first_pos)
+    } else {
+      self.scan_nonempty_decimal_number(first_pos, first_char)
+    }
+  }
+  fn scan_nonempty_hex_number(&mut self, first_pos: feedback::Cursor) -> Token {
+    let hex_int_mantissa = self.scan_hex_int_chunk();
+    Token::new(
+      self.span(first_pos), 
+      TokenInfo::LiteralInteger(hex_int_mantissa, IntegerFormat::Hexadecimal)
+    )
+  }
+  fn scan_nonempty_decimal_number(&mut self, first_pos: feedback::Cursor, first_char: u8) -> Token {
+    let mut is_float = false;
+    let mantissa = {
+      let mut mantissa = self.scan_decimal_int_chunk(Some(first_char));
+      if self.reader.match_byte(b'.') {
+        let post_point_int = self.scan_decimal_int_chunk(None);
+        is_float = true;
+        mantissa.reserve_exact(1 + post_point_int.len());
+        mantissa.push('.');
+        mantissa += post_point_int.as_str();
+      };
+      mantissa
+    };
+    let opt_exponent =
+      if self.reader.match_byte_if(|b| b == b'e' || b == b'E') {
+        is_float = true;
+        Some(self.scan_exponent_suffix())
+      } else {
+        None
+      };
+    let token_info =
+      if is_float {
+        TokenInfo::LiteralFloat { mantissa: mantissa, exponent: opt_exponent } 
+      } else {
+        TokenInfo::LiteralInteger(mantissa, IntegerFormat::Decimal)
+      };
+    Token::new(self.span(first_pos), token_info)
+  }
+  fn scan_exponent_suffix(&mut self) -> String {
+    let exponent_has_neg_prefix = self.reader.match_byte(b'-');
+    let exponent_int = self.scan_decimal_int_chunk(None);
+    if exponent_int.is_empty() {
+      panic!("Expected valid exponent after 'e/E' exponent");
+    }
+    if exponent_has_neg_prefix {
+      let mut neg_exponent_int = String::with_capacity(1+exponent_int.len());
+      neg_exponent_int.push('-');
+      neg_exponent_int += exponent_int.as_str();
+      neg_exponent_int
+    } else {
+      exponent_int
+    }
+  }
+  fn scan_hex_int_chunk(&mut self) -> String {
+    let mut hex_int_chunk_chars = Vec::with_capacity(DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY);
+    loop {
+      let opt_int_chunk_char = self.reader.peek();
+      if self.reader.match_byte_if(|b| b.is_ascii_hexdigit() || b == b'_') {
+        hex_int_chunk_chars.push(opt_int_chunk_char.unwrap());
+      } else {
+        break;
+      }
+    };
+    String::from_utf8(hex_int_chunk_chars).unwrap()
+  }
+  fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<u8>) -> String {
+    let mut decimal_int_chunk_chars = Vec::with_capacity(DEFAULT_DECIMAL_INT_CHUNK_CAPACITY);
+    if let Some(first_char) = opt_first_char {
+      decimal_int_chunk_chars.push(first_char);
+    }
+    loop {
+      let opt_int_chunk_char = self.reader.peek();
+      if self.reader.match_byte_if(|b| b.is_ascii_digit() || b == b'_') {
+        decimal_int_chunk_chars.push(opt_int_chunk_char.unwrap());
+      } else {
+        break;
+      }
+    };
+    String::from_utf8(decimal_int_chunk_chars).unwrap()
   }
 }
 

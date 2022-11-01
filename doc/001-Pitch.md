@@ -116,15 +116,11 @@ Bool =
 
 Friend = 
   BestFriend
-  RegularFriend
-    index: Int
-    name: String
+  RegularFriend(index: Int, name: String)
 
 RegularFriendInfo = 
   email_id: String
   phone_number: PhoneNumber
-
-RegularFriendInfoList = List[RegularFriendInfo]
 
 PhoneNumber = 
   international_code: UByte
@@ -132,14 +128,12 @@ PhoneNumber =
   suffix: UInt
 
 Program = 
-  regular_friend_info_list: RegularFriendInfoList
+  regular_friend_info_list: List[RegularFriendInfo]
   former_friends_count: Int
 
 # entry points are special; 'main' is a built-in keyword, and is the only 
 # function you can define at a top-level.
-StringList = List[String]
-
-main (args: StringList) =
+main (args: List[String]) =
   # ...
 ```
 
@@ -183,6 +177,11 @@ Weak reference instances have a method called `acquire()` that returns an
 `Option[T]` instance where the `Some` case is a strong reference.
 
 Weak references cannot be unboxed.
+
+There are no type aliases, partly because this would cause syntactic ambiguity
+(between enum definition and alias), partly because it creates a lot of 
+additional confusion, partly because encapsulation will do the job better in
+most cases (creating a distinct type instance).
 
 ---
 

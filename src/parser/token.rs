@@ -22,7 +22,7 @@ pub enum TokenInfo {
   ValueIdentifier(intern::IntStr),
   LiteralString(String),
   LiteralInteger(String, IntegerFormat),
-  LiteralFloat(String),
+  LiteralFloat { mantissa: String, exponent: Option<String> },
   
   Period, Comma, Colon,
   LeftParenthesis, RightParenthesis,
