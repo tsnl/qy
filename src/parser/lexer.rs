@@ -4,6 +4,7 @@ pub struct Lexer<'a> {
   reader: Reader,
   intern_manager: &'a mut intern::Manager,
   cursor_state: CursorState,
+  keyword_map: HashMap<intern::IntStr, TokenInfo>
 }
 
 pub enum CursorState {
@@ -15,17 +16,32 @@ pub enum CursorState {
 const DEFAULT_IDENTIFIER_CAPACITY: usize = 10;
 const DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
 const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const KEYWORD_MAP_CAPACITY: usize = 6;
 
 impl<'a> Lexer<'a> {
-  pub fn new(intern_manager: &'a mut intern::Manager, source_id: source::SourceID, source_text: String) -> Self {
+  pub fn new(intern_manager: &'a mut intern::Manager, source_id: source::SourceID, source_text: String) -> Result<Self, feedback::Error> {
+    let keyword_map = Lexer::new_keyword_map(intern_manager);
     let mut lexer = Self {
       reader: Reader::new(source_id, source_text),
       intern_manager: intern_manager,
-      cursor_state: CursorState::StartOfFile
+      cursor_state: CursorState::StartOfFile,
+      keyword_map
     };
-    lexer.skip();
-    lexer
+    lexer.skip()?;
+    Ok(lexer)
   }
+  fn new_keyword_map(intern_manager: &'a mut intern::Manager) -> HashMap<intern::IntStr, TokenInfo> {
+    let mut kw_map = HashMap::with_capacity(KEYWORD_MAP_CAPACITY);
+    kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);
+    kw_map.insert(intern_manager.intern(String::from("Self")), TokenInfo::TypeSelfKeyword);
+    kw_map.insert(intern_manager.intern(String::from("in")), TokenInfo::InKeyword);
+    kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
+    kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
+    kw_map.insert(intern_manager.intern(String::from("use")), TokenInfo::UseKeyword);
+    kw_map
+  }
+}
+impl<'a> Lexer<'a> {
   pub fn skip(&mut self) -> Result<(), feedback::Error> {
     self.cursor_state =
       match self.cursor_state {
@@ -107,7 +123,7 @@ impl<'a> Lexer<'a> {
       }      
       // line comments
       if self.reader.match_byte(b'#')? {
-        self.skip_any_bytes_until_newline();
+        self.skip_any_bytes_until_newline()?;
         continue;
       }
       // neither whitespace nor line comments left; break.
@@ -115,19 +131,20 @@ impl<'a> Lexer<'a> {
     };
     Ok(())
   }
-  fn skip_any_bytes_until_newline(&mut self) {
+  fn skip_any_bytes_until_newline(&mut self) -> Result<(), feedback::Error> {
     loop {
       if let Some(peek) = self.reader.peek() {
         if peek == b'\n' {
           break;
         } else {
-          self.reader.skip();
+          self.reader.skip()?;
         }
       } else {
         // EOF
         break;
       }
-    }
+    };
+    Ok(())
   }
 }
 
@@ -217,24 +234,26 @@ impl<'a> Lexer<'a> {
           break;
         }
       }
-      Ok(Some(self.select_word_token(first_pos, chars)))
+      Ok(Some(self.new_word_token(first_pos, chars)))
     } else {
       Ok(None)
     }
   }
-  fn select_word_token(&mut self, first_pos: feedback::Cursor, id_chars: Vec<u8>) -> Token {
+  fn new_word_token(&mut self, first_pos: feedback::Cursor, id_chars: Vec<u8>) -> Token {
     let id_is_value = Self::is_value_identifier_chars(&id_chars);
     let id_string = String::from_utf8(id_chars).unwrap();
     let id_intstr = self.intern_manager.intern(id_string);
-    
-    // TODO: match out keywords here
-    
     Token::new(
       self.span(first_pos), 
-      if id_is_value {
-        TokenInfo::ValueIdentifier(id_intstr)
-      } else {
-        TokenInfo::TypeIdentifier(id_intstr)
+      match self.keyword_map.get(&id_intstr) {
+        Some(kw_token_info) => 
+          kw_token_info.clone(),
+        None => 
+          if id_is_value {
+            TokenInfo::ValueIdentifier(id_intstr)
+          } else {
+            TokenInfo::TypeIdentifier(id_intstr)
+          }
       }
     )
   }
@@ -302,7 +321,7 @@ impl<'a> Lexer<'a> {
     let opt_exponent =
       if self.reader.match_byte_if(|b| b == b'e' || b == b'E')? {
         is_float = true;
-        Some(self.scan_exponent_suffix(&mantissa)?)
+        Some(self.scan_number_exponent_suffix(&mantissa)?)
       } else {
         None
       };
@@ -314,7 +333,7 @@ impl<'a> Lexer<'a> {
       };
     Ok(Token::new(self.span(first_pos), token_info))
   }
-  fn scan_exponent_suffix(&mut self, mantissa: &String) -> Result<String, feedback::Error> {
+  fn scan_number_exponent_suffix(&mut self, mantissa: &String) -> Result<String, feedback::Error> {
     let start_of_suffix_pos = self.reader.cursor();
     let exponent_has_neg_prefix = self.reader.match_byte(b'-')?;
     let exponent_int = self.scan_decimal_int_chunk(None)?;

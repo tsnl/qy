@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::hash::Hash;
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct IntStr {
   id: usize
 }

@@ -17,6 +17,7 @@ impl Token {
   }
 }
 
+#[derive(Clone)]
 pub enum TokenInfo {
   TypeIdentifier(intern::IntStr),
   ValueIdentifier(intern::IntStr),
@@ -47,6 +48,7 @@ pub enum TokenInfo {
   BackslashEscape
 }
 
+#[derive(Clone)]
 pub enum IntegerFormat {
   Decimal,
   Hexadecimal
