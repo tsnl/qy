@@ -3,6 +3,7 @@ use super::*;
 #[derive(Clone, Copy)]
 pub enum Loc {
   File(source::SourceID),
+  FilePos(source::SourceID, Cursor),
   FileSpan(source::SourceID, Span),
   Builtin(intern::IntStr),
 }
