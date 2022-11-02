@@ -67,7 +67,7 @@ impl Reader {
       Ok(())
     }
   }
-  pub fn match_rune(&mut self, c: char) -> Result<bool, fb::Error> {
+  pub fn match_char(&mut self, c: char) -> Result<bool, fb::Error> {
     if let Some(peek) = self.peek() {
       if peek == c {
         self.skip()?;
@@ -76,7 +76,7 @@ impl Reader {
     }
     return Ok(false);
   }
-  pub fn match_rune_if<F: Fn(char)->bool>(&mut self, cp: F) -> Result<bool, fb::Error> {
+  pub fn match_char_if<F: Fn(char)->bool>(&mut self, cp: F) -> Result<bool, fb::Error> {
     if let Some(peek) = self.peek() {
       if cp(peek) {
         self.skip()?;
