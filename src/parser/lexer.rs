@@ -19,7 +19,7 @@ const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
 const KEYWORD_MAP_CAPACITY: usize = 6;
 
 impl<'a> Lexer<'a> {
-  pub fn new(intern_manager: &'a mut intern::Manager, source_id: source::SourceID, source_text: String) -> Result<Self, feedback::Error> {
+  pub fn new(intern_manager: &'a mut intern::Manager, source_id: source::SourceID, source_text: String) -> Result<Self, fb::Error> {
     let keyword_map = Lexer::new_keyword_map(intern_manager);
     let mut lexer = Self {
       reader: Reader::new(source_id, source_text),
@@ -42,7 +42,7 @@ impl<'a> Lexer<'a> {
   }
 }
 impl<'a> Lexer<'a> {
-  pub fn skip(&mut self) -> Result<(), feedback::Error> {
+  pub fn skip(&mut self) -> Result<(), fb::Error> {
     self.cursor_state =
       match self.cursor_state {
         CursorState::EndOfFile => {
@@ -54,7 +54,7 @@ impl<'a> Lexer<'a> {
       };
     Ok(())
   }
-  fn scan_next_token_and_get_new_cursor_state(&mut self) -> Result<CursorState, feedback::Error> {
+  fn scan_next_token_and_get_new_cursor_state(&mut self) -> Result<CursorState, fb::Error> {
     if !self.reader.at_eof() {
       let next_token = self.scan_next_token()?;
       match next_token {
@@ -70,10 +70,12 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_next_token(&mut self) -> Result<Option<Token>, feedback::Error> {
+  fn scan_next_token(&mut self) -> Result<Option<Token>, fb::Error> {
     // Reading out any leading spaces, tabs, and line comments.
     // After this, the cursor position is the correct start-of-token
     // position for a span.
+    // Note that we do not skip any newline characters (including at the end of line comments)
+    // to correctly generate indent, dedent, and end-of-line tokens.
     self.skip_any_spaces_and_line_comments()?;
 
     // terminating if at EOF
@@ -96,8 +98,16 @@ impl<'a> Lexer<'a> {
       return Ok(Some(token));
     }
 
+    // string literals:
+    if let Some(token) = self.scan_string_literal()? {
+      return Ok(Some(token));
+    }
+
+    // TODO: try scanning line-endings (indent, dedent, eol)
+
+    // error: unexpected character
     let msg =
-      feedback::Message::new(
+      fb::Message::new(
         format!(
           "Character '{}' came as a total surprise",
           self.reader.peek().unwrap().to_string()
@@ -105,113 +115,106 @@ impl<'a> Lexer<'a> {
       )
       .with_ref(
         String::from("see"),
-        feedback::Loc::FilePos(self.reader.source(), self.reader.cursor())
+        fb::Loc::FilePos(self.reader.source(), self.reader.cursor())
       );
-    Err(feedback::Error::new().with_msg(msg))
+    Err(fb::Error::new().with_message(msg))
   }
 }
 
 impl<'a> Lexer<'a> {
-  fn skip_any_spaces_and_line_comments(&mut self) -> Result<(), feedback::Error> {
+  fn skip_any_spaces_and_line_comments(&mut self) -> Result<(), fb::Error> {
     loop {
       // non-newline whitespace
-      if self.reader.match_byte(b' ')? {
+      if self.reader.match_rune(' ')? {
         continue;
       }
-      if self.reader.match_byte(b'\t')? {
+      if self.reader.match_rune('\t')? {
         continue;
       }      
       // line comments
-      if self.reader.match_byte(b'#')? {
+      if self.reader.match_rune('#')? {
         self.skip_any_bytes_until_newline()?;
-        continue;
+        // After skipping out a line-comment, we always have a newline or EOF. 
+        // We should not skip newline because it is used for indent, dedent, 
+        // and EOL generation (consider `x = 5 # ...\n`; we need the EOL).
+        // Hence safe to break here.
+        break;
       }
       // neither whitespace nor line comments left; break.
       break;
     };
     Ok(())
   }
-  fn skip_any_bytes_until_newline(&mut self) -> Result<(), feedback::Error> {
-    loop {
-      if let Some(peek) = self.reader.peek() {
-        if peek == b'\n' {
-          break;
-        } else {
-          self.reader.skip()?;
-        }
-      } else {
-        // EOF
-        break;
-      }
-    };
+  fn skip_any_bytes_until_newline(&mut self) -> Result<(), fb::Error> {
+    while self.reader.match_rune_if(|c| c != '\n')? {};
     Ok(())
   }
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_punctuation(&mut self) -> Result<Option<Token>, feedback::Error> {
+  fn scan_punctuation(&mut self) -> Result<Option<Token>, fb::Error> {
     let first_pos = self.reader.cursor();
     macro_rules! token_span {
       () => { self.span(first_pos) };
     }
-    if self.reader.match_byte(b'.')? {
+    if self.reader.match_rune('.')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Period)));
     }
-    if self.reader.match_byte(b',')? {
+    if self.reader.match_rune(',')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Comma)));
     }
-    if self.reader.match_byte(b':')? {
+    if self.reader.match_rune(':')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Colon)));
     }
-    if self.reader.match_byte(b'<')? {
-      if self.reader.match_byte(b'<')? {
+    if self.reader.match_rune('<')? {
+      if self.reader.match_rune('<')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::LeftShift)));
-      } else if self.reader.match_byte(b'=')? {
+      } else if self.reader.match_rune('=')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::LessThanOrEquals)));
       } else {
         return Ok(Some(Token::new(token_span!(), TokenInfo::LessThan)));
       }
     }
-    if self.reader.match_byte(b'>')? {
-      if self.reader.match_byte(b'>')? {
+    if self.reader.match_rune('>')? {
+      if self.reader.match_rune('>')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::RightShift)));
-      } else if self.reader.match_byte(b'=')? {
+      } else if self.reader.match_rune('=')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::GreaterThanOrEquals)));
       } else {
         return Ok(Some(Token::new(token_span!(), TokenInfo::GreaterThan)));
       }
     }
-    if self.reader.match_byte(b'=')? {
-      if self.reader.match_byte(b'=')? {
+    if self.reader.match_rune('=')? {
+      if self.reader.match_rune('=')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::Equals)));
       } else {
         return Ok(Some(Token::new(token_span!(), TokenInfo::Assign)));
       }
     }
-    if self.reader.match_byte(b'!')? {
-      if self.reader.match_byte(b'=')? {
+    if self.reader.match_rune('!')? {
+      if self.reader.match_rune('=')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::NotEquals)));
       } else {
         return Ok(Some(Token::new(token_span!(), TokenInfo::ExclamationPoint)));
       }
     }
-    if self.reader.match_byte(b'*')? {
+    if self.reader.match_rune('*')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Asterisk)));
     }
-    if self.reader.match_byte(b'/')? {
-      if self.reader.match_byte(b'/')? {
+    if self.reader.match_rune('/')? {
+      if self.reader.match_rune('/')? {
         return Ok(Some(Token::new(token_span!(), TokenInfo::Quotient)));
       } else {
         return Ok(Some(Token::new(token_span!(), TokenInfo::Divide)));
       }
     }
-    if self.reader.match_byte(b'%')? {
+    if self.reader.match_rune('%')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Modulo)));
     }
-    if self.reader.match_byte(b'+')? {
+    if self.reader.match_rune('+')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Plus)));
     }
-    if self.reader.match_byte(b'-')? {
+    if self.reader.match_rune('-')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Minus)));
     }
     return Ok(None)
@@ -219,16 +222,16 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_word(&mut self) -> Result<Option<Token>, feedback::Error> {
+  fn scan_word(&mut self) -> Result<Option<Token>, fb::Error> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
-    if self.reader.match_byte_if(|b| b.is_ascii_alphabetic() || b == b'_')? {
+    if self.reader.match_rune_if(|b| b.is_ascii_alphabetic() || b == '_')? {
       let first_char = opt_first_char.unwrap();
       let mut chars = Vec::with_capacity(DEFAULT_IDENTIFIER_CAPACITY);
       chars.push(first_char);
       loop {
         let opt_later_char = self.reader.peek();
-        if self.reader.match_byte_if(|b| b.is_ascii_alphanumeric() || b == b'_')? {
+        if self.reader.match_rune_if(|b| b.is_ascii_alphanumeric() || b == '_')? {
           chars.push(opt_later_char.unwrap())
         } else {
           break;
@@ -239,9 +242,9 @@ impl<'a> Lexer<'a> {
       Ok(None)
     }
   }
-  fn new_word_token(&mut self, first_pos: feedback::Cursor, id_chars: Vec<u8>) -> Token {
+  fn new_word_token(&mut self, first_pos: fb::Cursor, id_chars: Vec<char>) -> Token {
     let id_is_value = Self::is_value_identifier_chars(&id_chars);
-    let id_string = String::from_utf8(id_chars).unwrap();
+    let id_string = String::from_iter(id_chars);
     let id_intstr = self.intern_manager.intern(id_string);
     Token::new(
       self.span(first_pos), 
@@ -257,7 +260,7 @@ impl<'a> Lexer<'a> {
       }
     )
   }
-  fn is_value_identifier_chars(chars: &Vec<u8>) -> bool {
+  fn is_value_identifier_chars(chars: &Vec<char>) -> bool {
     for character in chars {
       if character.is_ascii_uppercase() {
         return false;
@@ -271,7 +274,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_number(&mut self) -> Result<Option<Token>, feedback::Error> {
+  fn scan_number(&mut self) -> Result<Option<Token>, fb::Error> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
     
@@ -288,28 +291,28 @@ impl<'a> Lexer<'a> {
         Ok(None)
     }
   }
-  fn scan_nonempty_number(&mut self, first_pos: feedback::Cursor, first_char: u8) -> Result<Token, feedback::Error> {
+  fn scan_nonempty_number(&mut self, first_pos: fb::Cursor, first_char: char) -> Result<Token, fb::Error> {
     let is_hex_number = 
-      first_char == b'0' && 
-      self.reader.match_byte_if(|b| b == b'x' || b == b'X')?;
+      first_char == '0' && 
+      self.reader.match_rune_if(|b| b == 'x' || b == 'X')?;
     if is_hex_number {
       Ok(self.scan_nonempty_hex_number(first_pos)?)
     } else {
       Ok(self.scan_nonempty_decimal_number(first_pos, first_char)?)
     }
   }
-  fn scan_nonempty_hex_number(&mut self, first_pos: feedback::Cursor) -> Result<Token, feedback::Error> {
+  fn scan_nonempty_hex_number(&mut self, first_pos: fb::Cursor) -> Result<Token, fb::Error> {
     let hex_int_mantissa = self.scan_hex_int_chunk()?;
     Ok(Token::new(
       self.span(first_pos), 
       TokenInfo::LiteralInteger(hex_int_mantissa, IntegerFormat::Hexadecimal)
     ))
   }
-  fn scan_nonempty_decimal_number(&mut self, first_pos: feedback::Cursor, first_char: u8) -> Result<Token, feedback::Error> {
+  fn scan_nonempty_decimal_number(&mut self, first_pos: fb::Cursor, first_char: char) -> Result<Token, fb::Error> {
     let mut is_float = false;
     let mantissa = {
       let mut mantissa = self.scan_decimal_int_chunk(Some(first_char))?;
-      if self.reader.match_byte(b'.')? {
+      if self.reader.match_rune('.')? {
         let post_point_int = self.scan_decimal_int_chunk(None)?;
         is_float = true;
         mantissa.reserve_exact(1 + post_point_int.len());
@@ -319,7 +322,7 @@ impl<'a> Lexer<'a> {
       mantissa
     };
     let opt_exponent =
-      if self.reader.match_byte_if(|b| b == b'e' || b == b'E')? {
+      if self.reader.match_rune_if(|b| b == 'e' || b == 'E')? {
         is_float = true;
         Some(self.scan_number_exponent_suffix(&mantissa)?)
       } else {
@@ -333,20 +336,20 @@ impl<'a> Lexer<'a> {
       };
     Ok(Token::new(self.span(first_pos), token_info))
   }
-  fn scan_number_exponent_suffix(&mut self, mantissa: &String) -> Result<String, feedback::Error> {
+  fn scan_number_exponent_suffix(&mut self, mantissa: &String) -> Result<String, fb::Error> {
     let start_of_suffix_pos = self.reader.cursor();
-    let exponent_has_neg_prefix = self.reader.match_byte(b'-')?;
+    let exponent_has_neg_prefix = self.reader.match_rune('-')?;
     let exponent_int = self.scan_decimal_int_chunk(None)?;
     if exponent_int.is_empty() {
       let message =
-        feedback::Message::new(
+        fb::Message::new(
           String::from("Expected valid exponent after 'e/E' exponent in float literal")
         )
         .with_ref(
           format!("See incomplete literal '{}': ", mantissa), 
-          feedback::Loc::FilePos(self.reader.source(), start_of_suffix_pos)
+          fb::Loc::FilePos(self.reader.source(), start_of_suffix_pos)
         );
-      return Err(feedback::Error::new().with_msg(message));
+      return Err(fb::Error::new().with_message(message));
     }
     if exponent_has_neg_prefix {
       let mut neg_exponent_int = String::with_capacity(1+exponent_int.len());
@@ -357,37 +360,110 @@ impl<'a> Lexer<'a> {
       Ok(exponent_int)
     }
   }
-  fn scan_hex_int_chunk(&mut self) -> Result<String, feedback::Error> {
+  fn scan_hex_int_chunk(&mut self) -> Result<String, fb::Error> {
     let mut hex_int_chunk_chars = Vec::with_capacity(DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY);
     loop {
       let opt_int_chunk_char = self.reader.peek();
-      if self.reader.match_byte_if(|b| b.is_ascii_hexdigit() || b == b'_')? {
+      if self.reader.match_rune_if(|b| b.is_ascii_hexdigit() || b == '_')? {
         hex_int_chunk_chars.push(opt_int_chunk_char.unwrap());
       } else {
         break;
       }
     };
-    Ok(String::from_utf8(hex_int_chunk_chars).unwrap())
+    Ok(String::from_iter(hex_int_chunk_chars))
   }
-  fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<u8>) -> Result<String, feedback::Error> {
+  fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<char>) -> Result<String, fb::Error> {
     let mut decimal_int_chunk_chars = Vec::with_capacity(DEFAULT_DECIMAL_INT_CHUNK_CAPACITY);
     if let Some(first_char) = opt_first_char {
       decimal_int_chunk_chars.push(first_char);
     }
     loop {
       let opt_int_chunk_char = self.reader.peek();
-      if self.reader.match_byte_if(|b| b.is_ascii_digit() || b == b'_')? {
+      if self.reader.match_rune_if(|b| b.is_ascii_digit() || b == '_')? {
         decimal_int_chunk_chars.push(opt_int_chunk_char.unwrap());
       } else {
         break;
       }
     };
-    Ok(String::from_utf8(decimal_int_chunk_chars).unwrap())
+    Ok(String::from_iter(decimal_int_chunk_chars))
   }
 }
 
 impl<'a> Lexer<'a> {
-  fn span(&self, first_pos: feedback::Cursor) -> feedback::Span {
-    feedback::Span::new(first_pos, self.reader.cursor())
+  fn scan_string_literal(&mut self) -> Result<Option<Token>, fb::Error> {
+    let first_pos = self.reader.cursor();
+    if self.reader.match_rune('"')? {
+      let mut literal_content_bytes: Vec<char> = Vec::new();
+      let literal_terminated =
+        loop {
+          let glyph_pos = self.reader.cursor();
+          let opt_peek_char = self.reader.peek();
+          match opt_peek_char {
+            Some(peek_char) => {
+              if self.reader.match_rune('\\')? {
+                let escaped_char: char = self.scan_escape_sequence_suffix(glyph_pos)?;
+                literal_content_bytes.push(escaped_char);
+              } else if self.reader.match_rune('"')? {
+                break true;
+              } else {
+                literal_content_bytes.push(peek_char);
+              }
+            }
+            None => {
+              break false;
+            }
+          }
+        };
+      if literal_terminated {
+        Ok(Some(
+          Token::new(
+            self.span(first_pos),
+            TokenInfo::LiteralString(String::from_iter(literal_content_bytes))
+          )
+        ))
+      } else {
+        Err(fb::Error::new())
+      }
+    } else {
+      Ok(None)
+    }
+  }
+  fn scan_escape_sequence_suffix(&mut self, peek_pos: fb::Cursor) -> Result<char, fb::Error> {
+    if self.reader.match_rune('"')? { 
+      Ok('"')
+    } else if self.reader.match_rune('n')? { 
+      Ok('\n')
+    }  else if self.reader.match_rune('r')? {
+      Ok('\r')
+    } else if self.reader.match_rune('t')? {
+      Ok('\t')
+    } else if self.reader.match_rune('a')? {
+      Ok(0x07 as char)
+    } else {
+      Err(
+        fb::Error::new()
+        .with_message(
+          fb::Message::new(
+            format!(
+              "Invalid escape sequence: after '\\', expected a valid escape character, not '{}'",
+              match self.reader.peek() {
+                Some(first_char) => String::from_iter([first_char]),
+                None => String::from("EOF")
+              }
+            )
+          )
+          .with_ref(
+            String::from("see..."), 
+            fb::Loc::FilePos(self.reader.source(), peek_pos)
+          )
+        )
+      )
+    }
+  }
+}
+
+impl<'a> Lexer<'a> {
+  fn span(&self, first_pos: fb::Cursor) -> fb::Span {
+    fb::Span::new(first_pos, self.reader.cursor())
   }
 }

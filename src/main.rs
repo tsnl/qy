@@ -1,7 +1,7 @@
 use std::collections::*;
 
 mod ast;
-mod feedback;
+mod fb;
 mod source;
 mod intern;
 mod parser;

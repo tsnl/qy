@@ -16,7 +16,7 @@ impl Error {
   pub fn new() -> Error {
     Error{message_vec: Vec::new()}
   }
-  pub fn with_msg(self, message: Message) -> Error {
+  pub fn with_message(self, message: Message) -> Error {
     let mut message_vec = self.message_vec;
     message_vec.push(message);
     Error{message_vec}

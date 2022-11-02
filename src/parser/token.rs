@@ -1,15 +1,15 @@
 use super::*;
 
 pub struct Token {
-  span: feedback::Span,
+  span: fb::Span,
   info: TokenInfo
 }
 
 impl Token {
-  pub fn new(span: feedback::Span, info: TokenInfo) -> Token {
+  pub fn new(span: fb::Span, info: TokenInfo) -> Token {
     Token { span, info }
   }
-  pub fn loc(&self) -> feedback::Span {
+  pub fn loc(&self) -> fb::Span {
     self.span
   }
   pub fn info(&self) -> &TokenInfo {
@@ -29,7 +29,7 @@ pub enum TokenInfo {
   LeftParenthesis, RightParenthesis,
   LeftSquareBracket, RightSquareBracket,
   LeftCurlyBrace, RightCurlyBrace,
-  Indent, Newline, Dedent,
+  
   Assign, Update,
   
   ValueSelfKeyword, TypeSelfKeyword, 
@@ -45,7 +45,7 @@ pub enum TokenInfo {
   BitwiseXOr, BitwiseAnd, BitwiseOr,
   LogicalAnd, LogicalOr,
 
-  BackslashEscape
+  Indent, Newline, Dedent,
 }
 
 #[derive(Clone)]
