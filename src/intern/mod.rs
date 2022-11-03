@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
+use std::fmt::{Debug, Formatter, Result};
+
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct IntStr {
   id: usize
@@ -30,5 +32,11 @@ impl Manager {
   }
   pub fn lookup(&self, i: IntStr) -> String {
     self.id_to_string_lut[i.id].clone()
+  }
+}
+
+impl Debug for IntStr {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+      f.write_fmt(format_args!("<IntStr:{}>", self.id))
   }
 }

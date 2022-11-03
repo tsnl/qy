@@ -1,5 +1,8 @@
 use super::*;
 
+use std::fmt::Debug;
+
+#[derive(Debug)]
 pub struct Token {
   span: fb::Span,
   info: TokenInfo
@@ -17,7 +20,7 @@ impl Token {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TokenInfo {
   TypeIdentifier(intern::IntStr),
   ValueIdentifier(intern::IntStr),
@@ -48,7 +51,7 @@ pub enum TokenInfo {
   Indent, EndOfLine, Dedent,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IntegerFormat {
   Decimal,
   Hexadecimal

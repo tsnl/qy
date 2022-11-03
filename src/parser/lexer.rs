@@ -25,7 +25,7 @@ impl<'a> Lexer<'a> {
       tab_width_in_spaces
     };
     lexer.indent_width_stack.push(0);
-    assert!(lexer.advance_impl()?.is_none(), "incorrect initial state while filling peek slot");
+    assert!(lexer.try_advance_impl()?.is_none(), "incorrect initial state while filling peek slot");
     Ok(lexer)
   }
 }
@@ -38,8 +38,11 @@ impl<'a> Lexer<'a> {
     }
   }
   pub fn advance(&mut self) -> fb::Result<Token> {
-    let opt_old_token: Option<Token> = self.advance_impl()?;
+    let opt_old_token: Option<Token> = self.try_advance_impl()?;
     Ok(opt_old_token.unwrap())
+  }
+  pub fn try_advance(&mut self) -> fb::Result<Option<Token>> {
+    self.try_advance_impl()
   }
   pub fn match_token<F: Fn(&Token)->bool>(&mut self, token_predicate: F) -> fb::Result<Option<Token>> {
     match self.peek() {
@@ -54,6 +57,29 @@ impl<'a> Lexer<'a> {
         Ok(None)
       }
     }
+  }
+}
+
+impl<'a> Lexer<'a> {
+  pub fn scan_all_remaining_tokens(&mut self) -> fb::Result<Vec<Token>> {
+    let mut output = Vec::with_capacity(1 << 20);
+    while let Some(token) = self.try_advance()? {
+      println!("{:?}", token);
+    };
+    Ok(output)
+  }
+}
+
+//
+// Tests:
+//
+
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn content_scan_test() {
+    // TODO: include a test file, scan it, and expect all tokens are OK
+    // let s = include_str!("");
   }
 }
 
@@ -84,7 +110,7 @@ const DEFAULT_INDENT_STACK_CAPACITY: usize = 12;
 const DEFAULT_TOKEN_QUEUE_CAPACITY: usize = DEFAULT_INDENT_STACK_CAPACITY;
 
 impl<'a> Lexer<'a> {
-  fn advance_impl(&mut self) -> fb::Result<Option<Token>> {
+  fn try_advance_impl(&mut self) -> fb::Result<Option<Token>> {
     let next_state =
       match &self.cursor_state {
         CursorState::EndOfFile => CursorState::EndOfFile,

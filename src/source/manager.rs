@@ -1,5 +1,7 @@
 use super::*;
 
+use std::fmt::{Debug, Formatter, Result};
+
 #[derive(Clone, Copy)]
 pub struct SourceID(usize);
 
@@ -35,3 +37,8 @@ impl SourceManager {
   }
 }
 
+impl Debug for SourceID {
+  fn fmt(&self, f: &mut Formatter) -> Result {
+    f.write_fmt(format_args!("{}", &self.0))
+  }
+}

@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Loc {
   File(source::SourceID),
   FilePos(source::SourceID, Cursor),
@@ -8,13 +8,13 @@ pub enum Loc {
   Builtin(intern::IntStr),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Span {
   first_pos: Cursor,
   last_pos: Cursor
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Cursor {
   line_index: i32,
   column_index: i32
