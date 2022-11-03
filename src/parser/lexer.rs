@@ -3,16 +3,6 @@ use super::*;
 use std::mem;
 use std::collections::vec_deque::VecDeque;
 
-pub struct Lexer<'a> {
-  reader: Reader,
-  intern_manager: &'a mut intern::Manager,
-  cursor_state: CursorState,
-  token_queue: VecDeque<Token>,
-  indent_width_stack: Vec<i32>,
-  keyword_map: HashMap<intern::IntStr, TokenInfo>,
-  tab_width_in_spaces: i32
-}
-
 //
 // Interface:
 //
@@ -23,7 +13,7 @@ impl<'a> Lexer<'a> {
     source_id: source::SourceID, 
     source_text: String,
     tab_width_in_spaces: i32
-  ) -> Result<Self, fb::Error> {
+  ) -> fb::Result<Self> {
     let keyword_map = Lexer::new_keyword_map(intern_manager);
     let mut lexer = Self {
       reader: Reader::new(source_id, source_text),
@@ -47,11 +37,11 @@ impl<'a> Lexer<'a> {
       _ => None
     }
   }
-  pub fn advance(&mut self) -> Result<Token, fb::Error> {
+  pub fn advance(&mut self) -> fb::Result<Token> {
     let opt_old_token: Option<Token> = self.advance_impl()?;
     Ok(opt_old_token.unwrap())
   }
-  pub fn match_token<F: Fn(&Token)->bool>(&mut self, token_predicate: F) -> Result<Option<Token>, fb::Error> {
+  pub fn match_token<F: Fn(&Token)->bool>(&mut self, token_predicate: F) -> fb::Result<Option<Token>> {
     match self.peek() {
       Some(peek_token) => {
         if token_predicate(peek_token) {
@@ -71,6 +61,16 @@ impl<'a> Lexer<'a> {
 // Implementation:
 //
 
+pub struct Lexer<'a> {
+  reader: Reader,
+  intern_manager: &'a mut intern::Manager,
+  cursor_state: CursorState,
+  token_queue: VecDeque<Token>,
+  indent_width_stack: Vec<i32>,
+  keyword_map: HashMap<intern::IntStr, TokenInfo>,
+  tab_width_in_spaces: i32
+}
+
 pub enum CursorState {
   StartOfFile,
   EndOfFile,
@@ -84,7 +84,7 @@ const DEFAULT_INDENT_STACK_CAPACITY: usize = 12;
 const DEFAULT_TOKEN_QUEUE_CAPACITY: usize = DEFAULT_INDENT_STACK_CAPACITY;
 
 impl<'a> Lexer<'a> {
-  fn advance_impl(&mut self) -> Result<Option<Token>, fb::Error> {
+  fn advance_impl(&mut self) -> fb::Result<Option<Token>> {
     let next_state =
       match &self.cursor_state {
         CursorState::EndOfFile => CursorState::EndOfFile,
@@ -98,7 +98,7 @@ impl<'a> Lexer<'a> {
       };
     Ok(replaced_old_token)
   }
-  fn get_next_state(&mut self) -> Result<CursorState, fb::Error> {
+  fn get_next_state(&mut self) -> fb::Result<CursorState> {
     // try depleting from the token queue:
     if let Some(next_token) = self.dequeue_token() {
       return Ok(CursorState::InFile(next_token));
@@ -116,7 +116,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn replenish_token_queue(&mut self) -> Result<bool, fb::Error> {
+  fn replenish_token_queue(&mut self) -> fb::Result<bool> {
     // Reading out any leading spaces, tabs, and line comments.
     // After this, the cursor position is the correct start-of-token
     // position for a span.
@@ -180,7 +180,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn skip_any_spaces_and_line_comments(&mut self) -> Result<(), fb::Error> {
+  fn skip_any_spaces_and_line_comments(&mut self) -> fb::Result<()> {
     loop {
       // non-newline whitespace
       if self.reader.match_char(' ')? {
@@ -203,14 +203,14 @@ impl<'a> Lexer<'a> {
     };
     Ok(())
   }
-  fn skip_any_bytes_until_newline(&mut self) -> Result<(), fb::Error> {
+  fn skip_any_bytes_until_newline(&mut self) -> fb::Result<()> {
     while self.reader.match_char_if(|c| c != '\n')? {};
     Ok(())
   }
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_punctuation(&mut self) -> Result<Option<Token>, fb::Error> {
+  fn scan_punctuation(&mut self) -> fb::Result<Option<Token>> {
     let first_pos = self.reader.cursor();
     macro_rules! token_span {
       () => { self.span(first_pos) };
@@ -284,7 +284,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_word(&mut self) -> Result<Option<Token>, fb::Error> {
+  fn scan_word(&mut self) -> fb::Result<Option<Token>> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
     if self.reader.match_char_if(|b| b.is_ascii_alphabetic() || b == '_')? {
@@ -336,7 +336,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_number(&mut self) -> Result<Option<Token>, fb::Error> {
+  fn scan_number(&mut self) -> fb::Result<Option<Token>> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
     
@@ -353,7 +353,7 @@ impl<'a> Lexer<'a> {
         Ok(None)
     }
   }
-  fn scan_nonempty_number(&mut self, first_pos: fb::Cursor, first_char: char) -> Result<Token, fb::Error> {
+  fn scan_nonempty_number(&mut self, first_pos: fb::Cursor, first_char: char) -> fb::Result<Token> {
     let is_hex_number = 
       first_char == '0' && 
       self.reader.match_char_if(|b| b == 'x' || b == 'X')?;
@@ -363,14 +363,14 @@ impl<'a> Lexer<'a> {
       Ok(self.scan_nonempty_decimal_number(first_pos, first_char)?)
     }
   }
-  fn scan_nonempty_hex_number(&mut self, first_pos: fb::Cursor) -> Result<Token, fb::Error> {
+  fn scan_nonempty_hex_number(&mut self, first_pos: fb::Cursor) -> fb::Result<Token> {
     let hex_int_mantissa = self.scan_hex_int_chunk()?;
     Ok(Token::new(
       self.span(first_pos), 
       TokenInfo::LiteralInteger(hex_int_mantissa, IntegerFormat::Hexadecimal)
     ))
   }
-  fn scan_nonempty_decimal_number(&mut self, first_pos: fb::Cursor, first_char: char) -> Result<Token, fb::Error> {
+  fn scan_nonempty_decimal_number(&mut self, first_pos: fb::Cursor, first_char: char) -> fb::Result<Token> {
     let mut is_float = false;
     let mantissa = {
       let mut mantissa = self.scan_decimal_int_chunk(Some(first_char))?;
@@ -398,7 +398,7 @@ impl<'a> Lexer<'a> {
       };
     Ok(Token::new(self.span(first_pos), token_info))
   }
-  fn scan_number_exponent_suffix(&mut self, mantissa: &String) -> Result<String, fb::Error> {
+  fn scan_number_exponent_suffix(&mut self, mantissa: &String) -> fb::Result<String> {
     let start_of_suffix_pos = self.reader.cursor();
     let exponent_has_neg_prefix = self.reader.match_char('-')?;
     let exponent_int = self.scan_decimal_int_chunk(None)?;
@@ -422,7 +422,7 @@ impl<'a> Lexer<'a> {
       Ok(exponent_int)
     }
   }
-  fn scan_hex_int_chunk(&mut self) -> Result<String, fb::Error> {
+  fn scan_hex_int_chunk(&mut self) -> fb::Result<String> {
     let mut hex_int_chunk_chars = Vec::with_capacity(DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY);
     loop {
       let opt_int_chunk_char = self.reader.peek();
@@ -434,7 +434,7 @@ impl<'a> Lexer<'a> {
     };
     Ok(String::from_iter(hex_int_chunk_chars))
   }
-  fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<char>) -> Result<String, fb::Error> {
+  fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<char>) -> fb::Result<String> {
     let mut decimal_int_chunk_chars = Vec::with_capacity(DEFAULT_DECIMAL_INT_CHUNK_CAPACITY);
     if let Some(first_char) = opt_first_char {
       decimal_int_chunk_chars.push(first_char);
@@ -452,7 +452,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_string_literal(&mut self) -> Result<Option<Token>, fb::Error> {
+  fn scan_string_literal(&mut self) -> fb::Result<Option<Token>> {
     let first_pos = self.reader.cursor();
     if self.reader.match_char('"')? {
       let mut literal_content_bytes: Vec<char> = Vec::new();
@@ -490,7 +490,7 @@ impl<'a> Lexer<'a> {
       Ok(None)
     }
   }
-  fn scan_escape_sequence_suffix(&mut self, peek_pos: fb::Cursor) -> Result<char, fb::Error> {
+  fn scan_escape_sequence_suffix(&mut self, peek_pos: fb::Cursor) -> fb::Result<char> {
     if self.reader.match_char('"')? { 
       Ok('"')
     } else if self.reader.match_char('n')? { 
@@ -525,7 +525,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_multiple_line_ending_tokens(&mut self) -> Result<Option<()>, fb::Error> {
+  fn scan_multiple_line_ending_tokens(&mut self) -> fb::Result<Option<()>> {
     if self.reader.match_char('\n')? {
       let first_pos = self.reader.cursor();
 

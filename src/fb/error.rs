@@ -11,6 +11,7 @@ struct SourceRef {
   desc: String,
   loc: Loc
 }
+pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
   pub fn new() -> Error {
