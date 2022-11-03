@@ -45,7 +45,7 @@ pub enum TokenInfo {
   BitwiseXOr, BitwiseAnd, BitwiseOr,
   LogicalAnd, LogicalOr,
 
-  Indent, Newline, Dedent,
+  Indent, EndOfLine, Dedent,
 }
 
 #[derive(Clone)]

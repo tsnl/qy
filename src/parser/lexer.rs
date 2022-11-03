@@ -1,5 +1,6 @@
 use super::*;
 
+use std::mem;
 use std::collections::vec_deque::VecDeque;
 
 pub struct Lexer<'a> {
@@ -12,17 +13,9 @@ pub struct Lexer<'a> {
   tab_width_in_spaces: i32
 }
 
-pub enum CursorState {
-  StartOfFile,
-  EndOfFile,
-  InFile(Token)
-}
-
-const DEFAULT_IDENTIFIER_CAPACITY: usize = 10;
-const DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
-const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
-const DEFAULT_INDENT_STACK_CAPACITY: usize = 12;
-const DEFAULT_TOKEN_QUEUE_CAPACITY: usize = DEFAULT_INDENT_STACK_CAPACITY;
+//
+// Interface:
+//
 
 impl<'a> Lexer<'a> {
   pub fn new(
@@ -42,50 +35,88 @@ impl<'a> Lexer<'a> {
       tab_width_in_spaces
     };
     lexer.indent_width_stack.push(0);
-    lexer.skip()?;
+    assert!(lexer.advance_impl()?.is_none(), "incorrect initial state while filling peek slot");
     Ok(lexer)
-  }
-  fn new_keyword_map(intern_manager: &'a mut intern::Manager) -> HashMap<intern::IntStr, TokenInfo> {
-    let mut kw_map = HashMap::with_capacity(6);
-    kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);
-    kw_map.insert(intern_manager.intern(String::from("Self")), TokenInfo::TypeSelfKeyword);
-    kw_map.insert(intern_manager.intern(String::from("in")), TokenInfo::InKeyword);
-    kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
-    kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
-    kw_map.insert(intern_manager.intern(String::from("use")), TokenInfo::UseKeyword);
-    kw_map
-  }
-}
-impl<'a> Lexer<'a> {
-  pub fn skip(&mut self) -> Result<(), fb::Error> {
-    self.cursor_state =
-      match self.cursor_state {
-        CursorState::EndOfFile => {
-          CursorState::EndOfFile
-        }
-        CursorState::StartOfFile | CursorState::InFile(_) => {
-          self.scan_next_token_and_get_new_cursor_state()?
-        }
-      };
-    Ok(())
-  }
-  fn scan_next_token_and_get_new_cursor_state(&mut self) -> Result<CursorState, fb::Error> {
-    if !self.reader.at_eof() {
-      let at_eof = self.scan_next_token()?;
-      if at_eof {
-        Ok(CursorState::EndOfFile)
-      } else {
-        let next_token = self.token_queue.pop_front().unwrap();
-        Ok(CursorState::InFile(next_token))
-      }
-    } else {
-      Ok(CursorState::EndOfFile)
-    }
   }
 }
 
 impl<'a> Lexer<'a> {
-  fn scan_next_token(&mut self) -> Result<bool, fb::Error> {
+  pub fn peek(&self) -> Option<&Token> {
+    match &self.cursor_state {
+      CursorState::InFile(token) => Some(&token),
+      _ => None
+    }
+  }
+  pub fn advance(&mut self) -> Result<Token, fb::Error> {
+    let opt_old_token: Option<Token> = self.advance_impl()?;
+    Ok(opt_old_token.unwrap())
+  }
+  pub fn match_token<F: Fn(&Token)->bool>(&mut self, token_predicate: F) -> Result<Option<Token>, fb::Error> {
+    match self.peek() {
+      Some(peek_token) => {
+        if token_predicate(peek_token) {
+          Ok(Some(self.advance()?))
+        } else {
+          Ok(None)
+        }
+      },
+      None => {
+        Ok(None)
+      }
+    }
+  }
+}
+
+//
+// Implementation:
+//
+
+pub enum CursorState {
+  StartOfFile,
+  EndOfFile,
+  InFile(Token)
+}
+
+const DEFAULT_IDENTIFIER_CAPACITY: usize = 10;
+const DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const DEFAULT_INDENT_STACK_CAPACITY: usize = 12;
+const DEFAULT_TOKEN_QUEUE_CAPACITY: usize = DEFAULT_INDENT_STACK_CAPACITY;
+
+impl<'a> Lexer<'a> {
+  fn advance_impl(&mut self) -> Result<Option<Token>, fb::Error> {
+    let next_state =
+      match &self.cursor_state {
+        CursorState::EndOfFile => CursorState::EndOfFile,
+        CursorState::StartOfFile => self.get_next_state()?,
+        CursorState::InFile(_) => self.get_next_state()?
+      };
+    let replaced_old_token =
+      match mem::replace(&mut self.cursor_state, next_state) {
+        CursorState::StartOfFile | CursorState::EndOfFile => None,
+        CursorState::InFile(old_token) => Some(old_token)
+      };
+    Ok(replaced_old_token)
+  }
+  fn get_next_state(&mut self) -> Result<CursorState, fb::Error> {
+    // try depleting from the token queue:
+    if let Some(next_token) = self.dequeue_token() {
+      return Ok(CursorState::InFile(next_token));
+    };
+    // Try refilling the token queue; if successful, return from queue.
+    // Note that the queue may or may not be empty after this pop.
+    if self.replenish_token_queue()? {
+      let next_token = self.dequeue_token().unwrap();
+      return Ok(CursorState::InFile(next_token));
+    };
+    // Token queue empty AND cannot refill, hence must be at EOF
+    debug_assert!(self.reader.at_eof());
+    return Ok(CursorState::EndOfFile);
+  }
+}
+
+impl<'a> Lexer<'a> {
+  fn replenish_token_queue(&mut self) -> Result<bool, fb::Error> {
     // Reading out any leading spaces, tabs, and line comments.
     // After this, the cursor position is the correct start-of-token
     // position for a span.
@@ -95,44 +126,44 @@ impl<'a> Lexer<'a> {
 
     // terminating if at EOF
     if self.reader.at_eof() {
-      return Ok(true);
+      return Ok(false);
     }
 
     // punctuation:
     if let Some(token) = self.scan_punctuation()? {
-      self.token_queue.push_back(token);
-      return Ok(false);
+      self.enqueue_token(token);
+      return Ok(true);
     }
     
     // keywords and identifiers:
     if let Some(token) = self.scan_word()? {
-      self.token_queue.push_back(token);
-      return Ok(false);
+      self.enqueue_token(token);
+      return Ok(true);
     }
 
     // number literals: int or float:
     if let Some(token) = self.scan_number()? {
-      self.token_queue.push_back(token);
-      return Ok(false);
+      self.enqueue_token(token);
+      return Ok(true);
     }
 
     // string literals:
     if let Some(token) = self.scan_string_literal()? {
-      self.token_queue.push_back(token);
-      return Ok(false);
+      self.enqueue_token(token);
+      return Ok(true);
     }
 
-    // TODO: try scanning line-endings (indent, dedent, eol)
+    // try scanning line-endings (indent, dedent, eol)
     // - need to allow multiple tokens to be pushed to a queue
     //   - e.g. multiple dedents (arbitrary limit)
     //   - e.g. EOL, indent and EOL, dedent
     // - when obtaining tokens, must first try to de-queue before scanning more from reader
     // - consider using Rust's 'yield' statements (highly unstable though)
     if let Some(()) = self.scan_multiple_line_ending_tokens()? {
-
+      return Ok(true);
     }
 
-    // error: unexpected character
+    // error: unexpected character, but not EOF
     let msg =
       fb::Message::new(
         format!(
@@ -492,30 +523,59 @@ impl<'a> Lexer<'a> {
     }
   }
 }
+
 impl<'a> Lexer<'a> {
   fn scan_multiple_line_ending_tokens(&mut self) -> Result<Option<()>, fb::Error> {
     if self.reader.match_char('\n')? {
+      let first_pos = self.reader.cursor();
+
       // counting the number of spaces immediately after this newline: this gives us
       // the indent width
       let this_indent_width = self.scan_indent_whitespace();
 
       // comparing the obtained count against the last value on the indent width stack,
       // generating tokens appropriately
-      // TODO: continue from here
       let last_indent_width = *self.indent_width_stack.last().unwrap();
+      
+      // always generating an EOL token before any indent, dedent
+      let eol_token = Token::new(self.span(first_pos), TokenInfo::EndOfLine);
+      self.enqueue_token(eol_token);
+
+      // generating indent/dedent:
       if this_indent_width < last_indent_width {
-        while this_indent_width < last_indent_width {
+        while this_indent_width < *self.indent_width_stack.last().unwrap() {
           self.indent_width_stack.pop();
+          let dedent_token = Token::new(self.span(first_pos), TokenInfo::Dedent);
+          self.enqueue_token(dedent_token);
+        }
+        let expected_indent_width = *self.indent_width_stack.last().unwrap();
+        if this_indent_width != expected_indent_width {
+          let error = 
+            fb::Error::new()
+            .with_message(
+              fb::Message::new(
+                format!(
+                  "Invalid indent: got block at depth {} spaces, but expected depth {} spaces",
+                  this_indent_width, expected_indent_width
+                )
+              )
+              .with_ref(
+                String::from("indentation whitespace here"),
+                fb::Loc::FileSpan(self.reader.source(), self.span(first_pos))
+              )
+            );
+          
+          return Err(error);
         }
       } else if this_indent_width > last_indent_width {
-
-      } else {
-        debug_assert!(this_indent_width == last_indent_width);
-
+        self.indent_width_stack.push(this_indent_width);
+        let indent_token = Token::new(self.span(first_pos), TokenInfo::Indent);
+        self.enqueue_token(indent_token);
       }
-
+      // return Ok(Some(())) to indicate tokens were successfully eaten
       Ok(Some(()))
     } else {
+      // return Ok(None) to indicate EOF without any errors
       Ok(None)
     }
   }
@@ -541,11 +601,34 @@ impl<'a> Lexer<'a> {
   }
 }
 
+//
+// Common utility:
+//
+
+impl<'a> Lexer<'a> {
+  fn new_keyword_map(intern_manager: &'a mut intern::Manager) -> HashMap<intern::IntStr, TokenInfo> {
+    let mut kw_map = HashMap::with_capacity(6);
+    kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);
+    kw_map.insert(intern_manager.intern(String::from("Self")), TokenInfo::TypeSelfKeyword);
+    kw_map.insert(intern_manager.intern(String::from("in")), TokenInfo::InKeyword);
+    kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
+    kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
+    kw_map.insert(intern_manager.intern(String::from("use")), TokenInfo::UseKeyword);
+    kw_map
+  }
+}
+
 impl<'a> Lexer<'a> {
   fn span(&self, first_pos: fb::Cursor) -> fb::Span {
     fb::Span::new(first_pos, self.reader.cursor())
   }
 }
+
 impl<'a> Lexer<'a> {
-  // TODO: write 'enqueue/dequeue' token methods
+  fn enqueue_token(&mut self, token: Token) {
+    self.token_queue.push_back(token);
+  }
+  fn dequeue_token(&mut self) -> Option<Token> {
+    self.token_queue.pop_front()
+  }
 }
