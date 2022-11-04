@@ -13,7 +13,7 @@ impl<'a> Lexer<'a> {
     source_id: source::SourceID, 
     source_text: String,
     tab_width_in_spaces: i32
-  ) -> fb::Result<Self> {
+  ) -> Self {
     let keyword_map = Lexer::new_keyword_map(intern_manager);
     let mut lexer = Self {
       reader: Reader::new(source_id, source_text),
@@ -25,8 +25,8 @@ impl<'a> Lexer<'a> {
       tab_width_in_spaces
     };
     lexer.indent_width_stack.push(0);
-    assert!(lexer.try_advance_impl()?.is_none(), "incorrect initial state while filling peek slot");
-    Ok(lexer)
+    assert!(lexer.try_advance_impl().unwrap().is_none(), "incorrect initial state while filling peek slot");
+    lexer
   }
 }
 
@@ -64,23 +64,25 @@ impl<'a> Lexer<'a> {
   pub fn scan_all_remaining_tokens(&mut self) -> fb::Result<Vec<Token>> {
     let mut output = Vec::with_capacity(1 << 20);
     while let Some(token) = self.try_advance()? {
-      println!("{:?}", token);
+      output.push(token);
     };
     Ok(output)
   }
 }
 
-//
-// Tests:
-//
-
-#[cfg(test)]
-mod tests {
-  #[test]
-  fn content_scan_test() {
-    // TODO: include a test file, scan it, and expect all tokens are OK
-    // let s = include_str!("");
-  }
+pub fn scan(filepath: &str) -> Vec<Token> {
+  let mut source_manager = source::Manager::new();
+  let mut intern_manager = intern::Manager::new();
+  let filepath = String::from(filepath);
+  let source_text = std::fs::read_to_string(filepath.as_str()).unwrap();
+  let source_id = source_manager.add(filepath);
+  let mut lexer = Lexer::new(
+    &mut intern_manager,
+    source_id,
+    source_text,
+    4
+  );
+  lexer.scan_all_remaining_tokens().unwrap()
 }
 
 //

@@ -1,12 +1,17 @@
 use super::*;
 
+#[derive(Debug)]
 pub struct Error {
   message_vec: Vec<Message>
 }
+
+#[derive(Debug)]
 pub struct Message {
   text: String,
   source_refs: Vec<SourceRef>
 }
+
+#[derive(Debug)]
 struct SourceRef {
   desc: String,
   loc: Loc

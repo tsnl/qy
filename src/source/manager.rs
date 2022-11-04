@@ -5,14 +5,14 @@ use std::fmt::{Debug, Formatter, Result};
 #[derive(Clone, Copy)]
 pub struct SourceID(usize);
 
-pub struct SourceManager {
+pub struct Manager {
   source_table: Vec<Source>,
   filepath_sid_map: HashMap<String, SourceID>
 }
 
-impl SourceManager {
-  pub fn new() -> SourceManager {
-    SourceManager {
+impl Manager {
+  pub fn new() -> Manager {
+    Manager {
       source_table: Vec::new(),
       filepath_sid_map: HashMap::new()
     }
@@ -25,8 +25,12 @@ impl SourceManager {
     fresh_sid
   }
   pub fn add(&mut self, filepath: String) -> SourceID {
-    let filepath_path_buf = std::fs::canonicalize(filepath).unwrap();
-    let filepath = filepath_path_buf.as_path().to_str().unwrap().to_owned();
+    let filepath = 
+      if !filepath.starts_with("$DEBUG") {
+        std::fs::canonicalize(filepath).unwrap().as_path().to_str().unwrap().to_owned()
+      } else {
+        filepath
+      };
     match self.filepath_sid_map.get(&filepath) {
       Some(sid) => { *sid },
       None => { self.add_fresh(filepath) }

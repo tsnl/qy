@@ -7,5 +7,10 @@ mod intern;
 mod parser;
 
 fn main() {
-  println!("Hello, world!");
+  let filepath = "test/lexer_test_01.txt";
+  println!("Begin token dump");
+  for token in parser::scan(filepath) {
+    println!("- {:#?}", &token);
+  }
+  println!("End token dump");
 }
