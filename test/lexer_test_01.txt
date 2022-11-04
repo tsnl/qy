@@ -5,3 +5,5 @@ Hello
       z = x + y
     1
 24
+
++self

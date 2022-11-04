@@ -9,8 +9,8 @@ use std::collections::vec_deque::VecDeque;
 
 impl<'a> Lexer<'a> {
   pub fn new(
-    intern_manager: &'a mut intern::Manager, 
-    source_id: source::SourceID, 
+    intern_manager: &'a mut intern::Manager,
+    source_id: source::SourceID,
     source_text: String,
     tab_width_in_spaces: i32
   ) -> Self {
@@ -155,13 +155,13 @@ impl<'a> Lexer<'a> {
     if self.reader.at_eof() {
       return Ok(false);
     }
-    
+
     // punctuation:
     if let Some(token) = self.scan_punctuation()? {
       self.enqueue_token(token);
       return Ok(true);
     }
-    
+
     // keywords and identifiers:
     if let Some(token) = self.scan_word()? {
       self.enqueue_token(token);
@@ -215,12 +215,12 @@ impl<'a> Lexer<'a> {
       }
       if self.reader.match_char('\t')? {
         continue;
-      }      
+      }
       // line comments
       if self.reader.match_char('#')? {
         self.skip_any_bytes_until_newline()?;
-        // After skipping out a line-comment, we always have a newline or EOF. 
-        // We should not skip newline because it is used for indent, dedent, 
+        // After skipping out a line-comment, we always have a newline or EOF.
+        // We should not skip newline because it is used for indent, dedent,
         // and EOL generation (consider `x = 5 # ...\n`; we need the EOL).
         // Hence safe to break here.
         break;
@@ -336,11 +336,11 @@ impl<'a> Lexer<'a> {
     let id_string = String::from_iter(id_chars);
     let id_intstr = self.intern_manager.intern(id_string);
     Token::new(
-      self.span(first_pos), 
+      self.span(first_pos),
       match self.keyword_map.get(&id_intstr) {
-        Some(kw_token_info) => 
+        Some(kw_token_info) =>
           kw_token_info.clone(),
-        None => 
+        None =>
           if id_is_value {
             TokenInfo::ValueIdentifier(id_intstr)
           } else {
@@ -366,13 +366,13 @@ impl<'a> Lexer<'a> {
   fn scan_number(&mut self) -> fb::Result<Option<Token>> {
     let first_pos = self.reader.cursor();
     let opt_first_char = self.reader.peek();
-    
+
     // If '0x' or '0X' detected, then should scan a hex integer chunk, no
     // hex floating point numbers.
     // Else should scan a decimal integer chunk;
     // decimal suffix is '[.<decimal-integer-chunk>][(e|E)<decimal-integer-chunk>]',
     // if suffix empty then just an integer, else float.
-    
+
     if self.reader.match_char_if(|c| c.is_ascii_digit())? {
       Ok(Some(self.scan_nonempty_number(first_pos, opt_first_char.unwrap())?))
     } else {
@@ -380,8 +380,8 @@ impl<'a> Lexer<'a> {
     }
   }
   fn scan_nonempty_number(&mut self, first_pos: fb::Cursor, first_char: char) -> fb::Result<Token> {
-    let is_hex_number = 
-      first_char == '0' && 
+    let is_hex_number =
+      first_char == '0' &&
       self.reader.match_char_if(|b| b == 'x' || b == 'X')?;
     if is_hex_number {
       Ok(self.scan_nonempty_hex_number(first_pos)?)
@@ -392,7 +392,7 @@ impl<'a> Lexer<'a> {
   fn scan_nonempty_hex_number(&mut self, first_pos: fb::Cursor) -> fb::Result<Token> {
     let hex_int_mantissa = self.scan_hex_int_chunk()?;
     Ok(Token::new(
-      self.span(first_pos), 
+      self.span(first_pos),
       TokenInfo::LiteralInteger(hex_int_mantissa, IntegerFormat::Hexadecimal)
     ))
   }
@@ -418,7 +418,7 @@ impl<'a> Lexer<'a> {
       };
     let token_info =
       if is_float {
-        TokenInfo::LiteralFloat { mantissa: mantissa, exponent: opt_exponent } 
+        TokenInfo::LiteralFloat { mantissa: mantissa, exponent: opt_exponent }
       } else {
         TokenInfo::LiteralInteger(mantissa, IntegerFormat::Decimal)
       };
@@ -434,7 +434,7 @@ impl<'a> Lexer<'a> {
           String::from("Expected valid exponent after 'e/E' exponent in float literal")
         )
         .with_ref(
-          format!("See incomplete literal '{}': ", mantissa), 
+          format!("See incomplete literal '{}': ", mantissa),
           fb::Loc::FilePos(self.reader.source(), start_of_suffix_pos)
         );
       return Err(fb::Error::new().with_message(message));
@@ -517,9 +517,9 @@ impl<'a> Lexer<'a> {
     }
   }
   fn scan_escape_sequence_suffix(&mut self, peek_pos: fb::Cursor) -> fb::Result<char> {
-    if self.reader.match_char('"')? { 
+    if self.reader.match_char('"')? {
       Ok('"')
-    } else if self.reader.match_char('n')? { 
+    } else if self.reader.match_char('n')? {
       Ok('\n')
     }  else if self.reader.match_char('r')? {
       Ok('\r')
@@ -541,7 +541,7 @@ impl<'a> Lexer<'a> {
             )
           )
           .with_ref(
-            String::from("see..."), 
+            String::from("see..."),
             fb::Loc::FilePos(self.reader.source(), peek_pos)
           )
         )
@@ -552,8 +552,10 @@ impl<'a> Lexer<'a> {
 
 impl<'a> Lexer<'a> {
   fn scan_multiple_line_ending_tokens(&mut self) -> fb::Result<Option<()>> {
+    let pre_eol_pos = self.reader.cursor();
+
     if self.reader.match_char('\n')? {
-      let first_pos = self.reader.cursor();
+      let post_eol_pos = self.reader.cursor();
 
       // counting the number of spaces immediately after this newline: this gives us
       // the indent width
@@ -562,21 +564,27 @@ impl<'a> Lexer<'a> {
       // comparing the obtained count against the last value on the indent width stack,
       // generating tokens appropriately
       let last_indent_width = *self.indent_width_stack.last().unwrap();
-      
+
       // always generating an EOL token before any indent, dedent
-      let eol_token = Token::new(self.span(first_pos), TokenInfo::EndOfLine);
+      let eol_token = Token::new(
+        fb::Span::new(pre_eol_pos, post_eol_pos),
+        TokenInfo::EndOfLine
+      );
       self.enqueue_token(eol_token);
 
       // generating indent/dedent:
       if this_indent_width < last_indent_width {
         while this_indent_width < *self.indent_width_stack.last().unwrap() {
           self.indent_width_stack.pop();
-          let dedent_token = Token::new(self.span(first_pos), TokenInfo::Dedent);
+          let dedent_token = Token::new(
+            self.span(pre_eol_pos),
+            TokenInfo::Dedent
+          );
           self.enqueue_token(dedent_token);
         }
         let expected_indent_width = *self.indent_width_stack.last().unwrap();
         if this_indent_width != expected_indent_width {
-          let error = 
+          let error =
             fb::Error::new()
             .with_message(
               fb::Message::new(
@@ -587,15 +595,18 @@ impl<'a> Lexer<'a> {
               )
               .with_ref(
                 String::from("indentation whitespace here"),
-                fb::Loc::FileSpan(self.reader.source(), self.span(first_pos))
+                fb::Loc::FileSpan(
+                  self.reader.source(),
+                  self.span(post_eol_pos)
+                )
               )
             );
-          
+
           return Err(error);
         }
       } else if this_indent_width > last_indent_width {
         self.indent_width_stack.push(this_indent_width);
-        let indent_token = Token::new(self.span(first_pos), TokenInfo::Indent);
+        let indent_token = Token::new(self.span(post_eol_pos), TokenInfo::Indent);
         self.enqueue_token(indent_token);
       }
       // return Ok(Some(())) to indicate tokens were successfully eaten
