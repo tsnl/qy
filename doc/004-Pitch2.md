@@ -2,23 +2,19 @@ Instead of an `Any` type, consider instead an `Auto` type
 - when type specifiers are omitted, default to `Auto` which creates a fresh type
   variable.
 - switch to an OO-style model to achieve qualified subtyping polymorphism;
-  only support `trait` and `type` instances, can define methods either in the
+  only support `abstract`, `type` instances, can define methods either in the
   `type` body or an `amend` block
   - traits are a set of constraints on a type; may intersect
-  - trait constraints require either methods or fields
+  - abstract constraints require either methods or fields
 - the `Auto` type solves to a concrete type if possible, else a `Trait` that may
   be anonymous/ad-hoc.
 
 ```
-trait FileLocation =
+abstract FileLocation =
   source_file: SourceFile
-  to_string(self): String
+  to_string(self) -> String
 
-type FilePosition with FileLocation =
-  source_file: SourceFile
-  line_index: Int
-  column_index: Int
-
+type FilePosition(source_file: SourceFile, line_index: Int, column_index: Int) with FileLocation =
   to_string(self) =
     "{}:{}".format(self.line_index, self.column_index)
 
@@ -40,14 +36,14 @@ type FileSpan(source_file: SourceFile, first_pos: FilePosition, last_pos: FilePo
         1+self.last_pos.line_index,
         1+self.last_pos.column_index
       )
-  
+
 amend FilePosition
   line(self) =
     1 + self.line_index
   column(self) =
     1 + self.column_index
 
-trait XmlSerializable =
+abstract XmlSerializable =
   to_xml_string(self) -> String
 
 amend FilePosition with XmlSerializable
