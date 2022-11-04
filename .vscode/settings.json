@@ -1,25 +1,28 @@
 {    
-    "files.associations": {
-        "*.qy": "qy"
-    },
-    "cmake.sourceDirectory": "${workspaceFolder}/qc-build",
-    "cmake.cmakePath": "cmake",
-    
+  "files.associations": {
+  "*.qy": "qy"
+  },
+  "cmake.sourceDirectory": "${workspaceFolder}/qc-build",
+  "cmake.cmakePath": "cmake",
+  
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "[rust]": {
     "editor.tabSize": 2,
-    "editor.insertSpaces": true,
-    "[rust]": {
-        "editor.tabSize": 2,
-        "editor.rulers": []
-    },
-    "[python]": {
-        "editor.tabSize": 4,
-        "editor.rulers": [100],
-    },
-    "[qy]": {
-        "editor.tabSize": 2,
-        "editor.rulers": [100],
-    },
-    "[json][jsonc][json5]": {
-        "editor.tabSize": 2,
-    },
+    "editor.rulers": []
+  },
+  "[python]": {
+    "editor.tabSize": 4,
+    "editor.rulers": [100],
+  },
+  "[qy]": {
+    "editor.tabSize": 2,
+    "editor.rulers": [100],
+  },
+  "[json][jsonc][json5]": {
+    "editor.tabSize": 2,
+  },
+  "[markdown]": {
+    "editor.tabSize": 2
+  }
 }
