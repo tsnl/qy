@@ -30,8 +30,8 @@ impl Manager {
       int_str
     }
   }
-  pub fn lookup(&self, i: IntStr) -> String {
-    self.id_to_string_lut[i.id].clone()
+  pub fn lookup(&self, i: IntStr) -> &String {
+    &self.id_to_string_lut[i.id]
   }
 }
 

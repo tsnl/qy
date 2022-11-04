@@ -30,7 +30,7 @@ impl Reader {
       None
     }
   }
-  pub fn skip(&mut self) -> Result<(), fb::Error> {
+  pub fn skip(&mut self) -> fb::Result<()> {
     if let Some(peek1) = self.peek() {
       if peek1 == '\r' {
         self.offset += 1;
@@ -67,7 +67,7 @@ impl Reader {
       Ok(())
     }
   }
-  pub fn match_char(&mut self, c: char) -> Result<bool, fb::Error> {
+  pub fn match_char(&mut self, c: char) -> fb::Result<bool> {
     if let Some(peek) = self.peek() {
       if peek == c {
         self.skip()?;
@@ -76,7 +76,7 @@ impl Reader {
     }
     return Ok(false);
   }
-  pub fn match_char_if<F: Fn(char)->bool>(&mut self, cp: F) -> Result<bool, fb::Error> {
+  pub fn match_char_if<F: Fn(char)->bool>(&mut self, cp: F) -> fb::Result<bool> {
     if let Some(peek) = self.peek() {
       if cp(peek) {
         self.skip()?;
@@ -89,9 +89,9 @@ impl Reader {
 impl Reader {
   pub fn at_eof(&self) -> bool {
     if let Some(_) = self.peek() {
-      true
-    } else {
       false
+    } else {
+      true
     }
   }
 }

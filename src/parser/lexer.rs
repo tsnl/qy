@@ -70,14 +70,13 @@ impl<'a> Lexer<'a> {
   }
 }
 
-pub fn scan(filepath: &str) -> Vec<Token> {
+pub fn scan(intern_manager: &mut intern::Manager, filepath: &str) -> Vec<Token> {
   let mut source_manager = source::Manager::new();
-  let mut intern_manager = intern::Manager::new();
   let filepath = String::from(filepath);
   let source_text = std::fs::read_to_string(filepath.as_str()).unwrap();
   let source_id = source_manager.add(filepath);
   let mut lexer = Lexer::new(
-    &mut intern_manager,
+    intern_manager,
     source_id,
     source_text,
     4
@@ -156,7 +155,7 @@ impl<'a> Lexer<'a> {
     if self.reader.at_eof() {
       return Ok(false);
     }
-
+    
     // punctuation:
     if let Some(token) = self.scan_punctuation()? {
       self.enqueue_token(token);
@@ -374,11 +373,10 @@ impl<'a> Lexer<'a> {
     // decimal suffix is '[.<decimal-integer-chunk>][(e|E)<decimal-integer-chunk>]',
     // if suffix empty then just an integer, else float.
     
-    match opt_first_char {
-      Some(first_char) =>
-        Ok(Some(self.scan_nonempty_number(first_pos, first_char)?)),
-      None =>
-        Ok(None)
+    if self.reader.match_char_if(|c| c.is_ascii_digit())? {
+      Ok(Some(self.scan_nonempty_number(first_pos, opt_first_char.unwrap())?))
+    } else {
+      Ok(None)
     }
   }
   fn scan_nonempty_number(&mut self, first_pos: fb::Cursor, first_char: char) -> fb::Result<Token> {
@@ -559,7 +557,7 @@ impl<'a> Lexer<'a> {
 
       // counting the number of spaces immediately after this newline: this gives us
       // the indent width
-      let this_indent_width = self.scan_indent_whitespace();
+      let this_indent_width = self.scan_indent_whitespace()?;
 
       // comparing the obtained count against the last value on the indent width stack,
       // generating tokens appropriately
@@ -607,14 +605,16 @@ impl<'a> Lexer<'a> {
       Ok(None)
     }
   }
-  fn scan_indent_whitespace(&mut self) -> i32 {
+  fn scan_indent_whitespace(&mut self) -> fb::Result<i32> {
     let mut indent_width = 0;
     loop {
       match self.reader.peek() {
         Some(peek_char) => {
           if peek_char == ' ' {
+            self.reader.skip()?;
             indent_width += 1;
           } else if peek_char == '\t' {
+            self.reader.skip()?;
             indent_width += self.tab_width_in_spaces;
           } else {
             break;
@@ -625,7 +625,7 @@ impl<'a> Lexer<'a> {
         }
       }
     };
-    indent_width
+    Ok(indent_width)
   }
 }
 

@@ -1,0 +1,13 @@
+Begin token dump
+  = scan start
+  * skip whitespace
+  * not at EOF
+  * not punctuation
+  * IS keyword/ID
+  = scan start
+  * skip whitespace
+  * not at EOF
+  * not punctuation
+  * not keyword/ID
+  * not number
+  * not string
