@@ -48,7 +48,7 @@ abstract XmlSerializable =
 
 amend FilePosition with XmlSerializable
   to_xml_string(self) -> String =
-    "<position><line>{}</line><column>{}</column><source-file></source-file></position>".format(
+    "<position><line>{}</line><column>{}</column><source-file>{}</source-file></position>".format(
       self.line(),
       self.column(),
       self.source_file.to_xml_string()
@@ -60,3 +60,30 @@ type List[TContent] =
   head: TContent
   tail: List[TContent] | Null
 ```
+
+The following two functions are identical; note that 'Auto' will probably
+resolve to an ad-hoc abstract bearing methods `__mul__`, `__eq__`, 
+`__sub__` based on usage in definition.
+
+Cannot default resolve to an ad-hoc abstract for monomorphic binding cases; 
+should try to find the most monomorphic type satisfying a join.
+
+```
+def factorial1(x) =
+  if (x == 0 or x == 1)
+    1
+  else
+    x * factorial1(x - 1)
+  
+def factorial2(x: Auto) -> Auto =
+  if (x == 0 or x == 1)
+    1
+  else
+    x * factorial2(x - 1)
+```
+
+Implementation
+- every instance is boxed by default; keep `*T` notation to forcably unbox, `*v`
+  to copy.
+- instances of `abstract` are exactly like `interface` instances in Go; when
+  converting to an `abstract` instance, we specify a V-table at compile-time.
