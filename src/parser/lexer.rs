@@ -21,8 +21,9 @@ impl<'a> Lexer<'a> {
       reader: Reader::new(source_id, source_text),
       intern_manager: intern_manager,
       cursor_state: CursorState::StartOfFile,
-      token_queue: VecDeque::with_capacity(DEFAULT_TOKEN_QUEUE_CAPACITY),
-      indent_width_stack: Vec::with_capacity(DEFAULT_INDENT_STACK_CAPACITY),
+      token_queue: VecDeque::with_capacity(TOKEN_QUEUE_CAPACITY),
+      indent_width_stack: Vec::with_capacity(INDENT_STACK_CAPACITY),
+      matching_token_pair_expectation_stack: Vec::with_capacity(PAREN_STACK_CAPACITY),
       keyword_map,
       tab_width_in_spaces
     };
@@ -96,6 +97,7 @@ pub struct Lexer<'a> {
   cursor_state: CursorState,
   token_queue: VecDeque<Token>,
   indent_width_stack: Vec<i32>,
+  matching_token_pair_expectation_stack: Vec<(fb::Span, char)>,
   keyword_map: HashMap<intern::IntStr, TokenInfo>,
   tab_width_in_spaces: i32
 }
@@ -106,11 +108,12 @@ pub enum CursorState {
   InFile(Token)
 }
 
-const DEFAULT_IDENTIFIER_CAPACITY: usize = 10;
-const DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
-const DEFAULT_DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
-const DEFAULT_INDENT_STACK_CAPACITY: usize = 12;
-const DEFAULT_TOKEN_QUEUE_CAPACITY: usize = DEFAULT_INDENT_STACK_CAPACITY;
+const IDENTIFIER_CAPACITY: usize = 10;
+const HEXADECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const DECIMAL_INT_CHUNK_CAPACITY: usize = 10;
+const INDENT_STACK_CAPACITY: usize = 12;
+const PAREN_STACK_CAPACITY: usize = 8;
+const TOKEN_QUEUE_CAPACITY: usize = INDENT_STACK_CAPACITY;
 
 impl<'a> Lexer<'a> {
   fn try_advance_impl(&mut self) -> fb::Result<Option<Token>> {
@@ -128,7 +131,7 @@ impl<'a> Lexer<'a> {
     Ok(replaced_old_token)
   }
   fn get_next_state(&mut self) -> fb::Result<CursorState> {
-    // try depleting from the token queue:
+    // Try depleting from the token queue:
     if let Some(next_token) = self.dequeue_token() {
       return Ok(CursorState::InFile(next_token));
     };
@@ -150,15 +153,36 @@ impl<'a> Lexer<'a> {
     // After this, the cursor position is the correct start-of-token
     // position for a span.
     // Note that we do not skip any newline characters (including at the end of line comments)
-    // to correctly generate indent, dedent, and end-of-line tokens.
+    // to correctly generate indent, dedent, and end-of-line tokens UNLESS between parens,
+    // brackets, or braces.
     self.skip_any_spaces_and_line_comments()?;
 
-    // terminating if at EOF
+    // if at EOF...
     if self.reader.at_eof() {
-      return Ok(false);
+      // if indent stack is not empty, can still generate 'dedent' tokens, else verify that
+      // EOF is expected, e.g. no unterminated pair tokens (...), [...], {...}
+      if self.indent_width_stack.len() == 1 {
+        self.check_on_eof()?;
+        return Ok(false);
+      } else {
+        let eof_pos = self.reader.cursor();
+        let eof_span = self.span(eof_pos);
+        while self.indent_width_stack.len() > 1 {
+          self.enqueue_token(Token::new(eof_span, TokenInfo::Dedent))
+        }
+        debug_assert!(self.indent_width_stack.len() == 1);
+        debug_assert!(*self.indent_width_stack.last().unwrap() == 0);
+        return Ok(true);
+      }
     }
 
-    // punctuation:
+    // parentheses, brackets, braces:
+    if let Some(token) = self.try_scan_paren_bracket_brace()? {
+      self.enqueue_token(token);
+      return Ok(true);
+    }
+
+    // other punctuation:
     if let Some(token) = self.scan_punctuation()? {
       self.enqueue_token(token);
       return Ok(true);
@@ -212,10 +236,7 @@ impl<'a> Lexer<'a> {
   fn skip_any_spaces_and_line_comments(&mut self) -> fb::Result<()> {
     loop {
       // non-newline whitespace
-      if self.reader.match_char(' ')? {
-        continue;
-      }
-      if self.reader.match_char('\t')? {
+      if self.reader.match_char(' ')? || self.reader.match_char('\t')? {
         continue;
       }
       // line comments
@@ -227,7 +248,13 @@ impl<'a> Lexer<'a> {
         // Hence safe to break here.
         break;
       }
-      // neither whitespace nor line comments left; break.
+      // skipping newlines if paren/bracket/brace stack is empty
+      if !self.matching_token_pair_expectation_stack.is_empty() {
+        if self.reader.match_char('\n')? {
+          continue;
+        }
+      }
+      // nothing left to skip; break.
       break;
     };
     Ok(())
@@ -308,7 +335,96 @@ impl<'a> Lexer<'a> {
     if self.reader.match_char('-')? {
       return Ok(Some(Token::new(token_span!(), TokenInfo::Minus)));
     }
+    if self.reader.match_char('&')? {
+      if self.reader.match_char('&')? {
+        return Ok(Some(Token::new(token_span!(), TokenInfo::LogicalAnd)));
+      } else {
+        return Ok(Some(Token::new(token_span!(), TokenInfo::BitwiseAnd)));
+      };
+    };
+    if self.reader.match_char('|')? {
+      if self.reader.match_char('|')? {
+        return Ok(Some(Token::new(token_span!(), TokenInfo::LogicalOr)));
+      } else {
+        return Ok(Some(Token::new(token_span!(), TokenInfo::BitwiseOr)));
+      };
+    };
+    if self.reader.match_char('^')? {
+      return Ok(Some(Token::new(token_span!(), TokenInfo::BitwiseXOr)));
+    }
     return Ok(None)
+  }
+}
+
+impl<'a> Lexer<'a> {
+  fn try_scan_paren_bracket_brace(&mut self) -> fb::Result<Option<Token>> {
+    // opening characters:
+    if let Some(token) = self.try_scan_opening_char('(', TokenInfo::LeftParenthesis, ')')? {
+      return Ok(Some(token));
+    };
+    if let Some(token) = self.try_scan_opening_char('[', TokenInfo::LeftSquareBracket, ']')? {
+      return Ok(Some(token));
+    };
+    if let Some(token) = self.try_scan_opening_char('{', TokenInfo::LeftCurlyBrace, '}')? {
+      return Ok(Some(token));
+    };
+    // closing characters:
+    if let Some(token) = self.try_scan_closing_char(')', TokenInfo::RightParenthesis, '(')? {
+      return Ok(Some(token));
+    };
+    if let Some(token) = self.try_scan_closing_char(']', TokenInfo::RightSquareBracket, '[')? {
+      return Ok(Some(token));
+    };
+    if let Some(token) = self.try_scan_closing_char('}', TokenInfo::RightCurlyBrace, '{')? {
+      return Ok(Some(token));
+    };
+    return Ok(None);
+  }
+  fn try_scan_opening_char(&mut self, opening_char: char, opening_token_info: TokenInfo, closing_char: char) -> fb::Result<Option<Token>> {
+    let first_pos = self.reader.cursor();
+    if self.reader.match_char(opening_char)? {
+      self.matching_token_pair_expectation_stack.push((self.span(first_pos), closing_char));
+      return Ok(Some(Token::new(self.span(first_pos), opening_token_info)))
+    } else {
+      Ok(None)
+    }
+  }
+  fn try_scan_closing_char(&mut self, closing_char: char, closing_token_info: TokenInfo, opening_char: char) -> fb::Result<Option<Token>> {
+    let first_pos = self.reader.cursor();
+    if self.reader.match_char(closing_char)? {
+      match self.matching_token_pair_expectation_stack.pop() {
+        Some((opening_paren_span, expected_char)) => {
+          if closing_char == expected_char {
+            Ok(Some(Token::new(self.span(first_pos), closing_token_info)))
+          } else {
+            Err(fb::Error::new().with_message(
+              fb::Message::new(
+                format!("Before '{}', expected '{}'", closing_char, expected_char)
+              ).with_ref(
+                String::from("opened here"), 
+                fb::Loc::FileSpan(self.reader.source(), opening_paren_span)
+              ).with_ref(
+                String::from("see"), 
+                fb::Loc::FileSpan(self.reader.source(), self.span(first_pos))
+              )
+            ))
+          }
+        },
+        None => {
+          // report an error indicating that extraneous ')' was found before an opening
+          Err(fb::Error::new().with_message(
+            fb::Message::new(
+              format!("Before '{}', expected complementary '{}'", closing_char, opening_char)
+            ).with_ref(
+              String::from("see"),
+              fb::Loc::FileSpan(self.reader.source(), self.span(first_pos))
+            )
+          ))
+        }
+      }
+    } else {
+      Ok(None)
+    }
   }
 }
 
@@ -318,7 +434,7 @@ impl<'a> Lexer<'a> {
     let opt_first_char = self.reader.peek();
     if self.reader.match_char_if(|b| b.is_ascii_alphabetic() || b == '_')? {
       let first_char = opt_first_char.unwrap();
-      let mut chars = Vec::with_capacity(DEFAULT_IDENTIFIER_CAPACITY);
+      let mut chars = Vec::with_capacity(IDENTIFIER_CAPACITY);
       chars.push(first_char);
       loop {
         let opt_later_char = self.reader.peek();
@@ -451,7 +567,7 @@ impl<'a> Lexer<'a> {
     }
   }
   fn scan_hex_int_chunk(&mut self) -> fb::Result<String> {
-    let mut hex_int_chunk_chars = Vec::with_capacity(DEFAULT_HEXADECIMAL_INT_CHUNK_CAPACITY);
+    let mut hex_int_chunk_chars = Vec::with_capacity(HEXADECIMAL_INT_CHUNK_CAPACITY);
     loop {
       let opt_int_chunk_char = self.reader.peek();
       if self.reader.match_char_if(|b| b.is_ascii_hexdigit() || b == '_')? {
@@ -463,7 +579,7 @@ impl<'a> Lexer<'a> {
     Ok(String::from_iter(hex_int_chunk_chars))
   }
   fn scan_decimal_int_chunk(&mut self, opt_first_char: Option<char>) -> fb::Result<String> {
-    let mut decimal_int_chunk_chars = Vec::with_capacity(DEFAULT_DECIMAL_INT_CHUNK_CAPACITY);
+    let mut decimal_int_chunk_chars = Vec::with_capacity(DECIMAL_INT_CHUNK_CAPACITY);
     if let Some(first_char) = opt_first_char {
       decimal_int_chunk_chars.push(first_char);
     }
@@ -559,6 +675,12 @@ impl<'a> Lexer<'a> {
     if self.reader.match_char('\n')? {
       let post_eol_pos = self.reader.cursor();
 
+      // if there are any open parentheses, brackets, or braces, then we do not generate
+      // any EOL, indent, or dedent tokens.
+      if !self.matching_token_pair_expectation_stack.is_empty() {
+        return Ok(None)
+      };
+
       // counting the number of spaces immediately after this newline: this gives us
       // the indent width
       let this_indent_width = self.scan_indent_whitespace()?;
@@ -640,6 +762,28 @@ impl<'a> Lexer<'a> {
     };
     Ok(indent_width)
   }
+}
+
+impl<'a> Lexer<'a> {
+  fn check_on_eof(&mut self) -> fb::Result<()> {
+    if self.matching_token_pair_expectation_stack.is_empty() {
+      // at EOF, all ok
+      Ok(())
+    } else {
+      let mut error = fb::Error::new();
+      while let Some((opening_span, closing_char)) = self.matching_token_pair_expectation_stack.pop() {
+        error = error.with_message(
+          fb::Message::new(
+            format!("Before EOF, expected '{}' to match opening token", closing_char)
+          ).with_ref(
+            String::from("opening token here..."),
+            fb::Loc::FileSpan(self.reader.source(), opening_span)
+          )
+        );
+      };
+      Err(error)
+    }
+  } 
 }
 
 //
