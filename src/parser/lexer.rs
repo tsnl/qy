@@ -167,8 +167,10 @@ impl<'a> Lexer<'a> {
       } else {
         let eof_pos = self.reader.cursor();
         let eof_span = self.span(eof_pos);
+        self.enqueue_token(Token::new(eof_span, TokenInfo::EndOfLine));
         while self.indent_width_stack.len() > 1 {
-          self.enqueue_token(Token::new(eof_span, TokenInfo::Dedent))
+          self.enqueue_token(Token::new(eof_span, TokenInfo::Dedent));
+          self.indent_width_stack.pop();
         }
         debug_assert!(self.indent_width_stack.len() == 1);
         debug_assert!(*self.indent_width_stack.last().unwrap() == 0);
