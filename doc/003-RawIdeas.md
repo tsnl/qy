@@ -39,3 +39,29 @@ Can use refinements on a single field to further sub-divide variations of a
 value. This would probably be checked at run-time (at least until the 
 distant future), but allows us to encode type-states and allows us to 
 minimize run-time type-checking overhead for such cases automatically.
+
+## Cast-free programming
+
+Casts are only required if static type information affects behavior.
+Dynamically typed languages do not support casts because all behavior is 
+purely dependent on runtime type information, e.g. dynamic dispatch.
+A manifestly typed language without any casts feels like a dynamically typed
+language.
+
+See [004-Pitch2.md](./004-Pitch2.md).
+
+## Missing Features/questions
+
+Exceptions?
+- destructors means stack unwinding, otherwise could use signals
+- see: https://mapping-high-level-constructs-to-llvm-ir.readthedocs.io/en/latest/exception-handling/index.html
+
+Global variables?
+- not supported => safe, but inconvenient
+- supported, maybe with a Scala-style object
+
+Control flow?
+- break, continue in loops
+- short-circuiting return
+
+Variadic arguments? Keyword arguments?
