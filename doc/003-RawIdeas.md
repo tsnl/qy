@@ -65,3 +65,6 @@ Control flow?
 - short-circuiting return
 
 Variadic arguments? Keyword arguments?
+
+RTTI, specifically being able to query an instance for a value uniquely 
+representing its constructor, further using this instance for reflection.

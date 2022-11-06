@@ -72,12 +72,16 @@ Vec2F =
   y: Float
 
 Robot = 
-  position: *Vec2F
+  position: Vec2F
   angle_deg: Float 
   pen_down: Bool
 
 Robot.new_default () =
-  Robot(Vec2F(0, 0), 0, Bool.False)
+  Robot {
+    position: Vec2F { x: 0, y: 0 }, 
+    angle_deg: 0, 
+    pen_down: Bool.False
+  }
 
 Robot.pen_down (self) () =
   self.pen_down := Bool.True
@@ -90,8 +94,8 @@ Robot.walk (self) (distance_px) =
   src_y = self.y
   dst_x = self.x + distance_px * Math.cos(Math.radians(self.angle))
   dst_y = self.y + distance_px * Math.sin(Math.radians(self.angle))
-  src_pt = Vec2f.new(src_x, src_y)
-  dst_pt = Vec2f.new(dst_x, dst_y)
+  src_pt = Vec2f { x: src_x, y: src_y }
+  dst_pt = Vec2f { x: dst_x, y: dst_y }
   if (self.pen_down)
     Gfx.draw_line(src_pt, dst_pt)
   self.position := dst_pt
