@@ -801,7 +801,7 @@ impl<'a> Lexer<'a> {
     kw_map.insert(intern_manager.intern(String::from("variant")), TokenInfo::VariantKeyword);
     kw_map.insert(intern_manager.intern(String::from("interface")), TokenInfo::InterfaceKeyword);
     kw_map.insert(intern_manager.intern(String::from("extend")), TokenInfo::ExtendKeyword);
-    kw_map.insert(intern_manager.intern(String::from("fn")), TokenInfo::FnKeyword);
+    kw_map.insert(intern_manager.intern(String::from("function")), TokenInfo::FunctionKeyword);
     kw_map.insert(intern_manager.intern(String::from("property")), TokenInfo::PropertyKeyword);
     kw_map.insert(intern_manager.intern(String::from("value")), TokenInfo::ValueKeyword);
     kw_map.insert(intern_manager.intern(String::from("get")), TokenInfo::GetKeyword);

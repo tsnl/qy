@@ -38,7 +38,7 @@ pub enum TokenInfo {
   ConstKeyword,
   StructKeyword, RecordKeyword, VariantKeyword, InterfaceKeyword,
   ExtendKeyword,
-  FnKeyword, PropertyKeyword, ValueKeyword, GetKeyword, SetKeyword,
+  FunctionKeyword, PropertyKeyword, ValueKeyword, GetKeyword, SetKeyword,
   ValueSelfKeyword, TypeSelfKeyword, 
   InKeyword, 
   MutKeyword, WeakKeyword,

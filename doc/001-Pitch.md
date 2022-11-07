@@ -30,13 +30,13 @@ record Robot:
   mut is_pen_down: Bool
 
 extend Robot:
-  fn pen_down():
+  function pen_down():
     self.is_pen_down := Bool.True
   
-  fn pen_up():
+  function pen_up():
     self.is_pen_down := Bool.False
   
-  fn walk(distance_px):
+  function walk(distance_px):
     src_x = self.x
     src_y = self.y
     dst_x = self.x + distance_px * Math.cos(self.angle * 1e-3)
@@ -47,7 +47,7 @@ extend Robot:
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
-  fn turn_ccw(rotation_deg):
+  function turn_ccw(rotation_deg):
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
     self.angle := self.angle % MAX_HEADING
 ```
@@ -63,7 +63,7 @@ record FilePosition:
   column_index: Int
 
 extend FilePosition with IFileLocation:
-  fn to_string():
+  function to_string():
     "{}:{}".format(self.line_index, self.column_index)
 
 record FileSpan:
@@ -72,15 +72,15 @@ record FileSpan:
   last_pos: FilePosition
   
 extend IFileSpan with IFileLocation:
-  fn to_string():
+  function to_string():
     if self.first_pos.line_index == self.last_pos.line_index:
       if self.first_pos.column_index == self.last_pos.column_index:
         self.first_pos.to_string()
       else:
         "{}:{}-{}".format(
-          1+self.first_pos.line_index,
-          1+self.first_pos.column_index,
-          1+self.last_pos.column_index
+          self.first_pos.line,
+          self.first_pos.column,
+          self.last_pos.column
         )
     else:
       "{}:{}-{}:{}".format(
@@ -105,10 +105,10 @@ extend FilePosition:
       self.column_index := value - 1
 
 interface IXmlSerializable:
-  fn to_xml_string() -> String
+  function to_xml_string() -> String
 
 extend FilePosition with IXmlSerializable:
-  fn to_xml_string() -> String:
+  function to_xml_string() -> String:
     (
       "<position>"
         "<line>{}</line>"
