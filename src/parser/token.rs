@@ -35,6 +35,9 @@ pub enum TokenInfo {
   
   Assign, Update,
   
+  ConstKeyword,
+  StructKeyword, RecordKeyword, VariantKeyword,
+  ExtendKeyword,
   ValueSelfKeyword, TypeSelfKeyword, 
   InKeyword, 
   MutKeyword, WeakKeyword,

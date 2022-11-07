@@ -14,7 +14,7 @@ IFileLocation: interface =
   source_file: SourceFile
   to_string(self) -> String
 
-FilePosition with IFileLocation =
+FilePosition: record with IFileLocation =
   source_file: SourceFile
   line_index: Int
   column_index: Int
@@ -22,11 +22,11 @@ FilePosition with IFileLocation =
   to_string(self) =
     "{}:{}".format(self.line_index, self.column_index)
 
-FileSpan with IFileLocation =
+FileSpan: record with IFileLocation =
   source_file: SourceFile
   first_pos: FilePosition
   last_pos: FilePosition
-
+  
   to_string(self) =
     if (self.first_pos.line_index == self.last_pos.line_index)
       if (self.first_pos.column_index == self.last_pos.column_index)

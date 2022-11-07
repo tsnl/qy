@@ -24,16 +24,7 @@ In summary...
   - there is an 'Any' datatype which offers dynamic typing via duck-dispatch,
     i.e. using a hash-map like Python.
     - this can be optimized in the future with compile-time interfaces.
-  - the unary `*` type operator unboxes an instance while the unary `*` value
-    operator creates a shallow copy. 
-    - All data-types are boxed by default, including primitives like `Int`, 
-      `Float`, `Double`, etc. This allows us to cast them to `Object` trivially.
-    - Fixed-length arrays (`Array[T, n]`) can be unboxed into an inline 
-      representation. Variable-length arrays (`List[T]`) can be unboxed too, but 
-      this only unboxes similar to C++ `std::vector<T>* -> std::vector<T>`.
-    - Compiler does not optimize referential transparency into unboxing; let the
-      user do it, maybe provide a warning/hint.
-    - `Any` cannot be unboxed. `weak T` cannot be unboxed.
+  - the unary `*` value operator creates a shallow copy. 
   - if type-specifier not provided, then compiler uses type-inference to guess,
     defaulting to the `Any` datatype on join, adding a `*` prefix only in cases
     of referential transparency and non-`Any`
@@ -42,8 +33,6 @@ In summary...
   - assignment always re-binds slots, so `mut` only controls slot mutability,
     not exterior mutability via slot/interior mutability of boxed instance.
     `mut` is the opposite of C#'s `readonly`
-  - exception: when `mut id: *T`, then 're-binding' the slot involves 
-    overwriting the datum, exactly like a value type.
   - no arguments can be marked as `mut` since these slots cannot be re-bound
 - Every function is a method (but not a closure)
   - closures can be provided with functors (ahh, C++ before C++11)
@@ -65,13 +54,13 @@ In summary...
 use Math
 use Gfx
 
-pi = 3.14159
+pi: Float = 3.14159
 
-Vec2F = 
-  x: Float
-  y: Float
+Vec2F: struct = 
+  mut x: Float
+  mut y: Float
 
-Robot = 
+Robot: record = 
   mut position: Vec2F
   mut angle_deg: Float 
   mut pen_down: Bool
@@ -114,24 +103,24 @@ Robot.draw_square (side_length_in_px) =
 ```
 # example 2
 
-Bool = 
+Bool: variant = 
   True 
   False
 
-Friend = 
+Friend: variant = 
   BestFriend
   RegularFriend(index: Int, name: String)
 
-RegularFriendInfo = 
+RegularFriendInfo: record = 
   email_id: String
   phone_number: PhoneNumber
 
-PhoneNumber = 
+PhoneNumber: record = 
   international_code: UByte
   area_code: UShort
   suffix: UInt
 
-Program = 
+Program: record = 
   regular_friend_info_list: List[RegularFriendInfo]
   former_friends_count: Int
 
@@ -144,16 +133,16 @@ main (args: List[String]) =
 ```
 # example 3: templates, fixed-size arrays
 
-List [ElemType] = 
+List[ElemType]: record = 
   data: UnsafePointer[ElemType]
   count: ISize
 
-NamedList [ElemType] = 
+NamedList[ElemType]: record = 
   slots: List[ElemType]
   name_index_map: HashMap[String, ISize]
 
-Vector [ElemType, elem_count: ISize] = 
-  slots: *Array[ElemType, elem_count]
+Vector[ElemType, elem_count: ISize]: record = 
+  slots: Array[ElemType, elem_count]
 
 # note that template arguments for the 'self' type are automatically introduced
 # into scope here
@@ -171,7 +160,7 @@ NamedArray.map_convert_to [T] (self) () =
 ```
 # example 4: weak references
 
-DoublyLinkedList [T] = 
+DoublyLinkedList[T]: record = 
   weak prev: DoublyLinkedList[T]
   next: DoublyLinkedList[T]
   head: T
@@ -191,32 +180,18 @@ most cases (creating a distinct type instance).
 
 ## Implementation plan
 
-**PHASE 1: pure dynamic**
+**PHASE 1: monomorphic typing**
 
-Implement a purely duck-typed language, so every instance is an instance of 
-`Any`. Every dynamic dispatch hash-map key is an IntStr.
-
-User can still bind type expressions for ADTs, these are used to define 
-constructors.
-
-At this stage, we will be able to provide 'weak' and 'mut' implementations for 
-'Any'. Mutability requires some compile-time checks that are orthogonal to 
-type-checking.
-
-Also add support for exceptions and exception handling at this stage.
-
-**PHASE 2: monomorphic gradual typing**
-
-Support type annotations, including `weak mut T`, `*T`.
+Support type annotations, e.g. `weak mut T`
 
 Implement checked type conversions. Conversions from `Any` to a non-`Any` type
 are checked at run-time, including implicit conversions at function call 
 boundaries. 
 
-Support a few built-in polymorphic datatypes like `List[T]`, `Array[T,n]`,
+Support a few built-in polymorphic datatypes like `List[T]`, `Slice[T]`,
 `Span[T]`, `HashMap[K, V]`, and `HashSet[T]`.
 
-**PHASE 3: templates**
+**PHASE 2: templates**
 
 Support template type arguments.
 
