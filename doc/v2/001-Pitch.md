@@ -11,6 +11,9 @@ can be re-bound.
 Note that `weak` is a type-level property that may return `None`.
 
 ```
+use Gfx
+use Math
+
 const MAX_HEADING: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
 struct Vec2[T]:
@@ -40,7 +43,7 @@ extend Robot:
     dst_y = self.y + distance_px * Math.sin(self.angle * 1e-3)
     src_pt = Vec2f { x: src_x, y: src_y }
     dst_pt = Vec2f { x: dst_x, y: dst_y }
-    if self.pen_down:
+    if self.is_pen_down:
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
