@@ -30,13 +30,13 @@ record Robot:
   mut is_pen_down: Bool
 
 extend Robot:
-  pen_down(self):
+  fn pen_down():
     self.is_pen_down := Bool.True
   
-  pen_up(self):
+  fn pen_up():
     self.is_pen_down := Bool.False
   
-  walk(self, distance_px):
+  fn walk(distance_px):
     src_x = self.x
     src_y = self.y
     dst_x = self.x + distance_px * Math.cos(self.angle * 1e-3)
@@ -47,7 +47,7 @@ extend Robot:
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
-  turn_ccw(self, rotation_deg):
+  fn turn_ccw(rotation_deg):
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
     self.angle := self.angle % MAX_HEADING
 ```
@@ -55,7 +55,7 @@ extend Robot:
 ```
 interface IFileLocation:
   source_file: SourceFile
-  to_string(self) -> String
+  to_string() -> String
 
 record FilePosition:
   source_file: SourceFile
@@ -63,7 +63,7 @@ record FilePosition:
   column_index: Int
 
 extend FilePosition with IFileLocation:
-  to_string(self):
+  fn to_string():
     "{}:{}".format(self.line_index, self.column_index)
 
 record FileSpan:
@@ -72,7 +72,7 @@ record FileSpan:
   last_pos: FilePosition
   
 extend IFileSpan with IFileLocation:
-  to_string(self):
+  fn to_string():
     if self.first_pos.line_index == self.last_pos.line_index:
       if self.first_pos.column_index == self.last_pos.column_index:
         self.first_pos.to_string()
@@ -84,24 +84,31 @@ extend IFileSpan with IFileLocation:
         )
     else:
       "{}:{}-{}:{}".format(
-        1+self.first_pos.line_index,
-        1+self.first_pos.column_index,
-        1+self.last_pos.line_index,
-        1+self.last_pos.column_index
+        self.first_pos.line,
+        self.first_pos.column,
+        self.last_pos.line,
+        self.last_pos.column
       )
 
 extend FilePosition:
-  line(self):
-    1 + self.line_index
-
-  column(self):
-    1 + self.column_index
+  property line:
+    get:
+      1 + self.line_index
+    set:
+      assert value >= 1
+      self.line_index := value - 1
+  property column:
+    get:
+      1 + self.column_index
+    set:
+      assert value >= 1
+      self.column_index := value - 1
 
 interface IXmlSerializable:
-  to_xml_string(self) -> String
+  fn to_xml_string() -> String
 
 extend FilePosition with IXmlSerializable:
-  to_xml_string(self) -> String:
+  fn to_xml_string() -> String:
     (
       "<position>"
         "<line>{}</line>"

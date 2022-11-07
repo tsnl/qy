@@ -794,18 +794,25 @@ impl<'a> Lexer<'a> {
 
 impl<'a> Lexer<'a> {
   fn new_keyword_map(intern_manager: &'a mut intern::Manager) -> HashMap<intern::IntStr, TokenInfo> {
-    let mut kw_map = HashMap::with_capacity(11);
+    let mut kw_map = HashMap::with_capacity(18);
     kw_map.insert(intern_manager.intern(String::from("const")), TokenInfo::ConstKeyword);
     kw_map.insert(intern_manager.intern(String::from("struct")), TokenInfo::StructKeyword);
     kw_map.insert(intern_manager.intern(String::from("record")), TokenInfo::RecordKeyword);
     kw_map.insert(intern_manager.intern(String::from("variant")), TokenInfo::VariantKeyword);
+    kw_map.insert(intern_manager.intern(String::from("interface")), TokenInfo::InterfaceKeyword);
     kw_map.insert(intern_manager.intern(String::from("extend")), TokenInfo::ExtendKeyword);
+    kw_map.insert(intern_manager.intern(String::from("fn")), TokenInfo::FnKeyword);
+    kw_map.insert(intern_manager.intern(String::from("property")), TokenInfo::PropertyKeyword);
+    kw_map.insert(intern_manager.intern(String::from("value")), TokenInfo::ValueKeyword);
+    kw_map.insert(intern_manager.intern(String::from("get")), TokenInfo::GetKeyword);
+    kw_map.insert(intern_manager.intern(String::from("set")), TokenInfo::SetKeyword);
     kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);
     kw_map.insert(intern_manager.intern(String::from("Self")), TokenInfo::TypeSelfKeyword);
     kw_map.insert(intern_manager.intern(String::from("in")), TokenInfo::InKeyword);
     kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
     kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
     kw_map.insert(intern_manager.intern(String::from("use")), TokenInfo::UseKeyword);
+    kw_map.insert(intern_manager.intern(String::from("assert")), TokenInfo::AssertKeyword);
     kw_map
   }
 }
