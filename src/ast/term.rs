@@ -5,7 +5,15 @@ pub struct Term {
   loc: fb::Loc
 }
 pub enum TermData {
-
+  Self_,
+  LiteralInt(String, LiteralIntBase),
+  LiteralFloat(String),
+  LiteralString(String, LiteralStringKind),
+  Unary(UnaryTermOperator, Box<Term>),
+  Binary(UnaryTermOperator, Box<Term>),
+  GetProperty(Box<Term>, intern::IntStr),
+  Send(Box<Term>, intern::IntStr, Vec<Term>),
+  EvalSuite(Suite)
 }
 
 pub enum UnaryTermOperator {
@@ -19,5 +27,14 @@ pub enum BinaryTermOperator {
   Add, Subtract,
   LeftShift, RightShfit,
   LessThan, GreaterThan, LessThanOrEquals, GreaterThanOrEquals,
-  Equals, NotEquals
+  Equals, NotEquals,
+  Update
+}
+
+pub enum LiteralIntBase {
+  Decimal,
+  Hexadecimal
+}
+pub enum LiteralStringKind {
+  EscapedDoubleQuotedString
 }

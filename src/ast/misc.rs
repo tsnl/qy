@@ -46,3 +46,13 @@ pub struct Suite {
   items: Vec<Stmt>,
   loc: fb::Loc
 }
+
+//
+// Formal arg specifiers
+//
+
+pub struct FormalArgSpec {
+  name: intern::IntStr,
+  type_spec: Option<TypeSpec>,
+  loc: fb::Loc
+}
