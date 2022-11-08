@@ -16,7 +16,7 @@ use Math
 
 const MAX_HEADING: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
-struct Vec2[T]:
+record Vec2[T]:
   x: Float
   y: Float
 
@@ -24,10 +24,10 @@ variant Bool:
   True
   False
 
-record Robot:
-  mut position: Vec2[Int]
-  mut angle: Int    # in radians * 1e-3
-  mut is_pen_down: Bool
+mutable record Robot:
+  position: Vec2[Int]
+  angle: Int    # in radians * 1e-3
+  is_pen_down: Bool
 
 extend Robot:
   function pen_down():
@@ -121,3 +121,18 @@ extend FilePosition with IXmlSerializable:
       self.source_file.to_xml_string()
     )
 ```
+
+---
+
+## Ideas/Requests
+
+- (MAYBE) <br/>
+  Support two different kinds of assignment with operators: by reference and by 
+  value.
+  - e.g. 
+    - use `<-` to copy data from RHS to LHS, use `:=` to alias
+    - PROBLEM: how to specify definitions?
+    - PROBLEM: unpredictability when interface instance is used
+- Support for more common features
+  - exceptions, try/catch
+  - reflection, at least getting a `__class__` instance

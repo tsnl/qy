@@ -809,7 +809,7 @@ impl<'a> Lexer<'a> {
     kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);
     kw_map.insert(intern_manager.intern(String::from("Self")), TokenInfo::TypeSelfKeyword);
     kw_map.insert(intern_manager.intern(String::from("in")), TokenInfo::InKeyword);
-    kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
+    kw_map.insert(intern_manager.intern(String::from("mutable")), TokenInfo::MutableKeyword);
     kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
     kw_map.insert(intern_manager.intern(String::from("use")), TokenInfo::UseKeyword);
     kw_map.insert(intern_manager.intern(String::from("assert")), TokenInfo::AssertKeyword);
