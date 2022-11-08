@@ -3,7 +3,7 @@
 # checking that indent, eol, and dedent are generated correctly
 Hello
   42
-    x = 99
+    x = 99e-1
     y = 0x9a
       z = x + y
     1

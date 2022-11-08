@@ -11,9 +11,8 @@ pub struct LPattern {
   loc: fb::Loc
 }
 pub enum LPatternData {
-  Singleton(IntStr),
-  AnnotatedSingleton(IntStr, TypeSpec),
-  Destructure(Vec<LPattern>)
+  Singleton(FormalArgSpec),
+  Destructured { sub_patterns: Vec<LPattern> }
 }
 
 //

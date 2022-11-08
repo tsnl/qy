@@ -6,6 +6,6 @@ pub struct TypeSpec {
 }
 
 pub enum TypeSpecData {
-  IdRef(Option<NamespacePrefix>, intern::IntStr),
-  SchemeInstantiation(Box<TypeSpec>, Vec<TemplateActualArg>)
+  IdRef { name: intern::IntStr, opt_prefix: Option<NamespacePrefix> },
+  SchemeInstantiation { scheme: Box<TypeSpec>, arguments: Vec<TemplateActualArg> }
 }
