@@ -4,9 +4,13 @@ use super::*;
 // Interface
 //
 
-impl ParserContext {
+pub fn parse_file(filepath: &str) -> ast::Module {
+  
+}
+
+impl Parser {
   pub fn new(tokens: Vec<Token>) -> Self {
-    ParserContext { tokens }
+    Parser { tokens }
   }
 }
 
@@ -14,10 +18,20 @@ impl ParserContext {
 // Implementation
 //
 
-struct ParserContext {
+struct Parser {
   tokens: Vec<Token>
 }
-struct Parser<'a> {
-  context: &'a ParserContext,
-  offset: usize
+struct ParserState<'a> {
+  context: &'a Parser,
+  peek_token_offset: usize
+}
+
+type Result<T, Ef> = std::result::Result<
+  
+>;
+
+impl<'a> ParserState<'a> {
+  pub fn parse_literal_int() -> ParserState {
+
+  }
 }
