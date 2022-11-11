@@ -125,4 +125,19 @@ QUESTION: do we need explicit casts? (Probably)
 - advantage: enables more flexible programming where user can assert the type
   based on values else throw an exception
 - disadvantage: cast-free programming is a hallmark of dynamically-typed 
-  languages
+  languages, breaks duck-typing.
+
+Object model
+- To the user, every instance has a head V-table slot which is a hash-map that
+  resolves certain fields. Keys are interned strings, so lookups fast.
+- In the presence of type-spec constraints and/or inferred monomorphism, we can
+  optimize this by const-evaluating the hash-map lookups, similar to inline 
+  caches. However, this is a detail for advanced users.
+- By default, `List[T]` must be parametrized by a specified type. If `T` is
+  omitted, then the compiler will infer this type which may be a union based on
+  use-cases. Thus, `List` denotes a heterogeneous list, can be restricted with
+  `List[T]`
+  - IDEA: use `[ElemType: T]` to allow arbitrary substitution, not 
+    order-dependent.
+  - NOTE: can use literal/const value parameters here, but cannot infer these.
+    QUESTION: Should we allow?
