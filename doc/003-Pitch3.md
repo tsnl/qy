@@ -28,8 +28,8 @@ How does mutability specification work?
 How do union types work?
 - All unions are written as `T | U | V | ...`
 - Can be matched out individually or restricted via built-ins, e.g. 
-  ``has_field(v, `x`)``, `is_ref(v)`, `is_weak_ref(v)`, etc. `has_field` 
-  requires field name to be a const argument.
+  ``has_field(v, `x`) = v has? x``, `v.is_ref?`, `v.is_weak_ref?`, etc. 
+  `has_field` requires field name to be a const argument.
 
 ```
 # module 'Robot'
@@ -111,23 +111,14 @@ get_child_1(animal) =
   | (reptile: Reptile) => reptile.lay_egg()
 
 get_child_2(animal) =
-  if has_field(animal, `birth_offspring`)
+  if animal has birth_offspring
     # 'animal' type is now restricted to fields with the `birth_offspring` field
     # aka smart-casting in other languages.
     animal.birth_offspring()
-  elif has_field(animal, `lay_egg`)
+  elif animal has birth_offspring
     animal.lay_egg()
-
-# This DOES NOT work; thus, we can always verify restriction at compile-time.
-# 'has_field' is a magic built-in that requires a const argument as the field 
-# name.
-get_child_by(animal, reproduction_method_list) =
-  child = None
-  for reproduction_method in reproduction_method_list
-    if has_field(animal, reproduction_method) then
-      child = get_field(animal, reproduction_method)
-      break
-  child
+  else
+    throw TypeError($"animal {animal} does not have any reproduction function")
 ```
 
 QUESTION: do we need explicit casts? (Probably)
