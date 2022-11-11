@@ -25,9 +25,11 @@ How does mutability specification work?
   are referenced weakly. Where ambiguous, type-solver will always generate 
   strong references, so this is an explicitly user-requested feature.
 
-QUESTION: how do user-defined union types work?
-- These are different than type-inferred unions because the user must explicitly
-  pattern-match, but we do not need a virtual-table.
+How do union types work?
+- All unions are written as `T | U | V | ...`
+- Can be matched out individually or restricted via built-ins, e.g. 
+  ``has_field(v, `x`)``, `is_ref(v)`, `is_weak_ref(v)`, etc. `has_field` 
+  requires field name to be a const argument.
 
 ```
 # module 'Robot'
@@ -69,7 +71,7 @@ move(mut robot, distance: Int) =
     x: robot.position.x + distance * Math.cos(robot.heading),
     y: robot.position.y + distance * Math.sin(robot.heading)
   }
-  if robot.is_pen_down then
+  if robot.is_pen_down
     new_polygon = Polygon { lines: new_list[Polygon]() }
     robot.polygons
     |> List.tail()
@@ -82,3 +84,54 @@ rotate_by_degrees(mut robot, rotation_in_degrees: Float) =
   robot
   |> rotate_by_radians(Int.from_float(Math.degrees(rotation_in_milliradians)))
 ```
+
+Example of unions:
+
+```
+True singleton
+False singleton
+Bool = True | False
+
+if_then_else(condition, if_true_thunk, if_false_thunk) =
+  match condition
+  | True => if_true_thunk()
+  | False => if_false_thunk()
+```
+
+```
+Mammal =
+  birth_offspring
+
+Reptile =
+  lay_egg
+
+get_child_1(animal) =
+  match animal
+  | (mammal: Mammal) => mammal.birth_offspring()
+  | (reptile: Reptile) => reptile.lay_egg()
+
+get_child_2(animal) =
+  if has_field(animal, `birth_offspring`)
+    # 'animal' type is now restricted to fields with the `birth_offspring` field
+    # aka smart-casting in other languages.
+    animal.birth_offspring()
+  elif has_field(animal, `lay_egg`)
+    animal.lay_egg()
+
+# This DOES NOT work; thus, we can always verify restriction at compile-time.
+# 'has_field' is a magic built-in that requires a const argument as the field 
+# name.
+get_child_by(animal, reproduction_method_list) =
+  child = None
+  for reproduction_method in reproduction_method_list
+    if has_field(animal, reproduction_method) then
+      child = get_field(animal, reproduction_method)
+      break
+  child
+```
+
+QUESTION: do we need explicit casts? (Probably)
+- advantage: enables more flexible programming where user can assert the type
+  based on values else throw an exception
+- disadvantage: cast-free programming is a hallmark of dynamically-typed 
+  languages
