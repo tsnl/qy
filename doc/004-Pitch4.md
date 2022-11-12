@@ -48,17 +48,17 @@ Float = Float32 | Float64
 Number = Int | Float
 
 Vector2 has:
-  fn add (other Vector2) -> Vector2:
+  fn add (other Vector2) Vector2:
     Vector2(self.x + other.x, self.y + other.y) 
 
-  fn scale (other Number) -> Vector2:
+  fn scale (other Number) Vector2:
     if other is Int:
       Vector2(self.x * other, self.y * other)
     else:
       assert other is Float
       Vector2(Int(self.x * other), Int(self.y * other))
 
-  fn dot (other Vector2) -> Int:
+  fn dot (other Vector2) Int:
     self.x * other.x + self.y * other.y
 
   property length Int:
