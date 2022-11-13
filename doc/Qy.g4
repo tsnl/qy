@@ -16,18 +16,20 @@ sourceFile: topLevelStatement+ ;
 // Statements
 //
 
-topLevelStatement: suiteStatement | multilineBindFunctionStatement ;
+topLevelStatement: suiteStatement | multilineBindFunctionStatement | bindTypeStatement ;
 suiteStatement: unilineSuiteStatement | multilineSuiteStatement ;
 extendStatement: multilineBindFunctionStatement | multilineBindPropertyStatement ;
 
 unilineSuiteStatement: simpleSuiteStatement (';' simpleSuiteStatement)* EOL ;
-simpleSuiteStatement: unilineBindValueStatement | unilineBindTypeStatement | unilineControlFlowStatement ;
+simpleSuiteStatement: unilineBindValueStatement | unilineControlFlowStatement ;
 unilineBindValueStatement: valuePattern '=' unilineTerm ;
-unilineBindTypeStatement: TID ('[' csTypeFormalArgList ']')? '=' typeExpr ;
 unilineControlFlowStatement: unilineBreakStatement | unilineReturnStatement | unilineContinueStatement ;
 unilineBreakStatement: 'break' unilineTerm? ;
 unilineReturnStatement: 'return' unilineTerm? ;
 unilineContinueStatement: 'continue' ;
+
+bindTypeStatement: TID ('[' csTypeFormalArgList ']')? '=' bindTypeInitializer ;
+bindTypeInitializer: typeExpr EOL | EOL INDENT typeExpr DEDENT ;
 
 multilineSuiteStatement: multilineBindValueStatement | multilineLoopStatement ;
 multilineBindValueStatement: valuePattern '=' multilineTerm ;
@@ -96,11 +98,11 @@ multilineIteTerm: 'if' unilineTerm 'then' suiteTerm ('elif' unilineTerm 'then' s
 //
 
 typeSpec: (namePrefix)? TID ('[' csTemplateActualArgList ']')? ;
-
-typeExpr: typeSpec | structTypeExpr ;
-structTypeExpr: '{' csValueFormalArgList '}' ;
-
 templateActualArg: unilineTerm | typeSpec ;
+
+typeExpr: sumTypeExpr ;
+mulTypeExpr: typeSpec | '{' csValueFormalArgList '}' ;
+sumTypeExpr: mulTypeExpr ('|' mulTypeExpr)+ ;
 
 //
 // Patterns, misc
