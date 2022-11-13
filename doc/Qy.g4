@@ -21,9 +21,10 @@ suiteStatement: unilineSuiteStatement | multilineSuiteStatement ;
 extendStatement: multilineBindFunctionStatement | multilineBindPropertyStatement ;
 
 unilineSuiteStatement: simpleSuiteStatement (';' simpleSuiteStatement)* EOL ;
-simpleSuiteStatement: unilineBindValueStatement | unilineControlFlowStatement ;
+simpleSuiteStatement: unilineBindValueStatement | unilineControlFlowStatement | unilineTermStatement ;
 unilineBindValueStatement: valuePattern '=' unilineTerm ;
 unilineControlFlowStatement: unilineBreakStatement | unilineReturnStatement | unilineContinueStatement ;
+unilineTermStatement: unilineTerm ;
 unilineBreakStatement: 'break' unilineTerm? ;
 unilineReturnStatement: 'return' unilineTerm? ;
 unilineContinueStatement: 'continue' ;
@@ -31,7 +32,8 @@ unilineContinueStatement: 'continue' ;
 bindTypeStatement: TID ('[' csTypeFormalArgList ']')? '=' bindTypeInitializer ;
 bindTypeInitializer: typeExpr EOL | EOL INDENT typeExpr DEDENT ;
 
-multilineSuiteStatement: multilineBindValueStatement | multilineLoopStatement ;
+multilineSuiteStatement: multilineBindValueStatement | multilineLoopStatement | multilineTermStatement ;
+multilineTermStatement: multilineTerm ;
 multilineBindValueStatement: valuePattern '=' multilineTerm ;
 multilineLoopStatement: multilineForStatement | multilineWhileDoStatement | multilineDoWhileStatement ;
 multilineForStatement: 'for' valuePattern 'in' unilineTerm 'do' suiteTerm ;
@@ -66,7 +68,8 @@ postfixTermSuffix
 unaryTerm: postfixTerm | unaryOp unaryTerm ;
 unaryOp: '&' 'mut'? 'weak'? | '+' | '-' | '*' | '!' ;
 
-binaryTerm: orLogicalBinaryTerm ;
+// NOTE: left-associative binary expressions => want hand-rolled shift-reduce parser
+binaryTerm: assignBinaryTerm ;
 mulBinaryTerm: unaryTerm | mulBinaryTerm mulBinaryOp unaryTerm ;
 addBinaryTerm: mulBinaryTerm | addBinaryTerm addBinaryOp mulBinaryTerm;
 shiftBinaryTerm: addBinaryTerm | shiftBinaryTerm shiftBinaryOp addBinaryTerm ;
@@ -76,7 +79,8 @@ xorBitwiseBinaryTerm: eqBinaryTerm | xorBitwiseBinaryTerm xorBitwiseBinaryOp eqB
 andBitwiseBinaryTerm: xorBitwiseBinaryTerm | andBitwiseBinaryTerm andBitwiseBinaryOp xorBitwiseBinaryTerm ;
 orBitwiseBinaryTerm: andBitwiseBinaryTerm | orBitwiseBinaryTerm orBitwiseBinaryOp andBitwiseBinaryTerm ;
 andLogicalBinaryTerm: orBitwiseBinaryTerm | andLogicalBinaryTerm andLogicalBinaryOp orBitwiseBinaryTerm ;
-orLogicalBinaryTerm: andLogicalBinaryTerm | orLogicalBinaryTerm orLogicalBinaryTerm andLogicalBinaryTerm ;
+orLogicalBinaryTerm: andLogicalBinaryTerm | orLogicalBinaryTerm orLogicalBinaryOp andLogicalBinaryTerm ;
+assignBinaryTerm: orLogicalBinaryTerm | assignBinaryTerm assignBinaryOp orLogicalBinaryTerm ;
 
 mulBinaryOp: '*' | '/' | '//' | '%' ;
 addBinaryOp: '+' | '-' ;
@@ -88,6 +92,7 @@ andBitwiseBinaryOp: '&' ;
 orBitwiseBinaryOp: '|' ;
 andLogicalBinaryOp: '&&' ;
 orLogicalBinaryOp: '||' ;
+assignBinaryOp: ':=' ;
 
 multilineTerm: suiteTerm | multilineIteTerm ;
 suiteTerm: EOL INDENT suiteStatement+ DEDENT ;
