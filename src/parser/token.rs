@@ -39,7 +39,6 @@ pub enum TokenInfo {
   ValueSelfKeyword, TypeSelfKeyword, 
   InKeyword, 
   MutKeyword, WeakKeyword,
-  UseKeyword,
   AssertKeyword,
 
   Asterisk, Divide, Quotient, Modulo,

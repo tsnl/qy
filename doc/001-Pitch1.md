@@ -11,9 +11,6 @@ can be re-bound.
 Note that `weak` is a type-level property that may return `None`.
 
 ```
-use Gfx
-use Math
-
 Vec2[T] = {x: Float, y: Float}
 
 # angle in radians * 1e-3
