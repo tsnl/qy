@@ -14,71 +14,65 @@ Note that `weak` is a type-level property that may return `None`.
 use Gfx
 use Math
 
-const MAX_HEADING: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
+Vec2[T] = {x: Float, y: Float}
 
-record Vec2[T]:
-  x: Float
-  y: Float
+# angle in radians * 1e-3
+Robot = {position: Vec2[Int], angle: Int, is_pen_down: Bool}
 
-variant Bool:
-  True
-  False
+MAX_HEADING: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
-record Robot:
-  position: Vec2[Int]
-  angle: Int    # in radians * 1e-3
-  is_pen_down: Bool
-
-extend Robot:
-  function pen_down():
+Robot +=
+  pen_down() =
     self.is_pen_down := Bool.True
   
-  function pen_up():
+  pen_up() =
     self.is_pen_down := Bool.False
   
-  function walk(distance_px):
+  walk(distance_px) =
     src_x = self.x
     src_y = self.y
     dst_x = self.x + distance_px * Math.cos(self.angle * 1e-3)
     dst_y = self.y + distance_px * Math.sin(self.angle * 1e-3)
-    src_pt = Vec2f { x: src_x, y: src_y }
-    dst_pt = Vec2f { x: dst_x, y: dst_y }
+    src_pt = Vec2(x: src_x, y: src_y)
+    dst_pt = Vec2(x: dst_x, y: dst_y)
     if self.is_pen_down:
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
-  function turn_ccw(rotation_deg):
+  turn_ccw(rotation_deg) =
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
-    self.angle := self.angle % MAX_HEADING
+    self.angle := self.angle % Robot.MAX_HEADING
 ```
 
 ```
-record FilePosition:
-  source_file: SourceFile
-  line_index: Int
-  column_index: Int
+FilePosition = {
+  source_file: SourceFile,
+  line_index: Int,
+  column_index: Int,
+}
 
-extend FilePosition:
-  function to_string():
+FilePosition +=
+  to_string() =
     "{}:{}".format(self.line_index, self.column_index)
 
-record FileSpan:
-  source_file: SourceFile
-  first_pos: FilePosition
-  last_pos: FilePosition
+FileSpan = {
+  source_file: SourceFile,
+  first_pos: FilePosition,
+  last_pos: FilePosition,
+}
   
-extend IFileSpan:
-  function to_string():
-    if self.first_pos.line_index == self.last_pos.line_index:
-      if self.first_pos.column_index == self.last_pos.column_index:
+FileSpan +=
+  to_string() =
+    if self.first_pos.line_index == self.last_pos.line_index then
+      if self.first_pos.column_index == self.last_pos.column_index then
         self.first_pos.to_string()
-      else:
+      else
         "{}:{}-{}".format(
           self.first_pos.line,
           self.first_pos.column,
           self.last_pos.column
         )
-    else:
+    else
       "{}:{}-{}:{}".format(
         self.first_pos.line,
         self.first_pos.column,
@@ -86,22 +80,23 @@ extend IFileSpan:
         self.last_pos.column
       )
 
-extend FilePosition:
-  property line:
-    get:
+FilePosition +=
+  line =
+    get ->
       1 + self.line_index
-    set:
+    set ->
       assert value >= 1
       self.line_index := value - 1
-  property column:
-    get:
+  
+  column: Int = 
+    get ->
       1 + self.column_index
-    set:
+    set ->
       assert value >= 1
       self.column_index := value - 1
 
-extend FilePosition:
-  function to_xml_string() -> String:
+FilePosition +=
+  to_xml_string() -> String =
     (
       "<position>"
         "<line>{}</line>"
@@ -115,17 +110,14 @@ extend FilePosition:
     )
 ```
 
+```
+Number = Int | Long | Float | Double
+```
+
 ---
 
 ## Ideas/Requests
 
-- (MAYBE) <br/>
-  Support two different kinds of assignment with operators: by reference and by 
-  value.
-  - e.g. 
-    - use `<-` to copy data from RHS to LHS, use `:=` to alias
-    - PROBLEM: how to specify definitions?
-    - PROBLEM: unpredictability when interface instance is used
 - Support for more common features
   - exceptions, try/catch
   - reflection, at least getting a `__class__` instance
@@ -150,6 +142,9 @@ Monomorphs can be optimized by pre-computing all `vtab` lookups, but this does
 not eliminate the `vtab` field. Each `vtab` instance is implemented as a 
 hash-table keyed by interned symbols.
 
+This also means there is no aliasing by default; must use the `&T` or `&weak T`
+types to specify.
+
 When a field or method is accessed in a `record` type, we resolve the field by
 invoking a method from the virtual-table. This field lookup can be performed at
 compile-time, so the hash-map lookup is guaranteed to be elided.
@@ -169,3 +164,16 @@ all dynamic dispatch, but serves as a powerful optimization tool.
 Thus, a typical user story is to begin with un-annotated arguments for a 
 function, then to specify type arguments as monomorphic records, refactoring as
 required.
+
+Re polymorphic types, omitting the polymorphic arguments tells the typer to 
+solve for an appropriate type argument, effectively making this unspecified.
+
+Summary of built-in types:
+- `Char`, `Int`, `Long`, `Float`, `Double`
+- `String`
+- `List[T]` `HashSet[T: ?]`, `HashMap[K: ?, V: ?]`
+- `Ref[T]`, `WeakRef[T]`
+
+NOTE: function signatures include argument names so that the `(name: val)` 
+pattern works correctly. This is also used to supply arbitrary arguments to
+templates for parametric polymorphism.

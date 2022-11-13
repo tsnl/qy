@@ -798,8 +798,7 @@ impl<'a> Lexer<'a> {
     kw_map.insert(intern_manager.intern(String::from("const")), TokenInfo::ConstKeyword);
     kw_map.insert(intern_manager.intern(String::from("struct")), TokenInfo::StructKeyword);
     kw_map.insert(intern_manager.intern(String::from("record")), TokenInfo::RecordKeyword);
-    kw_map.insert(intern_manager.intern(String::from("variant")), TokenInfo::VariantKeyword);
-    kw_map.insert(intern_manager.intern(String::from("interface")), TokenInfo::InterfaceKeyword);
+    kw_map.insert(intern_manager.intern(String::from("type")), TokenInfo::VariantKeyword);
     kw_map.insert(intern_manager.intern(String::from("extend")), TokenInfo::ExtendKeyword);
     kw_map.insert(intern_manager.intern(String::from("function")), TokenInfo::FunctionKeyword);
     kw_map.insert(intern_manager.intern(String::from("property")), TokenInfo::PropertyKeyword);
