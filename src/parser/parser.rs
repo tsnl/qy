@@ -4,9 +4,9 @@ use super::*;
 // Interface
 //
 
-pub fn parse_file(filepath: &str) -> ast::Module {
+// pub fn parse_file(filepath: &str) -> ast::Module {
   
-}
+// }
 
 impl Parser {
   pub fn new(tokens: Vec<Token>) -> Self {
@@ -26,12 +26,8 @@ struct ParserState<'a> {
   peek_token_offset: usize
 }
 
-type Result<T, Ef> = std::result::Result<
-  
->;
+// impl<'a> ParserState<'a> {
+//   pub fn parse_literal_int() -> ParserState {
 
-impl<'a> ParserState<'a> {
-  pub fn parse_literal_int() -> ParserState {
-
-  }
-}
+//   }
+// }

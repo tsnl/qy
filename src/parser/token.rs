@@ -34,14 +34,11 @@ pub enum TokenInfo {
   LeftCurlyBrace, RightCurlyBrace,
   
   Assign, Update,
-  
-  ConstKeyword,
-  StructKeyword, RecordKeyword, VariantKeyword, InterfaceKeyword,
-  ExtendKeyword,
-  FunctionKeyword, PropertyKeyword, ValueKeyword, GetKeyword, SetKeyword,
+
+  GetKeyword, SetKeyword,
   ValueSelfKeyword, TypeSelfKeyword, 
   InKeyword, 
-  MutableKeyword, WeakKeyword,
+  MutKeyword, WeakKeyword,
   UseKeyword,
   AssertKeyword,
 

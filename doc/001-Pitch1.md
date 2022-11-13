@@ -19,7 +19,7 @@ Vec2[T] = {x: Float, y: Float}
 # angle in radians * 1e-3
 Robot = {position: Vec2[Int], angle: Int, is_pen_down: Bool}
 
-MAX_HEADING: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
+max_heading: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
 Robot +=
   pen_down() =
@@ -41,7 +41,7 @@ Robot +=
 
   turn_ccw(rotation_deg) =
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
-    self.angle := self.angle % Robot.MAX_HEADING
+    self.angle := self.angle % Robot.max_heading
 ```
 
 ```
