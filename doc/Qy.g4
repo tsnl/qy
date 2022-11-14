@@ -51,11 +51,12 @@ propertyVerb: 'get' | 'set' ;
 
 unilineTerm: binaryTerm ;
 
-primaryTerm: (namePrefix)? VID | LITERAL | listTerm | dictionaryTerm | parenTerm ;
+primaryTerm: (namePrefix)? VID | LITERAL | listTerm | dictionaryTerm | parenTerm | newTerm ;
 listTerm: '[' csTermList ']' ;
 dictionaryTerm: '{' csDictionaryPairList '}' ;
 dictionaryPair: unilineTerm ':' unilineTerm ;
 parenTerm: '(' unilineTerm ')' ;
+newTerm: 'new' typeSpec '(' csTermList ')' ;
 
 postfixTerm: primaryTerm postfixTermSuffix? ;
 postfixTermSuffix
