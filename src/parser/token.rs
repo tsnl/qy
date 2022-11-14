@@ -40,6 +40,7 @@ pub enum TokenInfo {
   InKeyword, 
   MutKeyword, WeakKeyword,
   AssertKeyword,
+  ReturnKeyword, BreakKeyword, ContinueKeyword,
 
   Asterisk, Divide, Quotient, Modulo,
   Plus, Minus, ExclamationPoint,

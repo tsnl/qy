@@ -10,6 +10,10 @@ mod parser;
 
 fn main() {
   let filepath = "test/lexer_test_01.txt";
+  run_token_dump(filepath);
+}
+
+fn run_token_dump(filepath: &str) {
   println!("Begin token dump");
   let mut intern_manager = intern::Manager::new();
   for token in parser::scan(&mut intern_manager, filepath) {

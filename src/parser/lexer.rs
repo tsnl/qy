@@ -803,6 +803,9 @@ impl<'a> Lexer<'a> {
     kw_map.insert(intern_manager.intern(String::from("mut")), TokenInfo::MutKeyword);
     kw_map.insert(intern_manager.intern(String::from("weak")), TokenInfo::WeakKeyword);
     kw_map.insert(intern_manager.intern(String::from("assert")), TokenInfo::AssertKeyword);
+    kw_map.insert(intern_manager.intern(String::from("return")), TokenInfo::ReturnKeyword);
+    kw_map.insert(intern_manager.intern(String::from("continue")), TokenInfo::ContinueKeyword);
+    kw_map.insert(intern_manager.intern(String::from("break")), TokenInfo::BreakKeyword);
     kw_map
   }
 }
