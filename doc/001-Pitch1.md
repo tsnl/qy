@@ -20,19 +20,19 @@ max_heading: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
 Robot +=
   pen_down() =
-    self.is_pen_down := Bool.True
+    self.is_pen_down := True
   
   pen_up() =
-    self.is_pen_down := Bool.False
+    self.is_pen_down := False
   
   walk(distance_px) =
     src_x = self.x
     src_y = self.y
     dst_x = self.x + distance_px * Math.cos(self.angle * 1e-3)
     dst_y = self.y + distance_px * Math.sin(self.angle * 1e-3)
-    src_pt = Vec2(x: src_x, y: src_y)
-    dst_pt = Vec2(x: dst_x, y: dst_y)
-    if self.is_pen_down:
+    src_pt = Vec2(src_x, src_y)
+    dst_pt = Vec2(dst_x, dst_y)
+    if self.is_pen_down then
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
@@ -50,7 +50,7 @@ FilePosition = {
 
 FilePosition +=
   to_string() =
-    "{}:{}".format(self.line_index, self.column_index)
+    "{}:{}".format(self.line, self.column)
 
 FileSpan = {
   source_file: SourceFile,
@@ -169,7 +169,7 @@ Summary of built-in types:
 - `Char`, `Int`, `Long`, `Float`, `Double`
 - `String`
 - `List[T]` `HashSet[T: ?]`, `HashMap[K: ?, V: ?]`
-- `Ref[T]`, `WeakRef[T]`
+- `&T`, `&mut T`, `&weak T`, `&mut weak T`
 
 NOTE: function signatures include argument names so that the `(name: val)` 
 pattern works correctly. This is also used to supply arbitrary arguments to
