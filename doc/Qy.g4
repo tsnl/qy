@@ -18,7 +18,6 @@ sourceFile: topLevelStatement+ ;
 
 topLevelStatement: suiteStatement | multilineBindFunctionStatement | bindTypeStatement ;
 suiteStatement: unilineSuiteStatement | multilineSuiteStatement ;
-extendStatement: multilineBindFunctionStatement | multilineBindPropertyStatement ;
 
 unilineSuiteStatement: simpleSuiteStatement (';' simpleSuiteStatement)* EOL ;
 simpleSuiteStatement: unilineBindValueStatement | unilineControlFlowStatement | unilineTermStatement ;
@@ -40,9 +39,9 @@ multilineForStatement: 'for' valuePattern 'in' unilineTerm 'do' suiteTerm ;
 multilineWhileDoStatement: 'while' unilineTerm 'do' suiteTerm EOL ;
 multilineDoWhileStatement: 'do' suiteTerm 'while' unilineTerm EOL ;
 
-multilineBindFunctionStatement: VID '(' csValueFormalArgList? ')' '=' (unilineTerm EOL | multilineTerm) ;
-multilineBindPropertyStatement: valueFormalArg '=' propertyDefBlock ;
-propertyDefBlock: EOL INDENT (propertyVerb '->' (unilineTerm EOL | multilineTerm))+ ;
+multilineBindFunctionStatement: (typeSpec '.')? VID '(' csValueFormalArgList? ')' ('->' typeSpec)? '=' (unilineTerm EOL | suiteTerm) ;
+multilineBindPropertyStatement: typeSpec '.' valueFormalArg 'property' '=' propertyDefBlock ;
+propertyDefBlock: EOL INDENT (propertyVerb '->' (unilineTerm EOL | suiteTerm))+ ;
 propertyVerb: 'get' | 'set' ;
 
 //
@@ -51,7 +50,8 @@ propertyVerb: 'get' | 'set' ;
 
 unilineTerm: binaryTerm ;
 
-primaryTerm: (namePrefix)? VID | LITERAL | listTerm | dictionaryTerm | parenTerm | newTerm ;
+primaryTerm: idRefTerm | LITERAL | listTerm | dictionaryTerm | parenTerm | newTerm ;
+idRefTerm: namePrefix? VID ;
 listTerm: '[' csTermList ']' ;
 dictionaryTerm: '{' csDictionaryPairList '}' ;
 dictionaryPair: unilineTerm ':' unilineTerm ;

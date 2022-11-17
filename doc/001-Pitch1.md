@@ -17,7 +17,7 @@ Vec2.add(self, other) =
   Vec2(self.x + other.x, self.y + other.y)
 
 # angle in radians * 1e-3
-Robot = {position: Vec2, angle: Int, is_pen_down: Bool}
+Robot = { mut position: Vec2, mut angle: Int, mut is_pen_down: Bool }
 
 Robot.max_heading: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
 
@@ -77,12 +77,17 @@ FileSpan.to_string(self) =
       self.last_pos.column
     )
 
-FilePosition.line(self) =
-  1 + self.line_index
+FilePosition.line property =
+  get ->
+    1 + self.line_index
   
-FilePosition.column(self) -> Int =
-  1 + self.column_index
-  
+FilePosition.column property =
+  get ->
+    1 + self.column_index
+  set ->
+    assert value >= 1
+    self.column_index = value - 1
+
 FilePosition.to_xml_string(self) -> String =
   (
     "<position>"
@@ -129,9 +134,6 @@ Monomorphs can be optimized by pre-computing all `vtab` lookups, but this does
 not eliminate the `vtab` field. Each `vtab` instance is implemented as a 
 hash-table keyed by interned symbols.
 
-This also means there is no aliasing by default; must use the `&T` or `&weak T`
-types to specify.
-
 When a field or method is accessed in a `record` type, we resolve the field by
 invoking a method from the virtual-table. This field lookup can be performed at
 compile-time, so the hash-map lookup is guaranteed to be elided.
@@ -142,6 +144,15 @@ At run-time, we perform dynamic dispatch, looking up the specific field or
 method's function using the virtual table. Any typing information about 
 arguments and return types is also broadcast to all fields and methods of 
 disjunctands. This technique is used for operator overloading too.
+
+By default, each record instance is allocated in a box and is aliased on 
+assignment. To support automatic unboxing for immutable/readonly slots, we need
+a special flag to indicate when instances are allocated in-line with other
+instances (or on the stack). We still run a destructor when strong refcount goes
+to 0, return None for any persistent weak references; just don't free the memory
+occupied by this object directly. E.g. call `CAN_DEALLOCATE_PTR` flag. Automatic
+unboxing fails when (1) slot is marked 'mut', or (2) unboxing this slot would
+result in an infinite-size type.
 
 Type-specifiers are used to restrict the types of specific values and are 
 checked against user types. If a type-specifier is omitted, the compiler infers
@@ -159,7 +170,7 @@ Summary of built-in types:
 - `Char`, `Int`, `Long`, `Float`, `Double`
 - `String`
 - `List[T]` `HashSet[T: ?]`, `HashMap[K: ?, V: ?]`
-- `&T`, `&mut T`, `&weak T`, `&mut weak T`
+- `weak T`
 
 NOTE: function signatures include argument names so that the `(name: val)` 
 pattern works correctly. This is also used to supply arbitrary arguments to

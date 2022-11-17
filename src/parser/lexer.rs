@@ -795,6 +795,7 @@ impl<'a> Lexer<'a> {
 impl<'a> Lexer<'a> {
   fn new_keyword_map(intern_manager: &'a mut intern::Manager) -> HashMap<intern::IntStr, TokenInfo> {
     let mut kw_map = HashMap::with_capacity(18);
+    kw_map.insert(intern_manager.intern(String::from("property")), TokenInfo::PropertyKeyword);
     kw_map.insert(intern_manager.intern(String::from("get")), TokenInfo::GetKeyword);
     kw_map.insert(intern_manager.intern(String::from("set")), TokenInfo::SetKeyword);
     kw_map.insert(intern_manager.intern(String::from("self")), TokenInfo::ValueSelfKeyword);

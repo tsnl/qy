@@ -35,6 +35,7 @@ pub enum TokenInfo {
   
   Assign, Update,
 
+  PropertyKeyword,
   GetKeyword, SetKeyword,
   ValueSelfKeyword, TypeSelfKeyword, 
   InKeyword, 
