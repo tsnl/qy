@@ -2,7 +2,10 @@ A Java/C#-level language with...
 - extensive support for type inference and automatic ad-hoc interfaces for that 
   duck-typed feel.
 - reference counting and automatic destructors, including weak references
-- support for `struct` and `record` datatypes
+- classes
+  - the 'class' definition is actually identical to a 'trait' definition in 
+    other languages; constructors must provide anonymous record instances that
+    must satisfy a specified trait.
 - mutability specifiers (`mut` is the opposite of C# `readonly`)
 
 Note that both `mut` is a variable-level property that affects whether a slot 
@@ -11,14 +14,22 @@ can be re-bound.
 Note that `weak` is a type-level property that may return `None`.
 
 ```
-class Vec2(x: Float, y: Float):
-  def add(other):
-    Vec2(self.x + other.x, self.y + other.y)
+class Vec2(Object):
+  x: Int
+  y: Int
+
+  def new(cls, x, y):
+    Vec2 { x: x, y: y }
+
+  def add(self, other):
+    Vec2.new(self.x + other.x, self.y + other.y)
 
 # angle in radians * 1e-3
-class Robot(mut position: Vec2, mut angle: Int, mut is_pen_down: Bool):
-  static max_heading: Int = 6283   # (3.14159 * 2) = 6.28318, rounded to 3 places
-
+class Robot(Object):
+  mut position :: Vec2
+  mut angle :: Int
+  mut is_pen_down :: Bool
+  
   def pen_down(self):
     self.is_pen_down := True
 
@@ -36,21 +47,30 @@ class Robot(mut position: Vec2, mut angle: Int, mut is_pen_down: Bool):
       Gfx.draw_line(src_pt, dst_pt)
     self.position := dst_pt
 
-  def turn_ccw(self, rotation_deg) =
+  def turn_ccw(self, rotation_deg):
+    # 2pi = (2 * 3.14159) = 6.28318, rounded to 3 places
+    max_heading = 6283
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
-    self.angle := self.angle % Robot.max_heading
+    self.angle := self.angle % max_heading
+
+  def new(cls):
+    Robot {
+      position: Vec2.new(0, 0),
+      angle: 0,
+      is_pen_down: false
+    }
 ```
 
 ```
-abstract FileLoc:
+class FileLoc:
   def to_xml_string(self)
-  get magic_attribute
-  def describe(class)
+  get magic_attribute(self)
+  def describe(class): ???
 
-class FilePosition(source_file: SourceFile, line_index: Int, column_index: Int):
-  assert self <: FileLoc
-
-  magic_attribute = line_index + column_index
+class FilePosition(FileLoc):
+  source_file: SourceFile
+  line_index: Int
+  column_index: Int
 
   def to_string(self):
     "{}:{}".format(self.line, self.column)
@@ -61,9 +81,12 @@ class FilePosition(source_file: SourceFile, line_index: Int, column_index: Int):
   get column(self):
     1 + self.column_index
   
-  set column(self):
+  set column(self, value):
     assert value >= 1
     self.column_index = value - 1
+
+  get magic_attribute(self):
+    line_index + column_index
 
   def to_xml_string(self) -> String:
     (
@@ -73,8 +96,8 @@ class FilePosition(source_file: SourceFile, line_index: Int, column_index: Int):
         "<source-file>{}</source-file>"
       "</position>"
     ).format(
-      self.line(),
-      self.column(),
+      self.line,
+      self.column,
       self.source_file.to_xml_string()
     )
   
@@ -86,8 +109,10 @@ class FilePosition(source_file: SourceFile, line_index: Int, column_index: Int):
     "FilePos"
 
 
-class FileSpan(source_file: SourceFile, first_pos: FilePosition, last_pos: FilePosition):
-  assert self <: FileLoc
+class FileSpan(FileLoc):
+  source_file: SourceFile
+  first_pos: FilePosition
+  last_pos: FilePosition
 
   def to_string(self):
     if self.first_pos.line_index == self.last_pos.line_index:
@@ -111,14 +136,6 @@ class FileSpan(source_file: SourceFile, first_pos: FilePosition, last_pos: FileP
     first_pos.magic_attribute + last_pos.magic_attribute
 
   # ...
-```
-
-```
-union Number: 
-  int: Int 
-  long: Long
-  float: Float
-  double: Double
 ```
 
 ---
@@ -146,19 +163,8 @@ Every type definition is just a record type. By default, every instance is an
 object of the form `struct { VirtualTable* vtab; Content content; }` where 
 `vtab` is common for all objects and `content` is type-dependent. 
 Monomorphs can be optimized by pre-computing all `vtab` lookups, but this does 
-not eliminate the `vtab` field. Each `vtab` instance is implemented as a 
-hash-table keyed by interned symbols.
-
-When a field or method is accessed in a `record` type, we resolve the field by
-invoking a method from the virtual-table. This field lookup can be performed at
-compile-time, so the hash-map lookup is guaranteed to be elided.
-
-When a field or method is accesed in a `union` type, the type-checker ensures 
-that all disjunctand types have the accessed field or method at compile-time.
-At run-time, we perform dynamic dispatch, looking up the specific field or 
-method's function using the virtual table. Any typing information about 
-arguments and return types is also broadcast to all fields and methods of 
-disjunctands. This technique is used for operator overloading too.
+not eliminate the `vtab` field. Each `vtab` instance is implemented as an array
+lookup table. Offsets are determined at compile-time.
 
 By default, each record instance is allocated in a box and is aliased on 
 assignment. To support automatic unboxing for immutable/readonly slots, we need
