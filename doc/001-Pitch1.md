@@ -5,7 +5,12 @@ A Java/C#-level language with...
 - classes
   - the 'class' definition is actually identical to a 'trait' definition in 
     other languages; constructors must provide anonymous record instances that
-    must satisfy a specified trait.
+    must satisfy a specified trait. <br/>
+    A basic implementation uses dynamic dispatch to resolve all fields and
+    methods, but for function calls, we can optimize by treating the trait/class
+    as a typeclass (static polymorphism) rather than a dynamic one.
+  - if 'self' keyword is the first argument, then method, else 
+    static/classmethod.
 - mutability specifiers (`mut` is the opposite of C# `readonly`)
 
 Note that both `mut` is a variable-level property that affects whether a slot 
@@ -53,19 +58,28 @@ class Robot(Object):
     self.angle := (self.angle + Math.radians(rotation_deg) * 1e-3).to_int()
     self.angle := self.angle % max_heading
 
-  def new(cls):
-    Robot {
+  def draw_square():
+    robot = Self {
       position: Vec2.new(0, 0),
       angle: 0,
       is_pen_down: false
     }
+    robot.pen_down()
+    for _ in range(4):
+      robot.walk(side)
+      robot.turn_ccw(Int.from_float(Math.pi / 2 * 1000))
+    robot.pen_up()
+
+
+def main():
+  Robot.draw_square()
 ```
 
 ```
 class FileLoc:
   def to_xml_string(self)
   get magic_attribute(self)
-  def describe(class): ???
+  def describe()
 
 class FilePosition(FileLoc):
   source_file: SourceFile
@@ -101,11 +115,10 @@ class FilePosition(FileLoc):
       self.source_file.to_xml_string()
     )
   
-  #
-  # Static methods are indicated using the `class` keyword instead of `self`
-  #
+  # Static methods are indicated by a missing `self` keyword.
+  # They can be accessed with the `Self.<method>` accessor.
 
-  def describe(class) -> String:
+  def describe() -> String:
     "FilePos"
 
 
