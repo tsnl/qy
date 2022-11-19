@@ -26,9 +26,9 @@ class Vec2(Object):
 
 # angle in radians * 1e-3
 class Robot(Object):
-  mut position :: Vec2
-  mut angle :: Int
-  mut is_pen_down :: Bool
+  mut position: Vec2
+  mut angle: Int
+  mut is_pen_down: Bool
   
   def pen_down(self):
     self.is_pen_down := True
