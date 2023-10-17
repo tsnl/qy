@@ -1,14 +1,14 @@
-pub hello: (I32) -> I32;
+pub hello: (Int) -> Int;
 def hello (x) = do {
     x
 };
 
-pub wrongPhi: (Bool, I32, I32) -> I32;
+pub wrongPhi: (Bool, Int, Int) -> Int;
 def wrongPhi (b, x, y) = do {
     if (b) {x} else {y}
 };
 
-pub rightPhi: (Bool, I32, I32) -> I32;
+pub rightPhi: (Bool, Int, Int) -> Int;
 def rightPhi (b, x, y) = do {
     if (b) {x} else {y}
 };
@@ -17,7 +17,7 @@ def runWrongPhi() = do {
     val j = wrongPhi(true, 15, 32);
 };
 
-pub fibonacci: (x: I32) -> I32;
+pub fibonacci: (x: Int) -> Int;
 def fibonacci (x) = do {
     if (x == 0 or x == 1) {
         x
@@ -26,9 +26,9 @@ def fibonacci (x) = do {
     }
 };
 
-type FibRes = (x: I32, y: I32);
-pub better_fibonacci: (x: I32) -> I32;
-pvt better_fibonacci_helper: (a: I32, b: I32) -> FibRes;
+type FibRes = (x: Int, y: Int);
+pub better_fibonacci: (x: Int) -> Int;
+pvt better_fibonacci_helper: (a: Int, b: Int) -> FibRes;
 def better_fibonacci (x) = do {
     if (x == 0 or x == 1) {
         x
@@ -66,11 +66,11 @@ val Point = (
 
 /* FIXME: this example should produce a unification error because 
  * no implicit int->float conversion
-pub main: () -> i32;
+pub main: () -> Int;
 def main () = do {
     val v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
     v.x
 };
 */
 
-type Vec2f = (x: F32, y: F32);
+type Vec2f = (x: Float, y: Float);

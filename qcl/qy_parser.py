@@ -535,16 +535,16 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
         else:
             return ast1.BuiltinPrimitiveTypeSpec(
                 self.loc(ctx), {
-                    'F32': ast1.BuiltinPrimitiveTypeIdentity.Float32,
-                    'F64': ast1.BuiltinPrimitiveTypeIdentity.Float64,
-                    'I64': ast1.BuiltinPrimitiveTypeIdentity.Int64,
-                    'I32': ast1.BuiltinPrimitiveTypeIdentity.Int32,
-                    'I16': ast1.BuiltinPrimitiveTypeIdentity.Int16,
-                    'I8': ast1.BuiltinPrimitiveTypeIdentity.Int8,
-                    'U64': ast1.BuiltinPrimitiveTypeIdentity.UInt64,
-                    'U32': ast1.BuiltinPrimitiveTypeIdentity.UInt32,
-                    'U16': ast1.BuiltinPrimitiveTypeIdentity.UInt16,
-                    'U8': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
+                    'Float': ast1.BuiltinPrimitiveTypeIdentity.Float32,
+                    'Double': ast1.BuiltinPrimitiveTypeIdentity.Float64,
+                    'Long': ast1.BuiltinPrimitiveTypeIdentity.Int64,
+                    'Int': ast1.BuiltinPrimitiveTypeIdentity.Int32,
+                    'Short': ast1.BuiltinPrimitiveTypeIdentity.Int16,
+                    'Char': ast1.BuiltinPrimitiveTypeIdentity.Int8,
+                    'ULong': ast1.BuiltinPrimitiveTypeIdentity.UInt64,
+                    'UInt': ast1.BuiltinPrimitiveTypeIdentity.UInt32,
+                    'UShort': ast1.BuiltinPrimitiveTypeIdentity.UInt16,
+                    'Byte': ast1.BuiltinPrimitiveTypeIdentity.UInt8,
                     'Bool': ast1.BuiltinPrimitiveTypeIdentity.Bool,
                     'Void': ast1.BuiltinPrimitiveTypeIdentity.Void
                 }[ctx.tok.text]

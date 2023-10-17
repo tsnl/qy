@@ -7,7 +7,10 @@ import qcl
 
 def main():
     args_obj = parse_args()
-    transpile_opts = qcl.TranspileOptions(print_summary_after_run=args_obj.verbose > 0, run_debug_routine_after_compilation=False)
+    transpile_opts = qcl.TranspileOptions(
+        print_summary_after_run=args_obj.verbose > 0,
+        run_debug_routine_after_compilation=False
+    )
     root_qyp_path = args_obj.root_qyp_path
     output_dir_path = args_obj.output_dir_path
 

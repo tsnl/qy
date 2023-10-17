@@ -38,7 +38,7 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
     caught_exc = None
 
     # compilation:
-    try:    
+    try:
         # basic checks
 
         # TODO: perform basic checks on AST structure
@@ -46,7 +46,8 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
         #       - 'return', 'ite' not allowed except inside a function
         #       - 'const', 'bind1f' only globally allowed
         #   - `iota` expression only allowed inside a 'const' initializer
-        # NOTE: this is happening during 'seeding' in the typer instead... clean up typer if this changes.
+        # NOTE: this is happening during 'seeding' in the typer instead... clean up
+        # typer if this changes.
 
         # typing native source files:
         # - two distinct passes: seeding and modelling
@@ -56,12 +57,12 @@ def transpile_one_package_set(path_to_input_root_qyp_file: str, emitter: base_em
         # - e.g. check that 'main' has the correct signature.
 
         # compile-time evaluation:
-        
+
         # emitting:
         emitter.emit_qyp_set(qyp_set)
     except panic.PanicException as exc:
         caught_exc = exc
-    
+
     # (post-compilation) print types:
     if transpile_opts.print_summary_after_run:
         print("(POST-MORTEM)")
@@ -133,7 +134,7 @@ def print_unification_subs_test():
     # unifying structs:
     t3 = types.VarType("b")
     t4 = types.StructType([
-        ('field1', t1), 
+        ('field1', t1),
         ('field2', t2)
     ])
     t5 = types.StructType([
@@ -161,7 +162,7 @@ def print_unification_subs_test():
 def verbose_unify(t, u, annotation=""):
     print('\tinput1: ' + str(t))
     print('\tinput2: ' + str(u))
-    
+
     output_str = "<UNKNOWN_ERROR>"
     try:
         output_str = str(typer.unify(t, u))

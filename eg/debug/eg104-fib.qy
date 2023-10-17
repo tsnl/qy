@@ -1,5 +1,21 @@
-pub printFibUntil: (I32) -> Void;
-def printFibUntil (n: I32): Void = do {
+def main () = do {
+    val v = new Vec3f(1.0f, 2.0f, 3.0f);
+    val w = v3f_add(v, v);
+    
+    // val w = new Vec2f(13, 0);
+    // val f = fibonacci(42);
+    
+    // printInt(f);
+    val short_run = false;
+    // printFibUntil(if (short_run) {10} else {42});
+    fastPrintFibUntilN();
+    // val _ = printFibUntil(n32);
+
+    0
+};
+
+// pub printFibUntil: (Int) -> Void;
+def printFibUntil (n: Int): Void = do {
     if (n > 0) {
         printFibUntil(n - 1);
         pv1_printInt(n);
@@ -9,16 +25,16 @@ def printFibUntil (n: I32): Void = do {
     };
 };
 
-const: I64 { n = 90L; };
-const: I32 { n32 = 90; };
-def fastPrintFibUntilN (): I32 = do {
+const: Long { n = 90L; };
+const: Int { n32 = 90; };
+def fastPrintFibUntilN (): Int = do {
     // TODO: replace with ArrayBox, make 'n' dynamic
     // TODO: switch to QSL
 
     // TODO: implement 'assert' based on symbolic logic
     // assert n > 1;
 
-    val a = new MutArray[I64, n]();
+    val a = new MutArray[Long, n](0L);
     a.ptr(0) := 0L;
     a.ptr(1) := 1L;
     val i = push mut 2L;
@@ -32,20 +48,3 @@ def fastPrintFibUntilN (): I32 = do {
     };
     a.get(n-1L)
 };
-
-def main () = do {
-    val v = new Vec3F(1.0f, 2.0f, 3.0f);
-    val w = v3f_add(v, v);
-    
-    // val w = new Vec2f(13, 0);
-    val f = fibonacci(new I32(w.x));
-    
-    // printInt(f);
-    val short_run = false;
-    // printFibUntil(if (short_run) {10} else {42});
-    fastPrintFibUntilN();
-    // val _ = printFibUntil(n32);
-
-    0
-};
-

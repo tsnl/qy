@@ -8,42 +8,42 @@
 // NOTE: functions do not need to be declared before definition unless...
 //   1. they are used before they are defined, or
 //   2. they are marked as 'public' (in which case declaration goes in a header)
-pub vec3f: (x: F32, y: F32, z: F32) -> Vec3F;
-pub v3f_add: (Vec3F, Vec3F) -> Vec3F;
-pub v3f_scale: (Vec3F, F32) -> Vec3F;
+pub vec3f: (x: Float, y: Float, z: Float) -> Vec3f;
+pub v3f_add: (Vec3f, Vec3f) -> Vec3f;
+pub v3f_scale: (Vec3f, Float) -> Vec3f;
 
 // enums provided using 'const', which translates into preprocessor declarations
-const: I32 {
+const: Int {
     EC_ALL_OK                 = 0;
     EC_BAD_CLI_ARGS           = 1 + pred!;
     EC_BAD_FILE_PATH          = 1 + pred!;
     EC_DETECTED_RUNTIME_ERROR = 1 + pred!;
 };
-const: U32 {
+const: UInt {
     WINDOW_FLAG_FULLSCREEN           = 0x1u;
     WINDOW_FLAG_FIXED_SIZE           = 2u * pred!;
     WINDOW_FLAG_HARDWARE_ACCELERATED = 2u * pred!;
 };
 
 // struct definitions: (enum, union are similar, but use '{...}' instead)
-type Point = (pos: Vec3F);
-type Vec3F = (x: F32, y: F32, z: F32);
+type Point = (pos: Vec3f);
+type Vec3f = (x: Float, y: Float, z: Float);
 
 // function definitions:
 // NOTE: type inference fills in holes, so any arg/ret typespec can be completely
 // omitted.
 
-def vec3f (x: F32, y: F32, z: F32): Vec3F = do {
-    new Vec3F(x, y, z)
+def vec3f (x: Float, y: Float, z: Float): Vec3f = do {
+    new Vec3f(x, y, z)
 };
 
-def v3f_add (v1: Vec3F, v2: Vec3F): Vec3F = do {
+def v3f_add (v1: Vec3f, v2: Vec3f): Vec3f = do {
     val vx = v1.x + v2.x;
     val vy = v1.y + v2.y;
     val vz = v1.z + v2.z;
     vec3f(vx, vy, vz)
 };
-def v3f_scale (v: Vec3F, s: F32): Vec3F = do {
+def v3f_scale (v: Vec3f, s: Float): Vec3f = do {
     val sx = v.x * s;
     val sy = v.y * s;
     val sz = v.z * s;

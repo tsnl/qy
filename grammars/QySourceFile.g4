@@ -140,9 +140,9 @@ typeSpec
     ;
 primaryTypeSpec
     : id_tok=ID
-    | tok='F32' | tok='F64'
-    | tok='I8'  | tok='I16' | tok='I32' | tok='I64'
-    | tok='U8'  | tok='U16' | tok='U32' | tok='U64'
+    | tok='Float' | tok='Double'
+    | tok='Char' | tok='Short' | tok='Int' | tok='Long'
+    | tok='Byte' | tok='UShort' | tok='UInt' | tok='ULong'
     | tok='Bool' | tok='Void'
     ;
 adtTypeSpec
