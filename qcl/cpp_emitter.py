@@ -239,6 +239,9 @@ class Emitter(base_emitter.BaseEmitter):
             for stmt in src_obj.stmt_list:
                 self.emit_statement_impl(self.active_c_file, stmt, is_top_level=True, decl_print_pass=True)
                 self.emit_statement_impl(self.active_h_file, stmt, is_top_level=True, decl_print_pass=True)
+        for src_file_path, src_obj in qyp.src_map.items():
+            assert isinstance(src_obj, ast2.QySourceFile)
+            for stmt in src_obj.stmt_list:
                 self.emit_statement_impl(self.active_c_file, stmt, is_top_level=True, decl_print_pass=False)
                 self.emit_statement_impl(self.active_h_file, stmt, is_top_level=True, decl_print_pass=False)
 
@@ -288,6 +291,24 @@ class Emitter(base_emitter.BaseEmitter):
                 self.emit_expression(s, stmt.discarded_exp)
             s.print()
         
+        elif isinstance(stmt, ast1.Bind1fStatement) and target in (DocType.MainHeader, DocType.MainSource) and decl_print_pass:
+            def_obj = stmt.x_def
+            write_pub = def_obj.is_public and target == DocType.MainHeader
+            write_pvt = not def_obj.is_public and target == DocType.MainSource
+            if write_pub or write_pvt:
+                qy_visibility_prefix, decl_prefix = ("pub ", "extern ") if def_obj.is_public else ("pvt ", "")
+                _, def_type = def_obj.scheme.instantiate()
+                s.print(f"// {qy_visibility_prefix}{stmt.name}")
+                if isinstance(def_type, types.ProcedureType) and not def_type.has_closure_slot:
+                    if is_top_level:
+                        args_list = ', '.join(map(self.translate_type, def_type.arg_types))
+                        s.print(f"{decl_prefix}{self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
+                    else:
+                        raise NotImplementedError("Cannot type a function in a non-global context")
+                else:
+                    s.print(f"{decl_prefix}{self.translate_type(def_type)} {stmt.name};", target_section=DocumentSectionId.Prefix)
+                s.print()
+
         elif isinstance(stmt, ast1.Bind1fStatement) and target == DocType.MainSource and not decl_print_pass:
             assert is_top_level
 
@@ -343,24 +364,6 @@ class Emitter(base_emitter.BaseEmitter):
                 s.print(f"using {stmt.name} = {self.translate_type(def_type)};")
             
             s.print()
-
-        elif isinstance(stmt, ast1.Type1vStatement) and target in (DocType.MainHeader, DocType.MainSource) and decl_print_pass:
-            def_obj = stmt.lookup_def_obj()
-            write_pub = def_obj.is_public and target == DocType.MainHeader
-            write_pvt = not def_obj.is_public and target == DocType.MainSource
-            if write_pub or write_pvt:
-                qy_visibility_prefix, decl_prefix = ("pub ", "extern ") if def_obj.is_public else ("pvt ", "")
-                _, def_type = def_obj.scheme.instantiate()
-                s.print(f"// {qy_visibility_prefix}{stmt.name}")
-                if isinstance(def_type, types.ProcedureType) and not def_type.has_closure_slot:
-                    if is_top_level:
-                        args_list = ', '.join(map(self.translate_type, def_type.arg_types))
-                        s.print(f"{decl_prefix}{self.translate_type(def_type.ret_type)} {stmt.name}({args_list});")
-                    else:
-                        raise NotImplementedError("Cannot type a function in a non-global context")
-                else:
-                    s.print(f"{decl_prefix}{self.translate_type(def_type)} {stmt.name};", target_section=DocumentSectionId.Prefix)
-                s.print()
 
         elif isinstance(stmt, ast1.ConstStatement) and target in (DocType.MainSource, DocType.ChainFragment) and not decl_print_pass:
             for stmt in stmt.body:

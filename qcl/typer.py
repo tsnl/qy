@@ -51,6 +51,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
     #
 
     new_definition = None
+    new_definition_is_pub = False
     if isinstance(stmt, ast1.Bind1vStatement):
         extern_tag = None
         if isinstance(stmt, ast1.Extern1vStatement):
@@ -98,7 +99,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             ]
             fn_ret_type = types.VarType(f"bind1f_ret")
             fn_type = types.ProcedureType.new(fn_arg_types, fn_ret_type, has_closure_slot=False, is_c_variadic=False)
-        new_definition = ValueDefinition(
+        stmt.x_def = new_definition = ValueDefinition(
             stmt.loc,
             stmt.name,
             Scheme([], fn_type),
@@ -106,6 +107,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             extern_tag=extern_tag,
             is_compile_time_constant=True
         )
+        new_definition_is_pub = stmt.is_pub
     elif isinstance(stmt, ast1.Bind1tStatement):
         if stmt.initializer is not None and stmt.initializer.wb_type is not None:
             extern_tag = "c"
@@ -121,7 +123,7 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
             stmt,
             extern_tag=extern_tag
         )
-    elif not isinstance(stmt, (ast1.ConstStatement, ast1.Type1vStatement)):
+    elif not isinstance(stmt, (ast1.ConstStatement,)):
         panic.because(
             panic.ExitCode.ScopingError,
             "Invalid statement found in top-level scope: please move this into a function.",
@@ -138,16 +140,8 @@ def seed_one_top_level_stmt(bind_in_ctx: "Context", stmt: ast1.BaseStatement):
                 f"- later: {new_definition.loc}",
                 opt_loc=stmt.loc
             )
-        return
-
-    #
-    # Handling 'type' statements:
-    #
-
-    if isinstance(stmt, ast1.Type1vStatement):
-        # ignore definitions-- but mark as public if export:
-        if stmt.is_export_line:
-            bind_in_ctx.export_name_set.add(stmt.name)
+        if new_definition_is_pub:
+            bind_in_ctx.export_name_set.add(new_definition.name)
         return
 
     #
@@ -322,16 +316,19 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
                 return def_sub.compose(exp_sub, stmt.loc)
 
     elif isinstance(stmt, ast1.Bind1fStatement):
-        args_sub = Substitution.empty
+        last_sub = Substitution.empty
+        if stmt.opt_ret_ts:
+            ret_sub, ret_type = model_one_type_spec(ctx, stmt.opt_ret_ts, dto_list)
+            last_sub = ret_sub.compose(last_sub, stmt.loc)
+        else:
+            ret_type = types.VoidType.singleton
         if isinstance(stmt, ast1.Extern1fStatement):
             assert stmt.opt_ret_ts.wb_type is not None
-            ret_sub, ret_type = model_one_type_spec(ctx, stmt.opt_ret_ts, dto_list)
             arg_type_list = []
             for arg_ts in stmt.args_types:
                 assert arg_ts.wb_type is not None
                 arg_ts_sub, this_arg_type = model_one_type_spec(ctx, arg_ts, dto_list)
-
-                args_sub = arg_ts_sub.compose(args_sub, arg_ts.loc)
+                last_sub = arg_ts_sub.compose(last_sub, arg_ts.loc)
                 arg_type_list.append(this_arg_type)
         else:
             arg_name_type_list = []
@@ -339,15 +336,19 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
             for arg_index, (arg_name, opt_arg_ts) in enumerate(zip(stmt.args_names, stmt.args_types)):
                 if opt_arg_ts is not None:
                     this_arg_sub, this_arg_type = model_one_type_spec(ctx, opt_arg_ts, dto_list)
-                    args_sub = this_arg_sub.compose(args_sub, opt_arg_ts.loc)
+                    last_sub = this_arg_sub.compose(last_sub, opt_arg_ts.loc)
                 else:
                     this_arg_type = types.VarType(f"arg{arg_index}:{arg_name}")
                 arg_type_list.append(this_arg_type)
                 arg_name_type_list.append((arg_name, this_arg_type))
-            ret_sub, ret_type = model_one_lambda_body(ctx, stmt.loc, arg_name_type_list, [], stmt.body_exp, dto_list)
+            ret_sub, ret_type2 = model_one_lambda_body(ctx, stmt.loc, arg_name_type_list, [], stmt.body_exp, dto_list)
+            last_sub = last_sub.compose(ret_sub, stmt.body_exp.loc)
+            ret_type = last_sub.rewrite_type(ret_type)
+            ret_type2 = last_sub.rewrite_type(ret_type2)
+            last_sub = unify(ret_type, ret_type2).compose(last_sub, stmt.body_exp.loc)
         proc_type = types.ProcedureType.new(arg_type_list, ret_type)
         def_sub, def_type = ctx.try_lookup(stmt.name).scheme.instantiate()
-        last_sub = def_sub.compose(ret_sub, stmt.loc).compose(args_sub, stmt.loc)
+        last_sub = def_sub.compose(last_sub, stmt.loc).compose(last_sub, stmt.loc)
         return unify(
             last_sub.rewrite_type(proc_type),
             last_sub.rewrite_type(def_type),
@@ -360,24 +361,6 @@ def model_one_statement(ctx: "Context", stmt: "ast1.BaseStatement", dto_list: "D
         def_sub, def_type = definition.scheme.instantiate()
         ts_sub, ts_type = model_one_type_spec(ctx, stmt.initializer, dto_list)
         last_sub = ts_sub.compose(def_sub, stmt.initializer.loc)
-        return unify(
-            last_sub.rewrite_type(def_type),
-            last_sub.rewrite_type(ts_type),
-            opt_loc=stmt.loc
-        ).compose(last_sub, stmt.loc)
-
-    elif isinstance(stmt, ast1.Type1vStatement):
-        definition = ctx.try_lookup(stmt.name)
-        if definition is None:
-            panic.because(
-                panic.ExitCode.TyperModelerUndefinedIdError,
-                f"Identifier '{stmt.name}' declared, but not defined.",
-                opt_loc=stmt.loc
-            )
-        assert definition is not None and definition.is_value_definition
-        def_sub, def_type = definition.scheme.instantiate()
-        ts_sub, ts_type = model_one_type_spec(ctx, stmt.ts, dto_list)
-        last_sub = ts_sub.compose(def_sub, stmt.ts.loc)
         return unify(
             last_sub.rewrite_type(def_type),
             last_sub.rewrite_type(ts_type),

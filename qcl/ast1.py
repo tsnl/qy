@@ -10,6 +10,9 @@ from collections import defaultdict
 from . import common
 from . import feedback as fb
 
+if t.TYPE_CHECKING:
+    from . import typer
+
 #
 #
 # Helpers:
@@ -188,7 +191,8 @@ class Bind1fStatement(BaseIdQualifierStatement):
         name: str, 
         arg_names: t.List[str], arg_types: t.List["BaseTypeSpec"], 
         body: t.Optional["BaseExpression"], opt_ret_ts: t.Optional["BaseTypeSpec"], 
-        is_variadic: bool = False
+        is_variadic: bool = False,
+        is_pub: bool = False
     ):
         assert isinstance(body, (type(None), BaseExpression))
         super().__init__(loc, name)
@@ -197,6 +201,8 @@ class Bind1fStatement(BaseIdQualifierStatement):
         self.body_exp = body
         self.opt_ret_ts = opt_ret_ts
         self.is_variadic = is_variadic
+        self.is_pub = is_pub
+        self.x_def: t.Optional["typer.BaseDefinition"] = None
 
     def is_extern(self):
         if isinstance(self, Bind1fStatement):
@@ -234,13 +240,6 @@ class Bind1tStatement(BaseIdQualifierStatement):
     def __init__(self, loc: fb.ILoc, name: str, initializer: BaseTypeSpec):
         super().__init__(loc, name)
         self.initializer = initializer
-
-
-class Type1vStatement(BaseIdQualifierStatement):
-    def __init__(self, loc: fb.ILoc, name: str, ts: BaseTypeSpec, is_export_line: bool):
-        super().__init__(loc, name)
-        self.ts = ts
-        self.is_export_line = is_export_line
 
 
 class ConstStatement(BaseStatement):

@@ -22,7 +22,6 @@ statement
     : b1v=bind1vStatement
     | b1f=bind1fStatement
     | b1t=bind1tStatement
-    | t1v=type1vStatement
     | con=constStatement
     | ret=returnStatement
     | discard=discardStatement
@@ -33,10 +32,9 @@ bind1vStatement
     : 'val' b1v_term=bind1vTerm
     ;
 bind1fStatement
-    : 'def' name=ID '(' args=csDefArgSpecList ')' (':' opt_ret_ts=typeSpec)? '=' body_exp=expression
+    : pub='pub'? 'fn' name=ID '(' args=csDefArgSpecList ')' ('->' opt_ret_ts=typeSpec)? '=' body_exp=expression
     ;
 bind1tStatement: 'type' name=ID '=' initializer=typeSpec ;
-type1vStatement: ((is_pub='pub')|'pvt') name=ID ':' ts=typeSpec ;
 constStatement: 'const' ':' type_spec=typeSpec b=constBlock ;
 returnStatement: 'return' ret_exp=expression ;
 discardStatement: discarded_exp=expression ;
@@ -167,14 +165,8 @@ signatureTypeSpec
     | '(' args=csTypeArgSpecList ')' ('->'|has_closure_slot='=>') ret=signatureTypeSpec
     ;
 
-typeArgSpec
-    : ts=typeSpec
-    | name_tok=ID ':' ts=typeSpec
-    ;
-defArgSpec
-    : name_tok=ID
-    | name_tok=ID ':' ts=typeSpec
-    ;
+typeArgSpec: (name_tok=ID ':')? ts=typeSpec ;
+defArgSpec: name_tok=ID ':' ts=typeSpec ;
 
 macroArgBlock
     : '[' (mab=macroArgBlock | ident=ID | exp=expression | ts=typeSpec)+? ']'

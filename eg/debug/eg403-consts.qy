@@ -2,10 +2,10 @@ const: I32 {
     val x = 128;
 };
 
-def hello () = do {
+fn hello () = do {
     x
 };
 
-def main () = do {
+fn main () = do {
     hello()
 };

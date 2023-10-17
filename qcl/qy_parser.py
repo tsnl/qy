@@ -200,8 +200,6 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             return self.visit(ctx.b1f)
         elif ctx.b1t is not None:
             return self.visit(ctx.b1t)
-        elif ctx.t1v is not None:
-            return self.visit(ctx.t1v)
         elif ctx.con is not None:
             return self.visit(ctx.con)
         elif ctx.ret is not None:
@@ -227,16 +225,21 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
             arg_name_list.append(arg_name)
             opt_arg_type_list.append(opt_arg_type)
         assert ctx.body_exp is not None
+        is_pub = bool(ctx.pub)
         opt_ret_ts = self.visit(ctx.opt_ret_ts) if ctx.opt_ret_ts is not None else None
         ret_exp = self.visit(ctx.body_exp)
-        return ast1.Bind1fStatement(self.loc(ctx), ctx.name.text, arg_name_list, opt_arg_type_list, ret_exp, opt_ret_ts)
+        return ast1.Bind1fStatement(
+            self.loc(ctx), 
+            ctx.name.text, 
+            arg_name_list, 
+            opt_arg_type_list, 
+            ret_exp, 
+            opt_ret_ts,
+            is_pub
+        )
 
     def visitBind1tStatement(self, ctx: antlr.QySourceFileParser.Bind1tStatementContext) -> ast1.Bind1tStatement:
         return ast1.Bind1tStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.initializer))
-
-    def visitType1vStatement(self, ctx: antlr.QySourceFileParser.Type1vStatementContext) -> ast1.Type1vStatement:
-        is_export_line = ctx.is_pub is not None
-        return ast1.Type1vStatement(self.loc(ctx), ctx.name.text, self.visit(ctx.ts), is_export_line)
 
     def visitConstStatement(self, ctx: antlr.QySourceFileParser.ConstStatementContext) -> ast1.ConstStatement:
         bind_statements = self.visit(ctx.b)
@@ -601,10 +604,10 @@ class AstConstructorVisitor(antlr.QySourceFileVisitor):
     # Misc:
     #
     
-    def visitDefArgSpec(self, ctx: antlr.QySourceFileParser.DefArgSpecContext) -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
+    def visitDefArgSpec(self, ctx: antlr.QySourceFileParser.DefArgSpecContext) -> t.Tuple[str, ast1.BaseTypeSpec]:
         name = ctx.name_tok.text
-        opt_ts = self.visit(ctx.ts) if ctx.ts is not None else None
-        return name, opt_ts
+        ts = self.visit(ctx.ts)
+        return name, ts
 
     def visitTypeArgSpec(self, ctx: antlr.QySourceFileParser.TypeArgSpecContext) -> t.Tuple[t.Optional[str], ast1.BaseTypeSpec]:
         opt_name = ctx.name_tok.text if ctx.name_tok is not None else None

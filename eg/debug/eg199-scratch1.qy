@@ -1,24 +1,20 @@
-pub hello: (Int) -> Int;
-def hello (x) = do {
+fn hello (x: Int) -> Int = do {
     x
 };
 
-pub wrongPhi: (Bool, Int, Int) -> Int;
-def wrongPhi (b, x, y) = do {
+pub fn wrongPhi (b: Bool, x: Int, y: Int) -> Int = do {
     if (b) {x} else {y}
 };
 
-pub rightPhi: (Bool, Int, Int) -> Int;
-def rightPhi (b, x, y) = do {
+pub fn rightPhi (b: Bool, x: Int, y: Int) -> Int = do {
     if (b) {x} else {y}
 };
 
-def runWrongPhi() = do {
+fn runWrongPhi() = do {
     val j = wrongPhi(true, 15, 32);
 };
 
-pub fibonacci: (x: Int) -> Int;
-def fibonacci (x) = do {
+fn fibonacci (x: Int) -> Int = do {
     if (x == 0 or x == 1) {
         x
     } else {
@@ -27,9 +23,7 @@ def fibonacci (x) = do {
 };
 
 type FibRes = (x: Int, y: Int);
-pub better_fibonacci: (x: Int) -> Int;
-pvt better_fibonacci_helper: (a: Int, b: Int) -> FibRes;
-def better_fibonacci (x) = do {
+pub fn better_fibonacci (x: Int) -> Int = do {
     if (x == 0 or x == 1) {
         x
     } else {
@@ -37,12 +31,12 @@ def better_fibonacci (x) = do {
         res.y
     }
 };
-def better_fibonacci_helper (a, b) = do {
+fn better_fibonacci_helper (a: Int, b: Int) -> FibRes = do {
     val c = a + b;
     new FibRes(b, c)
 };
 
-def booleans () = do {
+fn booleans () = do {
     val b1 = true;
     val b2 = false;
     val m = b1 or b2;
@@ -66,8 +60,7 @@ val Point = (
 
 /* FIXME: this example should produce a unification error because 
  * no implicit int->float conversion
-pub main: () -> Int;
-def main () = do {
+pub fn main (): Int = do {
     val v = vec3f(fibonacci(6), fibonacci(7), fibonacci(8));
     v.x
 };

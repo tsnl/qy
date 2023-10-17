@@ -1,4 +1,4 @@
-def main () = do {
+fn main (): Int = do {
     val j = push mut 0L;    
     val ss = push new_string_stream(default_heap_allocator);
     if (*j < 3L) {
